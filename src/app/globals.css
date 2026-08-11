@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Color system from spec Section 15 */
+    --color-primary: #FF5A36;
+    --color-secondary: #1B1F3B;
+    --color-accent: #17C3B2;
+    --color-action: #FF3D68;
+    --color-background: #FAFAFA;
+    --color-text: #1A1A1A;
+    --color-text-secondary: #6B7280;
+    --color-border: #E5E7EB;
+    --color-success: #22C55E;
+    --color-warning: #F59E0B;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-textPrimary antialiased;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* RTL-specific utilities */
+[dir="rtl"] .ltr\:left-2 {
+  left: auto;
+  right: 0.5rem;
+}
+[dir="rtl"] .ltr\:right-2 {
+  right: auto;
+  left: 0.5rem;
+}

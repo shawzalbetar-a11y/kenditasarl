@@ -1,0 +1,44 @@
+{
+  "name": "kenditasarl",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.9.0",
+    "@react-google-maps/api": "^2.20.8",
+    "autoprefixer": "^10.5.4",
+    "class-variance-authority": "^0.7.0",
+    "cloudinary": "^2.10.0",
+    "clsx": "^2.1.1",
+    "fabric": "^5.3.0",
+    "firebase": "^10.12.5",
+    "framer-motion": "^13.0.0",
+    "lucide-react": "^0.424.0",
+    "next": "14.2.5",
+    "next-intl": "^3.17.2",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-hook-form": "^7.52.2",
+    "tailwind-merge": "^2.5.2",
+    "tailwindcss-animate": "^1.0.7",
+    "use-places-autocomplete": "^4.0.1",
+    "zod": "^3.23.8",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/fabric": "^5.3.0",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.5",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}
