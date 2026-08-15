@@ -44,6 +44,9 @@ export default function ProductDetailsPage() {
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  
+  const [readyDesigns, setReadyDesigns] = useState<any[]>([]);
+  const [selectedReadyDesignId, setSelectedReadyDesignId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchProduct() {
@@ -95,6 +98,22 @@ export default function ProductDetailsPage() {
             ...data,
             images: images.length > 0 ? images : [{ url: 'https://via.placeholder.com/800', name: t('front') }],
           });
+          
+          // Fetch Ready Designs
+          let linkedIds = data.linked_ready_designs || [];
+          if (linkedIds.length === 0 && data.ready_design_id) {
+            linkedIds = [data.ready_design_id];
+          }
+          if (linkedIds.length > 0) {
+            const rdDocs = await Promise.all(linkedIds.map((rid: string) => getDoc(doc(db, 'designs', rid))));
+            const rdData = rdDocs
+              .filter(d => d.exists() && d.data().is_template === true) // Strict check
+              .map(d => ({ id: d.id, ...d.data() }));
+            setReadyDesigns(rdData);
+            if (rdData.length > 0) {
+              setSelectedReadyDesignId(rdData[0].id);
+            }
+          }
           
           // Initial selections
           if (fetchedVariants.length > 0) {
@@ -259,7 +278,8 @@ export default function ProductDetailsPage() {
           user_id: auth.currentUser.uid,
           product_id: id,
           variant_id: variantId,
-          design_id: null,
+          design_id: selectedReadyDesignId || product.ready_design_id || null,
+          design_type: (selectedReadyDesignId || product.ready_design_id) ? 'ready' : null,
           quantity: quantity,
           unit_price: product.base_price,
           created_at: new Date().toISOString()
@@ -446,12 +466,18 @@ export default function ProductDetailsPage() {
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 mb-10">
               <Link 
-                href={`/design-studio/${id}`}
+                href={
+                  selectedReadyDesignId || product.ready_design_id 
+                  ? `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&designId=${selectedReadyDesignId || product.ready_design_id}&mode=remix`
+                  : `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}`
+                }
                 className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:opacity-90 text-white py-4 px-6 rounded-2xl font-bold text-lg transition-all hover:-translate-y-1 shadow-lg shadow-[var(--color-primary)]/30 disabled:opacity-50 disabled:pointer-events-none"
                 style={{ pointerEvents: maxStock === 0 ? 'none' : 'auto', opacity: maxStock === 0 ? 0.5 : 1 }}
               >
                 <Paintbrush size={22} />
-                {t?.('design_it_now') || 'صمم بنفسك الآن'}
+                {product.ready_design_id && !selectedReadyDesignId ? (t?.('customize_this_design') || 'خصص هذا التصميم 🎨') : 
+                 selectedReadyDesignId ? (t?.('customize_this_design') || 'خصص هذا التصميم 🎨') : 
+                 (t?.('design_it_now') || 'صمم بنفسك الآن')}
               </Link>
               
               <button 
@@ -463,6 +489,46 @@ export default function ProductDetailsPage() {
                 {isAddingToCart ? (t?.('addingToCart') || 'جاري الإضافة...') : (t?.('addToCart') || 'أضف للسلة')}
               </button>
             </div>
+
+            {/* Ready Designs Gallery */}
+            {readyDesigns.length > 0 && (
+              <div className="mb-10 bg-gray-50 border rounded-2xl p-4 md:p-6">
+                <h3 className="text-lg font-bold text-[var(--color-text)] mb-4 flex items-center gap-2">
+                  <Paintbrush className="text-[var(--color-primary)]" size={20} />
+                  {t?.('readyDesigns') || 'تصاميم جاهزة (اختر واحدًا)'}
+                </h3>
+                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                  {readyDesigns.map((rd) => (
+                    <button
+                      key={rd.id}
+                      onClick={() => setSelectedReadyDesignId(rd.id)}
+                      className={`flex-shrink-0 w-24 h-24 md:w-32 md:h-32 rounded-xl border-2 overflow-hidden relative transition-all ${
+                        selectedReadyDesignId === rd.id ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/20 shadow-md' : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      {rd.preview_image_url ? (
+                        <img src={rd.preview_image_url} alt="Ready Design" className="w-full h-full object-contain p-2" />
+                      ) : (
+                        <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-400">بدون صورة</div>
+                      )}
+                      {selectedReadyDesignId === rd.id && (
+                        <div className="absolute top-2 right-2 bg-[var(--color-primary)] text-white rounded-full p-1 shadow-sm">
+                          <Check size={14} strokeWidth={3} />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {selectedReadyDesignId && (
+                  <button 
+                    onClick={() => setSelectedReadyDesignId(null)}
+                    className="text-sm text-red-500 font-semibold hover:text-red-700 mt-2 flex items-center gap-1"
+                  >
+                    <X size={16} /> {t?.('cancel_selection') || 'إلغاء التحديد (شراء منتج سادة)'}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Fabric & Print Quality */}
             {(() => {

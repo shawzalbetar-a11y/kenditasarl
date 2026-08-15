@@ -38,7 +38,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
       <section className="pt-8 pb-16 px-4 max-w-[100rem] mx-auto w-full">
         <ProductGrid 
           title={t('featuredProducts')}
-          products={featuredProducts.map(p => ({
+          products={featuredProducts.map((p: any) => ({
             id: p.id,
             title: p[`name_${locale}`] || p.name_en,
             price: p.base_price,

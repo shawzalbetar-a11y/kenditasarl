@@ -6,7 +6,7 @@ import { Link } from '@/i18n/routing';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Trash2, Minus, Plus, ShoppingBag, Loader2 } from 'lucide-react';
+import { Trash2, Minus, Plus, ShoppingBag, Loader2, PenTool } from 'lucide-react';
 import { getProductFrontImage } from '@/lib/products';
 import Image from 'next/image';
 import AddressSelectionModal from '@/components/checkout/AddressSelectionModal';

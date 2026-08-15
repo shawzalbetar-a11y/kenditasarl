@@ -53,6 +53,7 @@
     "priceFilter": "Price",
     "noProductsFound": "No products available at the moment. Please make sure the database is set up.",
     "viewAs": "View as:",
+    "oneColumn": "One Column",
     "twoColumns": "Two Columns",
     "threeColumns": "Three Columns",
     "fourColumns": "Four Columns"

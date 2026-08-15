@@ -110,7 +110,7 @@ export async function getExpandedProducts(productDocs: any[]) {
     const baseFrontImage = await getProductFrontImage(doc.id);
 
     if (colorMap.size > 0) {
-      for (const [color, image_front] of colorMap.entries()) {
+      Array.from(colorMap.entries()).forEach(([color, image_front]) => {
         expandedProducts.push({
           id: `${doc.id}?color=${encodeURIComponent(color)}`,
           original_id: doc.id,
@@ -125,7 +125,7 @@ export async function getExpandedProducts(productDocs: any[]) {
           media: { front: image_front || baseFrontImage },
           specificColor: color
         });
-      }
+      });
     } else {
       expandedProducts.push({
         id: doc.id,

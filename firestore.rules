@@ -36,8 +36,26 @@ service cloud.firestore {
     }
     
     match /designs/{designId} {
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.user_id;
-      allow read, update, delete: if request.auth != null && (request.auth.uid == resource.data.user_id || isAdmin());
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.user_id && 
+        (request.resource.data.get('is_template', false) != true || isAdmin());
+        
+      allow read: if resource.data.get('is_template', false) == true || 
+                  (request.auth != null && (request.auth.uid == resource.data.user_id || isAdmin()));
+      
+      allow update: if request.auth != null && (
+        isAdmin() || 
+        (
+          request.auth.uid == resource.data.user_id && 
+          resource.data.get('is_template', false) != true && 
+          request.resource.data.get('is_template', false) != true
+        )
+      );
+      
+      allow delete: if request.auth != null && (
+        isAdmin() || 
+        (request.auth.uid == resource.data.user_id && resource.data.get('is_template', false) != true)
+      );
     }
     
     match /wishlists/{wishlistId} {

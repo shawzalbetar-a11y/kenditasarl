@@ -57,6 +57,8 @@ export default function CheckoutSummaryPage() {
       const itemsWithNames = await Promise.all(cartItems.map(async (item: any) => {
         let name = 'Product';
         let imageUrl = item.image_url || null;
+        let customization_mode = null;
+        let quality_metadata = null;
         try {
            const pSnap = await getDocs(query(collection(db, 'products'), where('__name__', '==', item.product_id)));
            if (!pSnap.empty) {
@@ -84,14 +86,17 @@ export default function CheckoutSummaryPage() {
                  imageUrl = await getProductFrontImage(item.product_id);
               }
            }
-           if (item.design_id && !imageUrl) {
+           if (item.design_id) {
              const designSnap = await getDoc(doc(db, 'designs', item.design_id));
              if (designSnap.exists()) {
-                imageUrl = designSnap.data().preview_image_url;
+                const dData = designSnap.data();
+                if (!imageUrl) imageUrl = dData.preview_image_url;
+                customization_mode = dData.customization_mode || null;
+                quality_metadata = dData.quality_metadata || null;
              }
            }
         } catch(e) {}
-        return { ...item, name, imageUrl: imageUrl || 'https://via.placeholder.com/100' };
+        return { ...item, name, imageUrl: imageUrl || 'https://via.placeholder.com/100', customization_mode, quality_metadata };
       }));
       
       setItems(itemsWithNames);
@@ -171,6 +176,22 @@ export default function CheckoutSummaryPage() {
            variantDocs.push({ varRef, newStock: stock - item.quantity, size, vData });
         }
 
+        // Read Phase: Designs for Immutable Snapshot
+        const designDocs = new Map();
+        for (const item of items) {
+          if (item.design_id) {
+            const dDoc = await transaction.get(doc(db, 'designs', item.design_id));
+            if (!dDoc.exists()) {
+              throw new Error(`Design not found for ${item.name}. Cannot create order.`);
+            }
+            const dData = dDoc.data();
+            if (!dData.production_snapshot) {
+              throw new Error(`Production snapshot missing for ${item.name}. Cannot create order.`);
+            }
+            designDocs.set(item.id, dData);
+          }
+        }
+
         // Write Phase
         transaction.set(counterRef, { current_value: currentOrderNum }, { merge: true });
 
@@ -192,12 +213,20 @@ export default function CheckoutSummaryPage() {
 
         items.forEach(item => {
            const itemRef = doc(collection(orderRef, 'items'));
+           const dData = designDocs.get(item.id);
+
            transaction.set(itemRef, {
               product_id: item.product_id,
               variant_id: item.variant_id || null,
               design_id: item.design_id || null,
               quantity: item.quantity,
-              unit_price: item.unit_price
+              unit_price: item.unit_price,
+              
+              canvas_json: dData?.canvas_json ? JSON.parse(JSON.stringify(dData.canvas_json)) : null,
+              production_snapshot: dData?.production_snapshot ? JSON.parse(JSON.stringify(dData.production_snapshot)) : null,
+              preview_image_url: dData?.preview_image_url || null,
+              snapshot_version: dData?.production_snapshot ? 1 : null,
+              is_immutable_snapshot: !!dData?.production_snapshot
            });
         });
 

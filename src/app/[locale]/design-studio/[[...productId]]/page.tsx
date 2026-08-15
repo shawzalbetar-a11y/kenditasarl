@@ -1,12 +1,13 @@
 "use client";
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getProductMedia } from '@/lib/products';
+import { getCustomizationConfig } from '@/lib/customizationConfig';
 import ProductSelector from '@/components/editor/ProductSelector';
 import { Loader2 } from 'lucide-react';
 
@@ -22,7 +23,11 @@ const FabricCanvas = dynamic(() => import('@/components/editor/FabricCanvas'), {
 
 export default function DesignStudioPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
+  
+  const selectedColor = searchParams.get('color');
+  const selectedSize = searchParams.get('size');
   
   // Safe parsing of productId for catch-all route [[...productId]]
   const paramId = params.productId;
@@ -30,8 +35,6 @@ export default function DesignStudioPage() {
   
   if (Array.isArray(paramId)) {
     if (paramId.length > 1) {
-      // Intentionally ignoring extra path parts, or redirect to just the first part
-      // Example: /design-studio/123/456 -> load 123
       console.warn("Extra path segments ignored in design studio route.");
     }
     initialProductId = paramId[0];
@@ -58,15 +61,55 @@ export default function DesignStudioPage() {
       try {
         const pDoc = await getDoc(doc(db, 'products', activeProductId));
         if (pDoc.exists()) {
-          const media = await getProductMedia(activeProductId);
+          const data = pDoc.data();
+          
+          // Get customization config based on category_id
+          const config = getCustomizationConfig(data.category_id);
+          
+          let resolvedFaces: any = { front: '', back: '', left: '', right: '' };
+          
+          // 1. Try to fetch the selected variant to get its specific base mockup if available
+          let variantData = null;
+          if (selectedColor) {
+             const variantsSnap = await getDocs(collection(db, 'products', activeProductId, 'variants'));
+             const matchingVariant = variantsSnap.docs.find(v => v.data().color === selectedColor || v.data().hex === selectedColor || v.data().colorName_en === selectedColor);
+             if (matchingVariant) {
+               variantData = matchingVariant.data();
+               if (variantData.base_images) {
+                  resolvedFaces = variantData.base_images;
+               } else if (variantData.image_front) {
+                  // Last resort: use variant's image (might have ready design)
+                  resolvedFaces.front = variantData.image_front;
+                  resolvedFaces.back = variantData.image_back || variantData.image_front;
+               }
+             }
+          }
+
+          // 2. If variant didn't provide a valid base mockup, use product's base_images
+          if (!resolvedFaces.front && data.base_images && data.base_images.front) {
+            resolvedFaces = data.base_images;
+          }
+
+          // 3. Absolute Fallback: use product media (which usually has the ready design) but log a warning
+          if (!resolvedFaces.front) {
+             console.warn("No base_images found. Falling back to product media (may contain ready design).");
+             const media = await getProductMedia(activeProductId);
+             resolvedFaces = {
+               front: media.front,
+               back: media.back || media.front,
+               left: media.left || media.front,
+               right: media.right || media.front
+             };
+          }
+
           setProductData({
-            basePrice: pDoc.data().base_price || 250,
-            faces: {
-              front: media.front,
-              back: media.back || media.front,
-              left: media.left || media.front,
-              right: media.right || media.front
-            }
+            basePrice: data.base_price || 250,
+            category_id: data.category_id,
+            config,
+            variant: variantData,
+            selectedColor,
+            selectedSize,
+            faces: resolvedFaces
           });
         } else {
           // Handle invalid product ID
@@ -138,6 +181,7 @@ export default function DesignStudioPage() {
               productId={activeProductId} 
               basePrice={productData.basePrice} 
               productFaces={productData.faces} 
+              productData={productData}
             />
           </div>
         )}
