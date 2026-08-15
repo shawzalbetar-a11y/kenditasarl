@@ -63,8 +63,8 @@ export default function DesignStudioPage() {
         if (pDoc.exists()) {
           const data = pDoc.data();
           
-          // Get customization config based on category_id
-          const config = getCustomizationConfig(data.category_id);
+          // Get customization config from product document or fallback to category defaults
+          const config = data.customization_config || getCustomizationConfig(data.category_id);
           
           let resolvedFaces: any = { front: '', back: '', left: '', right: '' };
           
