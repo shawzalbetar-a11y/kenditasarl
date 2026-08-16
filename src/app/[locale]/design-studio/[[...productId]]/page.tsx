@@ -7,7 +7,8 @@ import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getProductMedia } from '@/lib/products';
-import { getCustomizationConfig } from '@/lib/customizationConfig';
+import { getCustomizationConfig, CustomizationConfig } from '@/lib/customizationConfig';
+import { resolveImagePrintAreaGeometry } from '@/lib/coordinateMapping';
 import ProductSelector from '@/components/editor/ProductSelector';
 import { Loader2 } from 'lucide-react';
 
@@ -102,10 +103,39 @@ export default function DesignStudioPage() {
              };
           }
 
+          // 4. Resolve Image-Driven print area geometry for each resolved face
+          const resolvedFacesConfig: any = {};
+          const baseFaces = config.faces || {};
+          const faceKeys = Array.from(new Set([...Object.keys(baseFaces), 'front', 'back', 'left', 'right']));
+
+          faceKeys.forEach(faceId => {
+            const faceImageUrl = resolvedFaces[faceId];
+            if (faceImageUrl || baseFaces[faceId]) {
+              const effectivePrintArea = resolveImagePrintAreaGeometry({
+                config,
+                faceId,
+                currentImage: faceImageUrl,
+                targetWidth: 400,
+                targetHeight: 500,
+              });
+
+              resolvedFacesConfig[faceId] = {
+                name: baseFaces[faceId]?.name || faceId.toUpperCase(),
+                enabled: baseFaces[faceId]?.enabled ?? true,
+                printArea: effectivePrintArea,
+              };
+            }
+          });
+
+          const finalizedConfig: CustomizationConfig = {
+            ...config,
+            faces: resolvedFacesConfig,
+          };
+
           setProductData({
             basePrice: data.base_price || 250,
             category_id: data.category_id,
-            config,
+            config: finalizedConfig,
             variant: variantData,
             selectedColor,
             selectedSize,

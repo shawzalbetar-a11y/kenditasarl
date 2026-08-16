@@ -31,6 +31,8 @@ import {
 
 export interface PrintAreaEditorProps {
   imageUrl: string;
+  imageId?: string;
+  angle?: string;
   nativeWidth: number;
   nativeHeight: number;
   initialPrintArea: PrintArea;
@@ -56,6 +58,8 @@ const RESIZE_HANDLES: Array<{ handle: ResizeHandle; cursor: string; positionClas
 
 export default function PrintAreaEditor({
   imageUrl,
+  imageId,
+  angle,
   nativeWidth,
   nativeHeight,
   initialPrintArea,
@@ -580,12 +584,26 @@ export default function PrintAreaEditor({
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <span className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
               <Info size={16} className="text-blue-600" />
-              Native Image Coordinates
+              Native Image Space
             </span>
             <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
               {nativeWidth} × {nativeHeight} px
             </span>
           </div>
+
+          {(imageId || angle) && (
+            <div className="text-[11px] text-slate-600 flex justify-between items-center bg-slate-50 p-2 rounded-xl border border-slate-100">
+              <span className="font-medium text-slate-500">Image Ref:</span>
+              <div className="flex items-center gap-1">
+                <span className="font-mono font-bold text-slate-700 truncate max-w-[140px]">{imageId || 'mockup'}</span>
+                {angle && (
+                  <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[9px] font-black uppercase">
+                    {angle}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">

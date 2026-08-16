@@ -12,10 +12,13 @@ export interface PrintArea {
   name: string; // Localized or generic name
   
   // Editor Canvas bounds
-  width: number; // width in pixels relative to the base canvas
+  width: number; // width in pixels relative to the base canvas / native image
   height: number;
-  top: number; // Y offset from top of canvas
-  left: number; // X offset from left of canvas
+  top: number; // Y offset from top of canvas / native image
+  left: number; // X offset from left of canvas / native image
+  // Optional native image dimensions reference
+  nativeWidth?: number;
+  nativeHeight?: number;
   
   shape?: PrintAreaShape;
   clipPath?: string; // SVG path string if shape is 'custom_path'
@@ -42,6 +45,22 @@ export interface FaceConfig {
   printArea: PrintArea;
 }
 
+/**
+ * Image-Specific Geometry Model
+ * Represents independent PrintArea calibration tied directly to an uploaded image/mockup.
+ */
+export interface ImageSpecificGeometry {
+  imageId: string;
+  imageUrl?: string;
+  faceId?: string;
+  angle?: string; // e.g. 'straight', '3/4', 'perspective', 'close-up', 'angled'
+
+  nativeWidth: number;
+  nativeHeight: number;
+
+  printArea: PrintArea;
+}
+
 export interface CustomizationConfig {
   version?: number;
   enabled: boolean;
@@ -53,8 +72,14 @@ export interface CustomizationConfig {
 
   productType?: string; // The normalized product category (e.g. 't-shirt', 'mug', 'hat')
   
+  // Legacy / fallback face configurations
   faces: {
     [faceId: string]: FaceConfig;
+  };
+
+  // Image-driven geometry registry
+  image_geometries?: {
+    [imageKey: string]: ImageSpecificGeometry;
   };
 }
 

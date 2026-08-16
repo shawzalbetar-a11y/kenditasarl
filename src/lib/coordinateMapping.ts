@@ -11,6 +11,8 @@
  * 4. Aspect ratios and letterbox offsets (object-fit: contain) are accounted for deterministically.
  */
 
+import { CustomizationConfig, PrintArea, getCustomizationConfig } from './customizationConfig';
+
 export interface Point {
   x: number;
   y: number;
@@ -333,5 +335,189 @@ export function validatePrintAreaCoordinates(
   return {
     isValid: errors.length === 0,
     errors,
+  };
+}
+
+export interface NativeToReferenceInput {
+  nativeWidth: number;
+  nativeHeight: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  targetWidth: number;
+  targetHeight: number;
+}
+
+export interface ReferenceToNativeInput {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  targetWidth: number;
+  targetHeight: number;
+  nativeWidth: number;
+  nativeHeight: number;
+}
+
+export interface ResolveImageGeometryParams {
+  config?: CustomizationConfig | null;
+  faceId: string;
+  currentImage?: { imageId?: string; imageUrl?: string } | string;
+  targetWidth?: number;
+  targetHeight?: number;
+}
+
+/**
+ * Transforms a rectangle from native image pixel coordinates to a dynamic reference coordinate space.
+ * targetWidth and targetHeight are supplied dynamically without hardcoded constants.
+ */
+export function nativeToReferencePrintArea(input: NativeToReferenceInput): Rect {
+  const { nativeWidth, nativeHeight, left, top, width, height, targetWidth, targetHeight } = input;
+  if (nativeWidth <= 0 || nativeHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+    return { x: left, y: top, width, height };
+  }
+
+  const scaleX = targetWidth / nativeWidth;
+  const scaleY = targetHeight / nativeHeight;
+
+  return {
+    x: Math.round(left * scaleX * 100) / 100,
+    y: Math.round(top * scaleY * 100) / 100,
+    width: Math.round(width * scaleX * 100) / 100,
+    height: Math.round(height * scaleY * 100) / 100,
+  };
+}
+
+/**
+ * Transforms a rectangle from a dynamic reference coordinate space back to native image pixel coordinates.
+ */
+export function referenceToNativePrintArea(input: ReferenceToNativeInput): Rect {
+  const { left, top, width, height, targetWidth, targetHeight, nativeWidth, nativeHeight } = input;
+  if (targetWidth <= 0 || targetHeight <= 0 || nativeWidth <= 0 || nativeHeight <= 0) {
+    return { x: left, y: top, width, height };
+  }
+
+  const scaleX = nativeWidth / targetWidth;
+  const scaleY = nativeHeight / targetHeight;
+
+  return {
+    x: Math.round(left * scaleX * 100) / 100,
+    y: Math.round(top * scaleY * 100) / 100,
+    width: Math.round(width * scaleX * 100) / 100,
+    height: Math.round(height * scaleY * 100) / 100,
+  };
+}
+
+/**
+ * Resolves the effective PrintArea for a given image, face, and CustomizationConfig.
+ *
+ * Priority Hierarchy:
+ * 1. Image-Specific Geometry (matched via imageId then imageUrl from config.image_geometries)
+ * 2. Face-Specific Geometry (from config.faces[faceId].printArea)
+ * 3. Category Defaults (from getCustomizationConfig)
+ *
+ * Invariants:
+ * - Angle metadata (e.g. '3/4', 'perspective', 'angled') is purely descriptive and does not alter coordinates.
+ * - If native dimensions or coordinates are invalid in image_geometries, falls back safely to face geometry.
+ * - Always returns a new, immutable copy without mutating original config objects.
+ */
+export function resolveImagePrintAreaGeometry(params: ResolveImageGeometryParams): PrintArea {
+  const { config, faceId, currentImage, targetWidth, targetHeight } = params;
+
+  // Extract search identity
+  const imageId = typeof currentImage === 'object' && currentImage !== null ? currentImage.imageId : undefined;
+  const imageUrl = typeof currentImage === 'string' ? currentImage : typeof currentImage === 'object' && currentImage !== null ? currentImage.imageUrl : undefined;
+
+  // 1. PRIORITY 1: Check image_geometries
+  if (config?.image_geometries) {
+    const geometries = Object.values(config.image_geometries);
+
+    // Look up by imageId first, then by imageUrl
+    let matchedGeometry = imageId ? geometries.find(g => g.imageId === imageId) : undefined;
+    if (!matchedGeometry && imageUrl) {
+      matchedGeometry = geometries.find(g => g.imageUrl === imageUrl || g.imageId === imageUrl);
+    }
+
+    if (matchedGeometry && matchedGeometry.printArea) {
+      const { nativeWidth, nativeHeight, printArea } = matchedGeometry;
+
+      // Strict validation of native bounds
+      const isValidBounds =
+        nativeWidth > 0 &&
+        nativeHeight > 0 &&
+        printArea.width > 0 &&
+        printArea.height > 0 &&
+        printArea.left >= 0 &&
+        printArea.top >= 0 &&
+        printArea.left + printArea.width <= nativeWidth + 0.01 &&
+        printArea.top + printArea.height <= nativeHeight + 0.01;
+
+      if (isValidBounds) {
+        // If reference target space is provided, convert coordinates dynamically
+        if (targetWidth && targetHeight && targetWidth > 0 && targetHeight > 0) {
+          const converted = nativeToReferencePrintArea({
+            nativeWidth,
+            nativeHeight,
+            left: printArea.left,
+            top: printArea.top,
+            width: printArea.width,
+            height: printArea.height,
+            targetWidth,
+            targetHeight,
+          });
+
+          return {
+            ...printArea,
+            left: converted.x,
+            top: converted.y,
+            width: converted.width,
+            height: converted.height,
+            nativeWidth,
+            nativeHeight,
+          };
+        }
+
+        // Return clone of native printArea
+        return {
+          ...printArea,
+          nativeWidth,
+          nativeHeight,
+        };
+      }
+    }
+  }
+
+  // 2. PRIORITY 2: Fall back to Face-Specific Geometry
+  const faceConfig = config?.faces?.[faceId];
+  if (faceConfig?.printArea) {
+    return {
+      ...faceConfig.printArea,
+    };
+  }
+
+  // 3. PRIORITY 3: Fall back to Category Defaults
+  const categoryConfig = getCustomizationConfig(config?.productType);
+  const defaultFace = categoryConfig.faces?.[faceId]?.printArea;
+  if (defaultFace) {
+    return {
+      ...defaultFace,
+    };
+  }
+
+  // Final emergency fallback if faceId not in category defaults
+  const genericConfig = getCustomizationConfig('generic');
+  return {
+    ...(genericConfig.faces?.front?.printArea || {
+      id: faceId,
+      name: faceId.toUpperCase(),
+      width: 200,
+      height: 200,
+      top: 100,
+      left: 100,
+      printMethod: 'DTF',
+    }),
+    id: faceId,
+    name: faceId.toUpperCase(),
   };
 }
