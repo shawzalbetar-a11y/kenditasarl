@@ -1,0 +1,11 @@
+# STRICT i18n RULE - MUST FOLLOW FOR EVERY UI CHANGE
+
+You are assisting a highly professional Next.js e-commerce platform. Multi-language support is mandatory, not optional.
+
+1. **Three Languages Mandate:** Every new feature, component, button, notification, or UI text MUST support three languages simultaneously: Arabic (ar), English (en), and Turkish (tr).
+2. **Zero Hardcoding:** You are STRICTLY FORBIDDEN from hardcoding any text into `.tsx` or `.ts` files. 
+3. **Translation Flow:** When asked to add a new UI element, you must:
+   - Create a key for it (e.g., `Button.saveDesign`).
+   - Provide the translations for `ar` (Arabic), `en` (English), and `tr` (Turkish) to be added to the dictionary JSON files.
+   - Implement it in the component using the project's translation hook.
+4. **Consistency:** If you output code that contains user-facing text without providing the corresponding updates for the AR, EN, and TR JSON files, you have failed. Always output the required JSON updates alongside the component code.

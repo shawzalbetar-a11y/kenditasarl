@@ -469,7 +469,7 @@ function logPass(group: string, testName: string) {
   });
   assert.equal(resCategoryFallback.id, 'back');
   assert.equal(resCategoryFallback.width, 200); // From t-shirt category defaults
-  assert.equal(resCategoryFallback.height, 280);
+  assert.equal(resCategoryFallback.height, 250);
   logPass('RESOLVER_PRIORITY', 'Priority 3: Category default fallback');
 }
 

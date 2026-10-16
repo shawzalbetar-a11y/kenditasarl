@@ -15,7 +15,8 @@ interface ProductSelectorProps {
 
 const CATEGORIES = [
   { id: 'tshirts', icon: Shirt, labelKey: 'tshirts' },
-  { id: 'hats', icon: ShoppingBag, labelKey: 'hats' }, // Reusing shopping bag for hats or maybe we can use a different icon if available
+  { id: 'hoodies', icon: Shirt, labelKey: 'hoodies' },
+  { id: 'hats', icon: ShoppingBag, labelKey: 'hats' },
   { id: 'mugs', icon: Coffee, labelKey: 'mugs' },
 ];
 
@@ -32,25 +33,27 @@ export default function ProductSelector({ onSelectProduct }: ProductSelectorProp
       if (!db) return;
       setLoading(true);
       try {
-        const q = query(
-          collection(db, 'products'),
-          where('category_id', '==', activeCategory)
-        );
-        const snap = await getDocs(q);
+        const snap = await getDocs(collection(db, 'products'));
         
+        const matchedDocs = snap.docs.filter(doc => {
+          const d = doc.data();
+          if (d.is_active === false || d.isActive === false) return false;
+          const cat = (d.category_id || d.category || '').toLowerCase().trim();
+          const target = activeCategory.toLowerCase().trim();
+          return cat === target || (target === 'tshirts' && cat === 't-shirts');
+        });
+
         const fetchedProducts = await Promise.all(
-          snap.docs
-            .filter(doc => doc.data().is_active === true)
-            .map(async (doc) => {
-              const data = doc.data();
-              const frontImage = await getProductFrontImage(doc.id);
-              return {
-                id: doc.id,
-                name: data[`name_${locale}`] || data.name_en || 'Product',
-                price: data.base_price || 0,
-                image: frontImage,
-              };
-            })
+          matchedDocs.map(async (doc) => {
+            const data = doc.data();
+            const frontImage = await getProductFrontImage(doc.id);
+            return {
+              id: doc.id,
+              name: data[`name_${locale}`] || data.name_en || data.name_ar || 'Product',
+              price: data.base_price || 0,
+              image: frontImage,
+            };
+          })
         );
         setProducts(fetchedProducts);
       } catch (err) {

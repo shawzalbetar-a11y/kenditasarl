@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { DEFAULT_PRICING_CONFIG, PricingSettingsConfig } from '@/lib/pricing';
 
 // Fallback Haversine function
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -41,7 +42,8 @@ async function getDrivingDistance(lat1: number, lon1: number, lat2: number, lon2
 
 export async function POST(request: Request) {
   try {
-    const { lat, lng } = await request.json();
+    const body = await request.json();
+    const { lat, lng, subtotal = 0 } = body;
 
     if (lat === undefined || lng === undefined) {
       return NextResponse.json({ error: 'lat and lng are required' }, { status: 400 });
@@ -52,28 +54,63 @@ export async function POST(request: Request) {
 
     const distance = await getDrivingDistance(storeLat, storeLng, lat, lng);
 
-    // Fetch active delivery zone
-    const q = query(collection(db, 'delivery_zones'), where('active', '==', true));
-    const snap = await getDocs(q);
-    
-    if (snap.empty) {
-      return NextResponse.json({ error: 'No active delivery zones found' }, { status: 404 });
+    // 1. Try to fetch unified pricing config from settings/pricing
+    let deliveryConfig = DEFAULT_PRICING_CONFIG.delivery;
+    try {
+      if (db) {
+        const pricingSnap = await getDoc(doc(db, 'settings', 'pricing'));
+        if (pricingSnap.exists()) {
+          const pricingData = pricingSnap.data() as Partial<PricingSettingsConfig>;
+          if (pricingData.delivery) {
+            deliveryConfig = {
+              ...DEFAULT_PRICING_CONFIG.delivery,
+              ...pricingData.delivery,
+              express: {
+                ...DEFAULT_PRICING_CONFIG.delivery.express,
+                ...(pricingData.delivery.express || {})
+              }
+            };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch settings/pricing, falling back to delivery_zones or defaults", err);
     }
 
-    const zone = snap.docs[0].data();
+    // 2. Check Free Shipping eligibility
+    const isFreeShipping = deliveryConfig.is_free_shipping_enabled && 
+      Number(subtotal) >= deliveryConfig.free_shipping_threshold;
     
-    // Calculate express fee
-    const expressFee = zone.base_fee + (zone.price_per_km * distance);
-    const isExpressAvailable = distance <= zone.max_km;
+    const fixedShippingFee = isFreeShipping ? 0 : deliveryConfig.fixed_shipping_fee;
+
+    // 3. Express Delivery calculation (Base fee + Flat tier fee up to Flat tier km, then price_per_km for extra distance)
+    const expressActive = deliveryConfig.express.is_active;
+    const isExpressAvailable = expressActive && (distance <= deliveryConfig.express.max_km);
+    
+    const baseFee = deliveryConfig.express.base_fee || 0;
+    const flatTierFee = typeof deliveryConfig.express.flat_tier_fee === 'number' ? deliveryConfig.express.flat_tier_fee : 150;
+    const flatTierKm = typeof deliveryConfig.express.flat_tier_km === 'number' ? deliveryConfig.express.flat_tier_km : 3;
+    const pricePerKm = typeof deliveryConfig.express.price_per_km === 'number' ? deliveryConfig.express.price_per_km : 10;
+
+    let computedExpressFee = baseFee + flatTierFee;
+    if (distance > flatTierKm) {
+      const extraKm = distance - flatTierKm;
+      computedExpressFee += extraKm * pricePerKm;
+    }
+    const expressFee = Math.round(computedExpressFee);
 
     return NextResponse.json({
       distance: Math.round(distance * 10) / 10,
       isExpressAvailable,
-      expressFee: Math.round(expressFee),
-      fixedShippingFee: zone.fixed_shipping_fee
+      expressFee,
+      fixedShippingFee,
+      isFreeShipping,
+      freeShippingThreshold: deliveryConfig.free_shipping_threshold,
+      isFreeShippingEnabled: deliveryConfig.is_free_shipping_enabled
     });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+

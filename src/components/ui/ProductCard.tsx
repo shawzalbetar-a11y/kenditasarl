@@ -25,10 +25,22 @@ export default function ProductCard({ id, title, price, imageUrl, adminBanner }:
   const [userId, setUserId] = useState<string | null>(null);
   const [isToggling, setIsToggling] = useState(false);
 
+  // Parse baseId and query string (e.g. "prod_123?color=%23000000&type=blank")
+  const [baseId, queryPart] = id.includes('?') ? id.split('?') : [id, ''];
+  const productHref = queryPart ? `/products/${baseId}?${queryPart}` : `/products/${baseId}`;
+  const designStudioHref = queryPart ? `/design-studio/${baseId}?${queryPart}` : `/design-studio/${baseId}`;
+  const isBlankCustomizable = id.includes('type=blank') || (adminBanner && (adminBanner.includes('صمم بنفسك') || adminBanner.includes('Kendin Tasarla') || adminBanner.includes('Design Yourself') || adminBanner === 'CUSTOMIZABLE_BADGE'));
+
   // Helper to translate adminBanner to the current locale
   const getTranslatedBanner = (banner?: string) => {
     if (!banner) return null;
     const lower = banner.toLowerCase();
+    if (lower.includes('صمم بنفسك') || lower.includes('design yourself') || lower.includes('kendin tasarla') || banner === 'CUSTOMIZABLE_BADGE') {
+      return t('customizableBadge');
+    }
+    if (lower.includes('جاهز') || lower.includes('ready') || lower.includes('hazır')) {
+      return t('readyBadge');
+    }
     if (lower.includes('çok satan') || lower.includes('best seller') || lower.includes('الاكثر')) return t('bestSeller');
     if (lower.includes('yeni') || lower.includes('new') || lower.includes('جديد')) return t('new');
     if (lower.includes('i̇ndi̇ri̇m') || lower.includes('indirim') || lower.includes('sale') || lower.includes('تنزيلات')) return t('sale');
@@ -40,7 +52,7 @@ export default function ProductCard({ id, title, price, imageUrl, adminBanner }:
       setUserId(user?.uid || null);
       if (user?.uid) {
         try {
-          const wishDoc = await getDoc(doc(db, 'wishlists', `${user.uid}_${id}`));
+          const wishDoc = await getDoc(doc(db, 'wishlists', `${user.uid}_${baseId}`));
           setIsFavorited(wishDoc.exists());
         } catch (err) {
           console.error(err);
@@ -50,7 +62,7 @@ export default function ProductCard({ id, title, price, imageUrl, adminBanner }:
       }
     });
     return () => unsubscribe();
-  }, [id]);
+  }, [baseId]);
 
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -62,14 +74,14 @@ export default function ProductCard({ id, title, price, imageUrl, adminBanner }:
     
     setIsToggling(true);
     try {
-      const docRef = doc(db, 'wishlists', `${userId}_${id}`);
+      const docRef = doc(db, 'wishlists', `${userId}_${baseId}`);
       if (isFavorited) {
         await deleteDoc(docRef);
         setIsFavorited(false);
       } else {
         await setDoc(docRef, {
           user_id: userId,
-          product_id: id,
+          product_id: baseId,
           created_at: new Date().toISOString()
         });
         setIsFavorited(true);
@@ -86,18 +98,22 @@ export default function ProductCard({ id, title, price, imageUrl, adminBanner }:
     <>
       <div className="group relative w-full max-w-sm rounded-2xl bg-white border border-border/50 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
         {/* Top Badges / Banners */}
-        <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-          {adminBanner && (
-            <span className="bg-[var(--color-action)] text-white text-xs font-bold px-3 py-1 rounded-full shadow-md uppercase">
+        <div className="absolute top-4 start-4 z-10 flex flex-col gap-2">
+          {isBlankCustomizable ? (
+            <span className="text-white text-xs font-bold px-3 py-1 rounded-full shadow-md uppercase bg-gradient-to-r from-purple-600 to-indigo-600">
+              {t('customizableBadge')}
+            </span>
+          ) : adminBanner ? (
+            <span className="text-white text-xs font-bold px-3 py-1 rounded-full shadow-md uppercase bg-[var(--color-action)]">
               {getTranslatedBanner(adminBanner)}
             </span>
-          )}
+          ) : null}
         </div>
 
         {/* Top Action Icons (Transparent overlay) */}
-        <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 opacity-100 translate-x-0 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-300 lg:translate-x-4 lg:group-hover:translate-x-0">
+        <div className="absolute top-4 end-4 z-20 flex flex-col gap-2 opacity-100 translate-x-0 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-300 lg:translate-x-4 lg:group-hover:translate-x-0">
           <Link 
-            href={`/design-studio/${id}`}
+            href={designStudioHref}
             title={t('edit')}
             className="p-2 bg-white/80 backdrop-blur-md rounded-full text-zinc-700 hover:text-[var(--color-primary)] transition-colors shadow-sm flex items-center justify-center"
           >
@@ -121,13 +137,13 @@ export default function ProductCard({ id, title, price, imageUrl, adminBanner }:
         </div>
 
         {/* Product Image */}
-        <div className="relative aspect-[4/5] w-full overflow-hidden bg-zinc-100 block">
+        <Link href={productHref} className="relative aspect-[4/5] w-full overflow-hidden bg-zinc-100 block">
           <img
             src={imageUrl}
             alt={title}
             className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-700 ease-in-out"
           />
-        </div>
+        </Link>
 
         {/* Product Details */}
         <div className="p-5 flex flex-col grow">
@@ -140,10 +156,15 @@ export default function ProductCard({ id, title, price, imageUrl, adminBanner }:
 
           <div className="mt-auto pt-4">
             <Link 
-              href={`/products/${id}`}
-              className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:bg-opacity-90 text-white py-3 px-4 rounded-xl font-bold transition-all hover:-translate-y-1 shadow-md hover:shadow-lg"
+              href={productHref}
+              className={cn(
+                "w-full flex items-center justify-center gap-2 text-white py-3 px-4 rounded-xl font-bold transition-all hover:-translate-y-1 shadow-md hover:shadow-lg",
+                isBlankCustomizable 
+                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700" 
+                  : "bg-[var(--color-primary)] hover:bg-opacity-90"
+              )}
             >
-              {t('details')}
+              {isBlankCustomizable ? t('customizeAndDetails') : t('details')}
             </Link>
           </div>
         </div>

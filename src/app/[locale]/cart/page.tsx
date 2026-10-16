@@ -336,6 +336,7 @@ export default function CartPage() {
         isOpen={isDeliveryModalOpen} 
         onClose={() => setIsDeliveryModalOpen(false)} 
         address={selectedAddressForDelivery} 
+        subtotal={subtotal}
         onConfirm={handleDeliveryConfirm} 
       />
     </div>

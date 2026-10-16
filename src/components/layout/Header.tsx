@@ -26,6 +26,11 @@ export default function Header() {
   const pathname = usePathname();
   const isDesignStudio = pathname.includes('/design-studio');
 
+  // Close mobile navigation drawer on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     let unsubscribeCart: () => void;
     
@@ -126,12 +131,14 @@ export default function Header() {
             : 'bg-white/90 backdrop-blur-md border-white/50'
         }`}
       >
-        {/* Announcement Bar */}
-        <div className={`transition-all duration-500 text-center py-2 text-xs font-medium px-4 flex items-center justify-center rounded-t-[2rem] ${
-          (isScrolled || isHovering) ? 'bg-primary/50 text-white/90' : 'bg-primary text-white'
-        }`}>
-          {t('announcement')}
-        </div>
+        {/* Announcement Bar (Collapsed completely on Design Studio) */}
+        {!isDesignStudio && (
+          <div className={`transition-all duration-500 text-center py-2 text-xs font-medium px-4 flex items-center justify-center rounded-t-[2rem] ${
+            (isScrolled || isHovering) ? 'bg-primary/50 text-white/90' : 'bg-primary text-white'
+          }`}>
+            {t('announcement')}
+          </div>
+        )}
 
         <div className="px-6 sm:px-8">
           <div className="flex justify-between items-center h-16">
@@ -154,7 +161,7 @@ export default function Header() {
             <Link href="/mugs" className="text-textPrimary hover:text-primary transition-colors font-medium">
               {t('mugs')}
             </Link>
-            <Link href="/design-studio/1" className="text-accent hover:text-primary transition-colors font-bold">
+            <Link href="/design-studio" className="text-accent hover:text-primary transition-colors font-bold">
               {t('designYourself')}
             </Link>
           </nav>
@@ -204,16 +211,32 @@ export default function Header() {
       {isMobileMenuOpen && (
         <div className="md:hidden mt-2 pointer-events-auto w-full max-w-6xl rounded-[2rem] bg-white/80 backdrop-blur-xl border border-white/50 shadow-lg overflow-hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 flex flex-col">
-            <Link href="/tshirts" className="block px-3 py-2 rounded-md text-base font-medium text-textPrimary hover:bg-gray-50 hover:text-primary">
+            <Link 
+              href="/tshirts" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-md text-base font-medium text-textPrimary hover:bg-gray-50 hover:text-primary"
+            >
               {t('tshirts')}
             </Link>
-            <Link href="/hats" className="block px-3 py-2 rounded-md text-base font-medium text-textPrimary hover:bg-gray-50 hover:text-primary">
+            <Link 
+              href="/hats" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-md text-base font-medium text-textPrimary hover:bg-gray-50 hover:text-primary"
+            >
               {t('hats')}
             </Link>
-            <Link href="/mugs" className="block px-3 py-2 rounded-md text-base font-medium text-textPrimary hover:bg-gray-50 hover:text-primary">
+            <Link 
+              href="/mugs" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-md text-base font-medium text-textPrimary hover:bg-gray-50 hover:text-primary"
+            >
               {t('mugs')}
             </Link>
-            <Link href="/design-studio" className="block px-3 py-2 rounded-md text-base font-bold text-accent hover:bg-gray-50">
+            <Link 
+              href="/design-studio" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-md text-base font-bold text-accent hover:bg-gray-50"
+            >
               {t('designYourself')}
             </Link>
             <div className="border-t border-border my-2"></div>

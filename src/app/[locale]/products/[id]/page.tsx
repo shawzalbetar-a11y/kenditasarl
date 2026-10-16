@@ -3,14 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { Minus, Plus, Paintbrush, ShieldCheck, Check, X } from 'lucide-react';
+import { Minus, Plus, Paintbrush, ShieldCheck, Check, X, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useParams, useSearchParams } from 'next/navigation';
 import { db, auth } from '@/lib/firebase';
 import { doc, getDoc, collection, getDocs, query, where, limit, addDoc, updateDoc } from 'firebase/firestore';
 import ProductCard from '@/components/ui/ProductCard';
 import AuthModal from '@/components/auth/AuthModal';
-import { ShoppingCart } from 'lucide-react';
 
 const COLOR_MAP: any = {
   white: '#FFFFFF',
@@ -21,6 +20,26 @@ const COLOR_MAP: any = {
   red: '#EF4444'
 };
 
+const isColorEqual = (c1?: string | null, c2?: string | null): boolean => {
+  if (!c1 || !c2) return false;
+  const s1 = c1.trim().toLowerCase();
+  const s2 = c2.trim().toLowerCase();
+  if (s1 === s2) return true;
+  
+  const hex1 = COLOR_MAP[s1]?.toLowerCase() || s1;
+  const hex2 = COLOR_MAP[s2]?.toLowerCase() || s2;
+  if (hex1 === hex2) return true;
+
+  const name1 = Object.keys(COLOR_MAP).find(k => COLOR_MAP[k]?.toLowerCase() === s1) || s1;
+  const name2 = Object.keys(COLOR_MAP).find(k => COLOR_MAP[k]?.toLowerCase() === s2) || s2;
+  return name1 === name2;
+};
+
+const isSizeEqual = (s1?: string | null, s2?: string | null): boolean => {
+  if (!s1 || !s2) return false;
+  return s1.trim().toLowerCase() === s2.trim().toLowerCase();
+};
+
 import { getProductMedia, getProductFrontImage } from '@/lib/products';
 
 export default function ProductDetailsPage() {
@@ -29,17 +48,28 @@ export default function ProductDetailsPage() {
   const id = params.id as string;
   const locale = params.locale as string;
   const t = useTranslations('ProductPage');
+  const tDetails = useTranslations('ProductDetails');
   
   const defaultColorParam = searchParams.get('color');
+  const defaultSizeParam = searchParams.get('size');
+  const defaultQtyParam = searchParams.get('quantity');
+  const defaultTypeParam = (searchParams.get('type') as 'ready' | 'blank') || null;
   
   const [product, setProduct] = useState<any>(null);
   const [variants, setVariants] = useState<any[]>([]);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  const [viewType, setViewType] = useState<'ready' | 'blank'>(defaultTypeParam || 'ready');
+  const [selectedColor, setSelectedColor] = useState<string | null>(defaultColorParam || null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(defaultSizeParam || null);
+  const [quantity, setQuantity] = useState<number>(() => {
+    if (defaultQtyParam) {
+      const q = parseInt(defaultQtyParam, 10);
+      if (!isNaN(q) && q > 0) return q;
+    }
+    return 1;
+  });
   const [activeImage, setActiveImage] = useState(0);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -78,24 +108,22 @@ export default function ProductDetailsPage() {
                 });
               });
             } else {
-              // Old schema
+              // Legacy schema
               fetchedVariants.push(data);
             }
           });
           
           setVariants(fetchedVariants);
           
-          const media = await getProductMedia(id);
-          const images = [
-            media.front && { url: media.front, name: t('front') },
-            media.back && { url: media.back, name: t('back') },
-            media.right && { url: media.right, name: t('right') },
-            media.left && { url: media.left, name: t('left') },
-          ].filter(Boolean);
+          const images = Array.isArray(data.images) ? data.images.map((img: any) => ({
+            url: typeof img === 'string' ? img : img.url,
+            name: (typeof img === 'object' && img.face) ? t(img.face) : t('front')
+          })) : [];
 
           setProduct({
             id: docSnap.id,
             ...data,
+            raw_images: data.images || [],
             images: images.length > 0 ? images : [{ url: 'https://via.placeholder.com/800', name: t('front') }],
           });
           
@@ -115,14 +143,39 @@ export default function ProductDetailsPage() {
             }
           }
           
-          // Initial selections
+          // Initial selections prioritizing URL params then localStorage
           if (fetchedVariants.length > 0) {
-            if (defaultColorParam && fetchedVariants.some(v => v.color === defaultColorParam)) {
-              setSelectedColor(defaultColorParam);
-            } else {
-              setSelectedColor(fetchedVariants[0].color);
+            let savedPref: any = null;
+            if (typeof window !== 'undefined') {
+              try {
+                const raw = localStorage.getItem(`product_pref_${id}`);
+                if (raw) savedPref = JSON.parse(raw);
+              } catch (e) {}
             }
-            setSelectedSize(fetchedVariants[0].size);
+
+            const targetColorParam = defaultColorParam || savedPref?.color;
+            const targetSizeParam = defaultSizeParam || savedPref?.size;
+            const targetQtyParam = defaultQtyParam || savedPref?.quantity;
+
+            const matchedColorVariant = targetColorParam 
+              ? fetchedVariants.find(v => isColorEqual(v.color, targetColorParam))
+              : null;
+            const initialColor = matchedColorVariant ? matchedColorVariant.color : fetchedVariants[0].color;
+            setSelectedColor(initialColor);
+
+            const matchedSizeVariant = targetSizeParam 
+              ? (fetchedVariants.find(v => isColorEqual(v.color, initialColor) && isSizeEqual(v.size, targetSizeParam)) ||
+                 fetchedVariants.find(v => isSizeEqual(v.size, targetSizeParam)))
+              : null;
+            const initialSize = matchedSizeVariant ? matchedSizeVariant.size : fetchedVariants[0].size;
+            setSelectedSize(initialSize);
+
+            if (targetQtyParam) {
+              const q = parseInt(targetQtyParam, 10);
+              if (!isNaN(q) && q > 0) {
+                setQuantity(q);
+              }
+            }
           }
 
           // Fetch similar products
@@ -140,7 +193,6 @@ export default function ProductDetailsPage() {
                 const sData = sDoc.data();
                 const frontImage = await getProductFrontImage(sDoc.id);
                 simProds.push({ id: sDoc.id, ...sData, media: { front: frontImage } });
-
               }
             }
             // limit to 4 if we got 5
@@ -154,18 +206,61 @@ export default function ProductDetailsPage() {
       }
     }
     fetchProduct();
-  }, [id]);
+  }, [id, defaultColorParam, defaultSizeParam, defaultQtyParam]);
 
   // Derived unique colors and sizes based on variants
   const uniqueColors = useMemo(() => Array.from(new Set(variants.map(v => v.color))), [variants]);
   const uniqueSizes = useMemo(() => Array.from(new Set(variants.map(v => v.size))), [variants]);
 
+  // Check if ready or blank options exist for current product & color
+  const { hasReadyOption, hasBlankOption } = useMemo(() => {
+    if (!product?.raw_images || !Array.isArray(product.raw_images)) {
+      return { hasReadyOption: false, hasBlankOption: false };
+    }
+    const catalog = product.raw_images as any[];
+    const colorImages = selectedColor 
+      ? catalog.filter(img => img.colorHex?.toLowerCase() === selectedColor.toLowerCase())
+      : catalog;
+    
+    return {
+      hasReadyOption: colorImages.some(img => img.type === 'ready') || catalog.some(img => img.type === 'ready'),
+      hasBlankOption: colorImages.some(img => img.type === 'blank') || catalog.some(img => img.type === 'blank')
+    };
+  }, [product, selectedColor]);
+
+  // Auto-switch viewType if one doesn't exist
+  useEffect(() => {
+    if (hasBlankOption && !hasReadyOption && viewType !== 'blank') {
+      setViewType('blank');
+    } else if (hasReadyOption && !hasBlankOption && viewType !== 'ready') {
+      setViewType('ready');
+    }
+  }, [hasReadyOption, hasBlankOption, viewType]);
+
+  // Localized Face Name Helper
+  const getFaceLabel = (face: string) => {
+    const cleanFace = face === 'left_shoulder' ? 'left' : face === 'right_shoulder' ? 'right' : face;
+    switch (cleanFace) {
+      case 'front': return t('frontFace');
+      case 'back': return t('backFace');
+      case 'left': return t('leftShoulder');
+      case 'right': return t('rightShoulder');
+      default: return cleanFace;
+    }
+  };
+
+  const getLocalizedImageName = (img: { face: string; type?: string }) => {
+    const typeLabel = img.type === 'ready' ? t('readyType') : t('blankType');
+    const faceLabel = getFaceLabel(img.face);
+    return `${typeLabel} • ${faceLabel}`;
+  };
+
   // Get current variant to check stock
-  const currentVariant = variants.find(v => v.color === selectedColor && v.size === selectedSize);
+  const currentVariant = variants.find(v => isColorEqual(v.color, selectedColor) && isSizeEqual(v.size, selectedSize));
   const maxStock = currentVariant ? currentVariant.stock : 0;
 
   const isVariantInStock = (color: string, size: string) => {
-    const v = variants.find(v => v.color === color && v.size === size);
+    const v = variants.find(v => isColorEqual(v.color, color) && isSizeEqual(v.size, size));
     return v && v.stock > 0;
   };
   
@@ -182,27 +277,50 @@ export default function ProductDetailsPage() {
       return indexA - indexB;
     });
 
-  // Reset size if selected is no longer available
+  // Keep size valid if stock is empty for selected
   useEffect(() => {
-    if (availableSizes.length > 0 && (!selectedSize || !availableSizes.includes(selectedSize))) {
+    if (availableSizes.length > 0 && selectedSize && !availableSizes.some(s => isSizeEqual(s, selectedSize))) {
       setSelectedSize(availableSizes[0]);
     }
   }, [availableSizes, selectedSize]);
 
-  // Update URL parameter when color changes
+  // Save preferences and update URL parameters when color, size, or quantity changes
   useEffect(() => {
-    if (selectedColor) {
-      try {
-        const url = new URL(window.location.href);
-        if (url.searchParams.get('color') !== selectedColor) {
-          url.searchParams.set('color', selectedColor);
-          window.history.replaceState(null, '', url.toString());
-        }
-      } catch (e) {
-        // Safe fallback if window is not available
+    if (typeof window === 'undefined' || !id) return;
+    try {
+      if (selectedColor || selectedSize || quantity) {
+        localStorage.setItem(`product_pref_${id}`, JSON.stringify({
+          color: selectedColor,
+          size: selectedSize,
+          quantity: quantity
+        }));
       }
+
+      const url = new URL(window.location.href);
+      let changed = false;
+      if (selectedColor && url.searchParams.get('color') !== selectedColor) {
+        url.searchParams.set('color', selectedColor);
+        changed = true;
+      }
+      if (selectedSize && url.searchParams.get('size') !== selectedSize) {
+        url.searchParams.set('size', selectedSize);
+        changed = true;
+      }
+      if (quantity && url.searchParams.get('quantity') !== String(quantity)) {
+        url.searchParams.set('quantity', String(quantity));
+        changed = true;
+      }
+      if (viewType && url.searchParams.get('type') !== viewType) {
+        url.searchParams.set('type', viewType);
+        changed = true;
+      }
+      if (changed) {
+        window.history.replaceState(null, '', url.toString());
+      }
+    } catch (e) {
+      // Safe fallback if window is not available
     }
-  }, [selectedColor]);
+  }, [id, selectedColor, selectedSize, quantity, viewType]);
 
   // Reset quantity if it exceeds new maxStock when color/size changes
   useEffect(() => {
@@ -214,28 +332,148 @@ export default function ProductDetailsPage() {
     }
   }, [maxStock, quantity]);
 
-  // Derive images to show based on selected color
+  // Derive images to show based on selected color and ready/blank type
   const displayImages = useMemo(() => {
     if (!product) return [];
-    let imgs = product.images || [];
-    
+
+    // 1. Structured product images from Admin Panel
+    if (Array.isArray(product.raw_images) && product.raw_images.length > 0) {
+      const catalog = product.raw_images as Array<{
+        id: string;
+        url: string;
+        type: 'ready' | 'blank';
+        face: string;
+        colorHex?: string;
+        title?: string;
+      }>;
+
+      const FACE_ORDER = ['front', 'back', 'left', 'left_shoulder', 'right', 'right_shoulder'];
+      const sortFaces = (list: typeof catalog) => {
+        return [...list].sort((a, b) => {
+          const idxA = FACE_ORDER.indexOf(a.face);
+          const idxB = FACE_ORDER.indexOf(b.face);
+          return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+        });
+      };
+
+      if (selectedColor) {
+        const colorImgs = catalog.filter(img => img.colorHex?.toLowerCase() === selectedColor.toLowerCase());
+        
+        // Priority: target viewType for this color
+        const colorTargetType = colorImgs.filter(img => img.type === viewType);
+        if (colorTargetType.length > 0) {
+          return sortFaces(colorTargetType).map(img => ({
+            url: img.url,
+            name: getLocalizedImageName(img),
+            type: img.type,
+            face: img.face
+          }));
+        }
+
+        // Secondary: other type for this color
+        const otherType = viewType === 'ready' ? 'blank' : 'ready';
+        const colorOtherType = colorImgs.filter(img => img.type === otherType);
+        if (colorOtherType.length > 0) {
+          return sortFaces(colorOtherType).map(img => ({
+            url: img.url,
+            name: getLocalizedImageName(img),
+            type: img.type,
+            face: img.face
+          }));
+        }
+      }
+
+      // Fallback across any items matching target viewType
+      const anyTargetType = catalog.filter(img => img.type === viewType);
+      if (anyTargetType.length > 0) {
+        return sortFaces(anyTargetType).map(img => ({
+          url: img.url,
+          name: getLocalizedImageName(img),
+          type: img.type,
+          face: img.face
+        }));
+      }
+
+      // All images in catalog
+      return sortFaces(catalog).map(img => ({
+        url: img.url,
+        name: getLocalizedImageName(img),
+        type: img.type,
+        face: img.face
+      }));
+    }
+
+    // 2. Legacy fallback from variant images or base media
+    let imgs: any[] = [];
     if (selectedColor) {
       const v = variants.find(v => v.color === selectedColor);
       if (v && (v.image_front || v.image_back)) {
         imgs = [
-          v.image_front && { url: v.image_front, name: t('front') },
-          v.image_back && { url: v.image_back, name: t('back') }
+          v.image_front && { url: v.image_front, name: getFaceLabel('front'), face: 'front' },
+          v.image_back && { url: v.image_back, name: getFaceLabel('back'), face: 'back' }
         ].filter(Boolean);
       }
     }
     
-    return imgs.length > 0 ? imgs : [{ url: 'https://via.placeholder.com/800', name: t('front') }];
-  }, [product, selectedColor, variants, t]);
+    if (imgs.length === 0 && product.images) {
+      imgs = product.images;
+    }
+    
+    return imgs.length > 0 ? imgs : [{ url: 'https://via.placeholder.com/800', name: getFaceLabel('front'), face: 'front' }];
+  }, [product, selectedColor, viewType, variants, locale, t]);
 
   // Reset active image if display images change
   useEffect(() => {
     setActiveImage(0);
   }, [displayImages]);
+
+  // Gallery Navigation Handlers (Prev / Next)
+  const handleNextImage = () => {
+    if (displayImages.length <= 1) return;
+    setActiveImage((prev) => (prev + 1) % displayImages.length);
+  };
+
+  const handlePrevImage = () => {
+    if (displayImages.length <= 1) return;
+    setActiveImage((prev) => (prev - 1 + displayImages.length) % displayImages.length);
+  };
+
+  // Mobile Touch Swipe Handling
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const minSwipeDistance = 40;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStartX || !touchEndX) return;
+    const distance = touchStartX - touchEndX;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (locale === 'ar') {
+      // In RTL layout
+      if (isLeftSwipe) {
+        handlePrevImage();
+      } else if (isRightSwipe) {
+        handleNextImage();
+      }
+    } else {
+      // In LTR layout
+      if (isLeftSwipe) {
+        handleNextImage();
+      } else if (isRightSwipe) {
+        handlePrevImage();
+      }
+    }
+  };
 
   const handleQuantityChange = (type: 'increase' | 'decrease') => {
     if (type === 'increase' && quantity < maxStock) setQuantity(prev => prev + 1);
@@ -303,52 +541,145 @@ export default function ProductDetailsPage() {
 
   const title = product[`name_${locale}`] || product.name_en;
   const description = product[`description_${locale}`] || product.description_en;
+  const activeFace = displayImages[activeImage]?.face || 'front';
 
   return (
     <div className="min-h-screen bg-[var(--color-background)] pt-8 pb-32 md:pb-16 px-4 md:px-8">
       <div className="max-w-[95rem] mx-auto">
         
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2 text-[var(--color-text)]">{title}</h1>
+        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-[var(--color-text)]">{title}</h1>
+          </div>
+
+          {/* View Type Toggle: Ready vs Blank */}
+          {hasReadyOption && hasBlankOption && (
+            <div className="flex items-center gap-1.5 p-1.5 bg-gray-100 rounded-2xl w-fit border border-gray-200 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setViewType('ready')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2",
+                  viewType === 'ready' 
+                    ? "bg-white text-zinc-900 shadow-sm border border-black/5" 
+                    : "text-zinc-600 hover:text-zinc-900"
+                )}
+              >
+                <span>👕</span>
+                <span>{t('readyProduct')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewType('blank')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2",
+                  viewType === 'blank' 
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/20" 
+                    : "text-zinc-600 hover:text-zinc-900"
+                )}
+              >
+                <span>🎨</span>
+                <span>{t('blankProduct')}</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           
           {/* Image Gallery */}
-          <div className="flex flex-col-reverse md:flex-row gap-4">
-            {/* Thumbnails */}
-            <div className="flex md:flex-col gap-3 overflow-x-auto md:overflow-y-auto scrollbar-hide py-2 md:py-0 md:w-24">
-              {displayImages.map((img: any, idx: number) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImage(idx)}
-                  className={cn(
-                    "relative flex-shrink-0 w-20 h-24 md:w-full md:h-28 rounded-xl overflow-hidden border-2 transition-all group",
-                    activeImage === idx ? "border-[var(--color-primary)] opacity-100" : "border-transparent opacity-60 hover:opacity-100"
-                  )}
-                  title={img.name}
-                >
-                  <img src={img.url} alt={`Thumbnail ${img.name}`} className="w-full h-full object-cover" />
-                  <div className="absolute inset-x-0 bottom-0 bg-black/50 text-white text-[10px] text-center py-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {img.name}
-                  </div>
-                </button>
-              ))}
-            </div>
-            {/* Main Image */}
-            <div className="flex-1 bg-white rounded-3xl overflow-hidden border border-border/50 shadow-sm aspect-[4/5] md:aspect-auto relative">
+          <div className="flex flex-col gap-4">
+            {/* Main Image Container with Swipe & Arrow Navigation */}
+            <div 
+              className="w-full bg-white rounded-3xl overflow-hidden border border-border/50 shadow-sm aspect-[4/5] md:aspect-[4/4] lg:aspect-[4/5] relative select-none group/mainimg"
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+            >
               {displayImages[activeImage] && (
                 <>
                   <img 
                     src={displayImages[activeImage].url} 
                     alt={title} 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-opacity duration-300"
                   />
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur text-[var(--color-secondary)] px-3 py-1 rounded-full text-sm font-bold shadow-sm">
+                  <div className="absolute top-4 start-4 bg-white/90 backdrop-blur text-[var(--color-secondary)] px-3 py-1 rounded-full text-sm font-bold shadow-sm z-10">
                     {displayImages[activeImage].name}
                   </div>
                 </>
               )}
+
+              {/* Navigation Arrows for multi-image gallery */}
+              {displayImages.length > 1 && (
+                <>
+                  {/* Previous Button */}
+                  <button
+                    type="button"
+                    onClick={handlePrevImage}
+                    aria-label="Previous image"
+                    className="absolute top-1/2 -translate-y-1/2 start-3 z-20 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/85 hover:bg-white text-zinc-800 backdrop-blur-md shadow-md hover:shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 border border-black/5 opacity-90 sm:opacity-75 sm:group-hover/mainimg:opacity-100"
+                  >
+                    <ChevronLeft size={22} className="rtl:rotate-180" />
+                  </button>
+
+                  {/* Next Button */}
+                  <button
+                    type="button"
+                    onClick={handleNextImage}
+                    aria-label="Next image"
+                    className="absolute top-1/2 -translate-y-1/2 end-3 z-20 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/85 hover:bg-white text-zinc-800 backdrop-blur-md shadow-md hover:shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 border border-black/5 opacity-90 sm:opacity-75 sm:group-hover/mainimg:opacity-100"
+                  >
+                    <ChevronRight size={22} className="rtl:rotate-180" />
+                  </button>
+
+                  {/* Bottom Indicator Dots */}
+                  <div className="absolute bottom-4 inset-x-0 flex items-center justify-center gap-1.5 z-20 pointer-events-none">
+                    {displayImages.map((_, idx) => (
+                      <div
+                        key={idx}
+                        className={cn(
+                          "h-1.5 sm:h-2 rounded-full transition-all duration-300 shadow-sm",
+                          activeImage === idx ? "w-6 sm:w-7 bg-white" : "w-1.5 sm:w-2 bg-white/50"
+                        )}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Thumbnails + Magic "Design it Yourself" CTA Container */}
+            <div className="flex flex-row items-center justify-between gap-3 sm:gap-4 w-full mt-2">
+              {/* Thumbnails List */}
+              <div className="shrink-0 flex gap-2 overflow-x-auto scrollbar-hide py-1 max-w-[55%] sm:max-w-[50%]">
+                {displayImages.map((img: any, idx: number) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveImage(idx)}
+                    className={cn(
+                      "relative shrink-0 w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden border-2 transition-all group",
+                      activeImage === idx ? "border-[var(--color-primary)] opacity-100 shadow-sm" : "border-transparent opacity-60 hover:opacity-100"
+                    )}
+                    title={img.name}
+                  >
+                    <img src={img.url} alt={`Thumbnail ${img.name}`} className="w-full h-full object-cover" />
+                    <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[9px] font-bold text-center py-0.5 group-hover:bg-black/80 transition-colors truncate px-0.5">
+                      {img.name}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Magic CTA Button */}
+              <Link 
+                href={
+                  `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&quantity=${quantity}&face=${activeFace}${selectedReadyDesignId || product.ready_design_id ? `&designId=${selectedReadyDesignId || product.ready_design_id}&mode=remix` : ''}`
+                }
+                className="flex-1 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-bold text-white text-sm sm:text-base bg-gradient-to-r from-purple-600 via-pink-600 to-[var(--color-primary)] shadow-lg shadow-purple-500/30 transform transition-all hover:-translate-y-1 active:scale-95 text-center"
+              >
+                <Paintbrush size={20} className="shrink-0" />
+                <span className="truncate">{locale === 'ar' ? 'صمم هذا المنتج بنفسك 🎨' : locale === 'tr' ? 'Kendin Tasarla 🎨' : 'Design It Yourself 🎨'}</span>
+              </Link>
             </div>
           </div>
 
@@ -468,8 +799,8 @@ export default function ProductDetailsPage() {
               <Link 
                 href={
                   selectedReadyDesignId || product.ready_design_id 
-                  ? `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&designId=${selectedReadyDesignId || product.ready_design_id}&mode=remix`
-                  : `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}`
+                  ? `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&quantity=${quantity}&designId=${selectedReadyDesignId || product.ready_design_id}&mode=remix`
+                  : `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&quantity=${quantity}`
                 }
                 className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:opacity-90 text-white py-4 px-6 rounded-2xl font-bold text-lg transition-all hover:-translate-y-1 shadow-lg shadow-[var(--color-primary)]/30 disabled:opacity-50 disabled:pointer-events-none"
                 style={{ pointerEvents: maxStock === 0 ? 'none' : 'auto', opacity: maxStock === 0 ? 0.5 : 1 }}

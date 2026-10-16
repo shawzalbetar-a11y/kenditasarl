@@ -6,7 +6,7 @@ import { Link } from '@/i18n/routing';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { Loader2, Package, ChevronRight, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Package, ChevronRight, Clock, CheckCircle2, XCircle, Truck, Printer } from 'lucide-react';
 
 export default function OrdersPage() {
   const t = useTranslations('Account');
@@ -46,6 +46,13 @@ export default function OrdersPage() {
   const getStatusIcon = (status: string) => {
      switch(status) {
        case 'pending': return <Clock className="text-yellow-500 w-5 h-5" />;
+       case 'ready':
+       case 'processing': return <Package className="text-blue-500 w-5 h-5" />;
+       case 'printing':
+       case 'quality_check': return <Printer className="text-blue-500 w-5 h-5" />;
+       case 'packed':
+       case 'shipped': return <Truck className="text-purple-500 w-5 h-5" />;
+       case 'delivered':
        case 'completed': return <CheckCircle2 className="text-green-500 w-5 h-5" />;
        case 'cancelled': return <XCircle className="text-red-500 w-5 h-5" />;
        default: return <Package className="text-blue-500 w-5 h-5" />;
@@ -55,6 +62,13 @@ export default function OrdersPage() {
   const getStatusColor = (status: string) => {
      switch(status) {
        case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+       case 'ready':
+       case 'processing':
+       case 'printing':
+       case 'quality_check': return 'bg-blue-50 text-blue-700 border-blue-200';
+       case 'packed':
+       case 'shipped': return 'bg-purple-50 text-purple-700 border-purple-200';
+       case 'delivered':
        case 'completed': return 'bg-green-50 text-green-700 border-green-200';
        case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
        default: return 'bg-blue-50 text-blue-700 border-blue-200';

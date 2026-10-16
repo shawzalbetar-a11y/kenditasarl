@@ -1,3 +1,4 @@
+import type { Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -16,6 +17,13 @@ const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
 export const metadata = {
   title: 'Kenditasarl',
   description: 'Design your own custom products.',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default async function LocaleLayout({

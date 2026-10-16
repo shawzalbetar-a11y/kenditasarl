@@ -222,8 +222,8 @@ export default function CheckoutSummaryPage() {
               quantity: item.quantity,
               unit_price: item.unit_price,
               
-              canvas_json: dData?.canvas_json ? JSON.parse(JSON.stringify(dData.canvas_json)) : null,
-              production_snapshot: dData?.production_snapshot ? JSON.parse(JSON.stringify(dData.production_snapshot)) : null,
+              canvas_json: typeof dData?.canvas_json === 'string' ? dData.canvas_json : (dData?.canvas_json ? JSON.stringify(dData.canvas_json) : null),
+              production_snapshot: typeof dData?.production_snapshot === 'string' ? dData.production_snapshot : (dData?.production_snapshot ? JSON.stringify(dData.production_snapshot) : null),
               preview_image_url: dData?.preview_image_url || null,
               snapshot_version: dData?.production_snapshot ? 1 : null,
               is_immutable_snapshot: !!dData?.production_snapshot
@@ -272,7 +272,23 @@ export default function CheckoutSummaryPage() {
         }).catch(console.error);
       }
 
-      // 5. Redirect
+      // 5. Send WhatsApp Order Confirmation Notification (Async / Non-blocking)
+      const phoneToSend = userPhone || selectedAddress?.phone || user?.phoneNumber;
+      const nameToSend = user?.displayName || selectedAddress?.full_name || (user?.email ? user.email.split('@')[0] : 'Değerli Müşterimiz');
+      if (phoneToSend) {
+        fetch('/api/whatsapp/order-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phoneNumber: phoneToSend,
+            customerName: nameToSend,
+            orderId: `ORD-${currentOrderNum}`,
+            status: 'pending'
+          })
+        }).catch((err) => console.warn('[WhatsApp Checkout Notification Warning]:', err));
+      }
+
+      // 6. Redirect
       router.push(`/order-confirmation/${orderId}`);
       
     } catch (err: any) {
@@ -366,7 +382,13 @@ export default function CheckoutSummaryPage() {
                 </div>
                 <div className="flex justify-between items-center text-gray-600">
                   <span>{t('deliveryFee')}</span>
-                  <span className="font-semibold">{deliveryFee} ₺</span>
+                  <span className="font-semibold">
+                    {deliveryFee === 0 ? (
+                      <span className="text-emerald-600 font-bold">0 ₺ ({locale === 'tr' ? 'Ücretsiz' : locale === 'en' ? 'Free' : 'مجاناً 🎉'})</span>
+                    ) : (
+                      `${deliveryFee} ₺`
+                    )}
+                  </span>
                 </div>
               </div>
               

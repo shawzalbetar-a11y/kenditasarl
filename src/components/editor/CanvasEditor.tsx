@@ -201,10 +201,10 @@ export default function CanvasEditor() {
       const data = f.target?.result;
       fabric.Image.fromURL(data as string, (img) => {
         img.scaleToWidth(200);
-        img.set({ left: 150, top: 150 });
+        img.set({ left: 150, top: 150, crossOrigin: 'anonymous' });
         canvas.add(img);
         canvas.setActiveObject(img);
-      });
+      }, { crossOrigin: 'anonymous' });
     };
     reader.readAsDataURL(file);
   };

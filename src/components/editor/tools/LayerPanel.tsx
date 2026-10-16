@@ -79,7 +79,7 @@ export default function LayerPanel({ canvas, activeObject, onSaveHistory }: Laye
 
   return (
     <div className="flex flex-col gap-2 w-full mt-4">
-      <h4 className="text-sm font-bold text-gray-500">{t('layers', { fallback: 'Layers' })}</h4>
+      <h4 className="text-sm font-bold text-gray-700">{t('layers', { fallback: 'إدارة الطبقات' })}</h4>
       <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
         {layers.map((obj, idx) => {
           const isActive = activeObject === obj;

@@ -9,19 +9,21 @@ import { getExpandedProducts } from '@/lib/products';
 async function getFeaturedProducts() {
   if (!db) return [];
   try {
-    const q = query(
-      collection(db, 'products'),
-      where('is_active', '==', true),
-      orderBy('created_at', 'desc'),
-      limit(8)
-    );
-    const snapshot = await getDocs(q);
+    // 1. Fetch products (resilient query avoiding missing composite index failures)
+    const snapshot = await getDocs(collection(db, 'products'));
     
-    // We pass the docs array to getExpandedProducts
+    // 2. Expand products with variants
     const products = await getExpandedProducts(snapshot.docs);
     
-    // Limit to 8 expanded products just in case one product had many colors
-    return products.slice(0, 8);
+    // 3. Sort by newest creation date descending
+    products.sort((a, b) => {
+      const timeA = new Date(a.created_at || 0).getTime();
+      const timeB = new Date(b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
+    
+    // Limit to 12 featured items
+    return products.slice(0, 12);
   } catch (error) {
     console.error("Error fetching featured products:", error);
     return [];

@@ -1,9 +1,18 @@
+"use client";
+
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { Instagram, MessageCircle, Twitter } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 export default function Footer() {
   const t = useTranslations('Footer');
+  const pathname = usePathname();
+  const isDesignStudio = pathname?.includes('/design-studio');
+
+  if (isDesignStudio) {
+    return null;
+  }
 
   return (
     <footer className="bg-secondary text-white pt-12 pb-8">

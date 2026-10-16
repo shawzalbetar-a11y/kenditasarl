@@ -47,7 +47,7 @@ export default function EditorToolbar({
       
       {/* Faces Selection */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">عرض المنتج</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">{t('productView')}</h3>
         <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
           {faces.map((face) => (
             <button
@@ -87,7 +87,7 @@ export default function EditorToolbar({
 
       {/* Tools / Actions */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">أدوات التحكم</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">{t('controlTools')}</h3>
         
         <div className="grid grid-cols-2 gap-2 mb-2">
           <button 
@@ -111,7 +111,7 @@ export default function EditorToolbar({
             onClick={() => onAlign('left')} 
             disabled={!hasSelection}
             className="flex items-center justify-center p-2 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 disabled:opacity-50 transition-colors"
-            title="محاذاة يسار"
+            title={t('alignLeft')}
           >
             <AlignLeft size={18} />
           </button>
@@ -127,7 +127,7 @@ export default function EditorToolbar({
             onClick={() => onAlign('right')} 
             disabled={!hasSelection}
             className="flex items-center justify-center p-2 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 disabled:opacity-50 transition-colors"
-            title="محاذاة يمين"
+            title={t('alignRight')}
           >
             <AlignRight size={18} />
           </button>

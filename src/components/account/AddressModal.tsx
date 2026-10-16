@@ -273,13 +273,13 @@ export default function AddressModal({ isOpen, onClose, onSave, initialData }: A
 
             {showMap && (
               <div className="flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-4 duration-300">
-                <label className="text-sm font-semibold px-1 text-red-600">تفاصيل العنوان (إجباري للشحن)</label>
+                <label className="text-sm font-semibold px-1 text-red-600">{t('detailedAddress')}</label>
                 <textarea 
                   required
                   value={detailedAddress}
                   onChange={(e) => setDetailedAddress(e.target.value)}
                   className="w-full p-4 rounded-xl border border-red-200 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none placeholder:text-red-300"
-                  placeholder="الشارع، المبنى، الطابق، الشقة، وأي تفاصيل أخرى لتسهيل التوصيل..."
+                  placeholder={t('detailedAddressPlaceholder')}
                   rows={3}
                 />
               </div>
