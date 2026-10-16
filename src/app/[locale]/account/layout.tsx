@@ -54,75 +54,78 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-secondary">{t('myAccount')}</h1>
+    <div className="max-w-6xl mx-auto px-4 py-4 md:py-8">
+      <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-8 text-secondary">{t('myAccount')}</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 md:gap-8">
         
-        {/* Navigation Sidebar */}
-        <div className="col-span-1 flex flex-col gap-2 sticky top-24 self-start">
+        {/* Navigation Sidebar: Horizontal scrollable pills on mobile, vertical sticky sidebar on desktop */}
+        <div className="col-span-1 flex flex-row md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none md:sticky md:top-32 md:self-start">
           <Link 
             href="/account" 
-            className={`flex items-center gap-3 p-4 rounded-xl font-medium transition-colors ${
+            className={`flex items-center gap-2.5 px-4 py-2.5 md:p-4 rounded-xl font-medium transition-all whitespace-nowrap shrink-0 text-sm md:text-base ${
               pathname === '/account' 
-                ? 'bg-[var(--color-primary)] text-white shadow-md' 
-                : 'hover:bg-gray-100'
+                ? 'bg-[var(--color-primary)] text-white shadow-sm' 
+                : 'bg-white md:bg-transparent text-gray-700 hover:bg-gray-100 border border-gray-200/70 md:border-0'
             }`}
           >
-            <User size={20} />
-            {t('profile')}
+            <User size={18} className="shrink-0" />
+            <span>{t('profile')}</span>
           </Link>
           <Link 
             href="/account/orders" 
-            className={`flex items-center gap-3 p-4 rounded-xl font-medium transition-colors ${
+            className={`flex items-center gap-2.5 px-4 py-2.5 md:p-4 rounded-xl font-medium transition-all whitespace-nowrap shrink-0 text-sm md:text-base ${
               pathname.startsWith('/account/orders') 
-                ? 'bg-[var(--color-primary)] text-white shadow-md' 
-                : 'hover:bg-gray-100'
+                ? 'bg-[var(--color-primary)] text-white shadow-sm' 
+                : 'bg-white md:bg-transparent text-gray-700 hover:bg-gray-100 border border-gray-200/70 md:border-0'
             }`}
           >
-            <ShoppingBag size={20} />
-            {t('orders')}
+            <ShoppingBag size={18} className="shrink-0" />
+            <span>{t('orders')}</span>
           </Link>
           <Link 
             href="/account/addresses" 
-            className={`flex items-center gap-3 p-4 rounded-xl font-medium transition-colors ${
+            className={`flex items-center gap-2.5 px-4 py-2.5 md:p-4 rounded-xl font-medium transition-all whitespace-nowrap shrink-0 text-sm md:text-base ${
               pathname.startsWith('/account/addresses') 
-                ? 'bg-[var(--color-primary)] text-white shadow-md' 
-                : 'hover:bg-gray-100'
+                ? 'bg-[var(--color-primary)] text-white shadow-sm' 
+                : 'bg-white md:bg-transparent text-gray-700 hover:bg-gray-100 border border-gray-200/70 md:border-0'
             }`}
           >
-            <MapPin size={20} />
-            {t('addresses')}
+            <MapPin size={18} className="shrink-0" />
+            <span>{t('addresses')}</span>
           </Link>
           <Link 
             href="/account/wishlists" 
-            className={`flex items-center gap-3 p-4 rounded-xl font-medium transition-colors ${
+            className={`flex items-center gap-2.5 px-4 py-2.5 md:p-4 rounded-xl font-medium transition-all whitespace-nowrap shrink-0 text-sm md:text-base ${
               pathname.startsWith('/account/wishlists') 
-                ? 'bg-[var(--color-primary)] text-white shadow-md' 
-                : 'hover:bg-gray-100'
+                ? 'bg-[var(--color-primary)] text-white shadow-sm' 
+                : 'bg-white md:bg-transparent text-gray-700 hover:bg-gray-100 border border-gray-200/70 md:border-0'
             }`}
           >
-            <Heart size={20} />
-            {t('wishlists')}
+            <Heart size={18} className="shrink-0" />
+            <span>{t('wishlists')}</span>
           </Link>
           <Link 
             href="/account/designs" 
-            className={`flex items-center gap-3 p-4 rounded-xl font-medium transition-colors ${
+            className={`flex items-center gap-2.5 px-4 py-2.5 md:p-4 rounded-xl font-medium transition-all whitespace-nowrap shrink-0 text-sm md:text-base ${
               pathname.startsWith('/account/designs') 
-                ? 'bg-[var(--color-primary)] text-white shadow-md' 
-                : 'hover:bg-gray-100'
+                ? 'bg-[var(--color-primary)] text-white shadow-sm' 
+                : 'bg-white md:bg-transparent text-gray-700 hover:bg-gray-100 border border-gray-200/70 md:border-0'
             }`}
           >
-            <Brush size={20} />
-            {t('designs')}
+            <Brush size={18} className="shrink-0" />
+            <span>{t('designs')}</span>
           </Link>
-          <hr className="my-2 border-gray-200" />
+          
+          <hr className="hidden md:block my-2 border-gray-200" />
+          
           <button 
+            type="button"
             onClick={handleLogout}
-            className="flex items-center gap-3 p-4 rounded-xl font-medium transition-colors hover:bg-red-50 text-red-600 text-start w-full"
+            className="flex items-center gap-2.5 px-4 py-2.5 md:p-4 rounded-xl font-medium transition-all whitespace-nowrap shrink-0 text-sm md:text-base bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/60 md:border-0 text-start cursor-pointer md:w-full"
           >
-            <LogOut size={20} />
-            {t('logout', { fallback: 'Logout' })}
+            <LogOut size={18} className="shrink-0" />
+            <span>{t('logout', { fallback: 'Logout' })}</span>
           </button>
         </div>
 
