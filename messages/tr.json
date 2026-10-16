@@ -381,6 +381,8 @@
     "buyNow": "Hemen Satın Al",
     "addToCart": "Sepete Ekle",
     "totalPrice": "Toplam",
+    "clearCart": "Sepeti Temizle",
+    "clearCartConfirm": "Tüm sepeti boşaltmak istediğinizden emin misiniz?",
     "processing": "Tasarım Hazırlanıyor..."
   },
   "Checkout": {

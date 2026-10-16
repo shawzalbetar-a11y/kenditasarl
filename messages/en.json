@@ -381,6 +381,8 @@
     "buyNow": "Buy Now",
     "addToCart": "Add to Cart",
     "totalPrice": "Total",
+    "clearCart": "Clear Cart",
+    "clearCartConfirm": "Are you sure you want to clear your shopping cart?",
     "processing": "Processing Design..."
   },
   "Checkout": {

@@ -144,6 +144,8 @@ export default function CartPage() {
     }
   };
 
+  const [clearing, setClearing] = useState(false);
+
   const removeItem = async (id: string) => {
     setItems(prev => prev.filter(item => item.id !== id));
     try {
@@ -151,6 +153,27 @@ export default function CartPage() {
     } catch (err) {
       console.error(err);
       fetchCartItems(user.uid);
+    }
+  };
+
+  const clearCart = async () => {
+    if (!user || items.length === 0 || clearing) return;
+    if (!window.confirm(t('clearCartConfirm') || 'Are you sure you want to clear your cart?')) {
+      return;
+    }
+    setClearing(true);
+    const previousItems = [...items];
+    setItems([]); // optimistic clear
+    try {
+      const q = query(collection(db, 'cart_items'), where('user_id', '==', user.uid));
+      const snap = await getDocs(q);
+      const deletePromises = snap.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+    } catch (err) {
+      console.error(err);
+      setItems(previousItems);
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -211,81 +234,132 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)] pt-28 pb-16 px-4 md:px-8">
+    <div className="min-h-screen bg-[var(--color-background)] pt-24 sm:pt-28 pb-16 px-3 sm:px-4 md:px-8">
       <div className="max-w-[95rem] mx-auto">
-        <h1 className="text-3xl md:text-4xl font-bold mb-8 text-[var(--color-text)]">{t('title')}</h1>
         
-        <div className="flex flex-col lg:flex-row gap-10">
+        {/* Cart Header: Title and Clear Cart Button */}
+        <div className="flex items-center justify-between gap-3 mb-6 pb-2 border-b border-border/40">
+          <div className="flex items-baseline gap-2 sm:gap-3">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[var(--color-text)]">
+              {t('title')}
+            </h1>
+            <span className="text-xs sm:text-sm font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
+              {items.length}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={clearCart}
+            disabled={clearing}
+            className="flex items-center gap-1.5 text-xs sm:text-sm text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 active:scale-95 px-3 py-1.5 sm:py-2 rounded-xl font-semibold transition-all border border-red-200/70 disabled:opacity-50 cursor-pointer"
+            title={t('clearCart')}
+          >
+            {clearing ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+            <span>{t('clearCart')}</span>
+          </button>
+        </div>
+        
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-10">
           
           {/* Cart Items List */}
-          <div className="flex-1 flex flex-col gap-6">
+          <div className="flex-1 flex flex-col gap-4 sm:gap-6">
             {items.map(item => {
               const [color, size] = item.variant_id ? item.variant_id.split('_') : ['', ''];
               
               return (
-                <div key={item.id} className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-border/50 flex flex-col sm:flex-row gap-6 relative group">
-                  
-                  {/* Remove Button */}
-                  <button 
-                    onClick={() => removeItem(item.id)}
-                    className="absolute top-4 ltr:right-4 rtl:left-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                    title={t('remove')}
+                <div 
+                  key={item.id} 
+                  className="bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-border/60 hover:border-gray-300 transition-all flex flex-row gap-3 sm:gap-5 relative group"
+                >
+                  {/* Product Image Thumbnail */}
+                  <Link 
+                    href={`/products/${item.product_id}`} 
+                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-gray-50 shrink-0 relative block border border-gray-100 self-center sm:self-start"
                   >
-                    <Trash2 size={20} />
-                  </button>
-
-                  {/* Product Image */}
-                  <Link href={`/products/${item.product_id}`} className="w-full sm:w-32 h-40 sm:h-32 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 relative block border border-gray-100">
-                    <Image src={item.imageUrl} alt={item.title} fill className="object-cover" />
+                    <Image 
+                      src={item.imageUrl} 
+                      alt={item.title} 
+                      fill 
+                      sizes="(max-width: 640px) 96px, 128px"
+                      className="object-cover" 
+                    />
                   </Link>
 
-                  {/* Product Details */}
-                  <div className="flex-1 flex flex-col justify-between">
+                  {/* Product Details Column */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between">
                     <div>
-                      <Link href={`/products/${item.product_id}`} className="font-bold text-lg text-[var(--color-text)] hover:text-[var(--color-primary)] transition-colors pr-8">
-                        {item.title}
-                      </Link>
-                      <div className="flex items-center gap-3 mt-2 text-sm text-gray-500 font-medium">
+                      {/* Top Row: Title + Delete Button */}
+                      <div className="flex items-start justify-between gap-2">
+                        <Link 
+                          href={`/products/${item.product_id}`} 
+                          className="font-bold text-sm sm:text-base md:text-lg text-[var(--color-text)] hover:text-[var(--color-primary)] transition-colors line-clamp-2 leading-snug"
+                        >
+                          {item.title}
+                        </Link>
+
+                        {/* Individual Remove Button (Always clearly visible & accessible on mobile) */}
+                        <button 
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="p-1.5 sm:p-2 text-red-500 sm:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shrink-0 active:scale-95 cursor-pointer -mt-1 -mr-1 rtl:-mr-0 rtl:-ml-1"
+                          title={t('remove')}
+                          aria-label={t('remove')}
+                        >
+                          <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 sm:text-gray-400 sm:group-hover:text-red-500" />
+                        </button>
+                      </div>
+
+                      {/* Color & Size Badges */}
+                      <div className="flex flex-wrap items-center gap-2 mt-1 sm:mt-2 text-xs text-gray-500 font-medium">
                         {color && (
-                          <div className="flex items-center gap-1">
-                            <span className="w-4 h-4 rounded-full border border-gray-300 shadow-sm" style={{ backgroundColor: color === 'navy' ? '#000080' : color }} title={item.colorName || color} />
+                          <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
+                            <span 
+                              className="w-3.5 h-3.5 rounded-full border border-gray-300 shadow-xs shrink-0" 
+                              style={{ backgroundColor: color === 'navy' ? '#000080' : color }} 
+                              title={item.colorName || color} 
+                            />
                             <span className="capitalize">{item.colorName || color}</span>
                           </div>
                         )}
                         {size && (
-                          <>
-                            <span className="w-1 h-1 bg-gray-300 rounded-full" />
-                            <span>{t('size')}: {size}</span>
-                          </>
+                          <div className="bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
+                            <span>{t('size')}: <strong className="text-gray-700">{size}</strong></span>
+                          </div>
                         )}
                       </div>
                     </div>
                     
-                    <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
-                      {/* Price */}
-                      <span className="font-black text-xl text-[var(--color-primary)]">
+                    {/* Bottom Row: Price & Quantity Controls */}
+                    <div className="flex items-center justify-between gap-2 mt-3 sm:mt-4 pt-2 border-t border-gray-50 sm:border-0 sm:pt-0">
+                      {/* Unit Price */}
+                      <span className="font-black text-base sm:text-xl text-[var(--color-primary)] whitespace-nowrap">
                         {item.unit_price} ₺
                       </span>
                       
-                      {/* Quantity Control */}
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center h-10 bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                      {/* Quantity Controls */}
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center h-8 sm:h-9 bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
                           <button 
+                            type="button"
                             onClick={() => updateQuantity(item.id, item.quantity, item.maxStock, -1)}
                             disabled={item.quantity <= 1}
-                            className="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                            className="w-8 sm:w-9 h-full flex items-center justify-center text-gray-600 hover:bg-gray-200 active:bg-gray-300 disabled:opacity-40 transition-colors cursor-pointer"
+                            aria-label="Decrease quantity"
                           >
-                            <Minus size={16} />
+                            <Minus size={14} />
                           </button>
-                          <span className="w-10 text-center font-bold text-sm">
+                          <span className="w-8 sm:w-9 text-center font-bold text-xs sm:text-sm text-gray-800">
                             {item.quantity}
                           </span>
                           <button 
+                            type="button"
                             onClick={() => updateQuantity(item.id, item.quantity, item.maxStock, 1)}
                             disabled={item.quantity >= item.maxStock}
-                            className="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                            className="w-8 sm:w-9 h-full flex items-center justify-center text-gray-600 hover:bg-gray-200 active:bg-gray-300 disabled:opacity-40 transition-colors cursor-pointer"
+                            aria-label="Increase quantity"
                           >
-                            <Plus size={16} />
+                            <Plus size={14} />
                           </button>
                         </div>
                         {item.quantity >= item.maxStock && item.maxStock > 0 && (
