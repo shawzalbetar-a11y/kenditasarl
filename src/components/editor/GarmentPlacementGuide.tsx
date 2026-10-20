@@ -136,6 +136,125 @@ function GarmentMiniature({
   );
 }
 
+/**
+ * Dynamic Typewriter Animated Onboarding Hint
+ * Types letter-by-letter rapidly and elegantly above the placement buttons
+ * to guide and captivate the user on where and how to start.
+ */
+function TypewriterHint({
+  locale,
+  onOpenPlacements,
+  onOpenFreeMode,
+  hidden = false,
+}: {
+  locale: string;
+  onOpenPlacements: () => void;
+  onOpenFreeMode: () => void;
+  hidden?: boolean;
+}) {
+  const [text, setText] = useState('');
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+
+  const phrases = useMemo(() => {
+    if (locale === 'tr') {
+      return [
+        { type: 'placements', text: '👇 Baskı yerlerini seçmek için dokunun!' },
+        { type: 'free', text: '⚡ Veya serbest mod ile tam yüzey tasarlayın!' },
+      ];
+    }
+    if (locale === 'en') {
+      return [
+        { type: 'placements', text: '👇 Tap here to choose print placements!' },
+        { type: 'free', text: '⚡ Or switch to Free Mode to design anywhere!' },
+      ];
+    }
+    return [
+      { type: 'placements', text: '👇 اضغط هنا لاختيار مواضع الطباعة (الصدر، الظهر)!' },
+      { type: 'free', text: '⚡ أو اضغط (الوضع الحر) للتصميم بكامل القطعة!' },
+    ];
+  }, [locale]);
+
+  const currentItem = phrases[phraseIndex % phrases.length];
+
+  useEffect(() => {
+    if (dismissed || hidden) return;
+    const currentTargetText = currentItem.text;
+
+    let timer: NodeJS.Timeout;
+
+    if (!isDeleting && text.length < currentTargetText.length) {
+      // Rapid elegant typing: 35ms per character
+      timer = setTimeout(() => {
+        setText(currentTargetText.slice(0, text.length + 1));
+      }, 35);
+    } else if (!isDeleting && text.length === currentTargetText.length) {
+      // Pause at full sentence: 3200ms
+      timer = setTimeout(() => {
+        setIsDeleting(true);
+      }, 3200);
+    } else if (isDeleting && text.length > 0) {
+      // Fast backspace: 18ms per character
+      timer = setTimeout(() => {
+        setText(currentTargetText.slice(0, text.length - 1));
+      }, 18);
+    } else if (isDeleting && text.length === 0) {
+      // Advance to next tip
+      setIsDeleting(false);
+      setPhraseIndex((prev) => prev + 1);
+    }
+
+    return () => clearTimeout(timer);
+  }, [text, isDeleting, phraseIndex, currentItem.text, dismissed, hidden]);
+
+  if (dismissed || hidden) return null;
+
+  const handleClick = () => {
+    if (currentItem.type === 'free') {
+      onOpenFreeMode();
+    } else {
+      onOpenPlacements();
+    }
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      className="absolute -top-9 sm:-top-10 start-0 z-40 flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white rounded-full shadow-lg shadow-orange-500/25 border border-amber-300/60 animate-in fade-in slide-in-from-bottom-2 duration-300 cursor-pointer select-none whitespace-nowrap active:scale-95 group hover:shadow-xl hover:scale-[1.02] transition-all"
+    >
+      {/* Dynamic Sparkle */}
+      <span className="flex items-center text-amber-200 animate-spin shrink-0" style={{ animationDuration: '4s' }}>
+        <Sparkles size={12} />
+      </span>
+
+      {/* Typed Text */}
+      <span className="text-[10px] sm:text-[11px] font-black tracking-wide text-white drop-shadow-xs">
+        {text}
+      </span>
+
+      {/* Blinking Cursor */}
+      <span className="inline-block w-1 h-3 bg-white rounded-full animate-pulse opacity-90 shrink-0" />
+
+      {/* Speech-bubble pointer tail */}
+      <div className="absolute -bottom-1 start-6 w-2 h-2 bg-orange-600 rotate-45 border-r border-b border-amber-300/60" />
+
+      {/* Dismiss Button */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setDismissed(true);
+        }}
+        className="ms-1 p-0.5 rounded-full hover:bg-black/20 text-amber-100 hover:text-white transition-colors cursor-pointer"
+        title={locale === 'tr' ? 'Kapat' : locale === 'en' ? 'Close' : 'إغلاق التلميح'}
+      >
+        <X size={10} />
+      </button>
+    </div>
+  );
+}
+
 export default function GarmentPlacementGuide({
   garmentType = 'tshirt',
   allowedPlacements,
@@ -225,6 +344,14 @@ export default function GarmentPlacementGuide({
 
   return (
     <div className={`relative ${className}`}>
+      {/* Dynamic Typewriter Animated Onboarding Hint (Focal interactive guide above the button) */}
+      <TypewriterHint
+        locale={locale}
+        onOpenPlacements={() => setIsExpanded(true)}
+        onOpenFreeMode={() => setShowDisclaimerModal(true)}
+        hidden={isExpanded || showDisclaimerModal}
+      />
+
       {/* ========================================================= */}
       {/* 1. MOBILE STREAMLINED VIEW (< sm): Inline Pill Beside Faces */}
       {/* ========================================================= */}
