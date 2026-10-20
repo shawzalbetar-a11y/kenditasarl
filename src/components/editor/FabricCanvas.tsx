@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { fabric } from 'fabric';
-import { Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw } from 'lucide-react';
+import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import AuthModal from '@/components/auth/AuthModal';
 import { auth, db } from '@/lib/firebase';
@@ -32,6 +32,8 @@ import {
 } from '@/lib/pricing';
 import { optimizeImageForUpload } from '@/lib/image-optimizer';
 import { setupModernFabricControls, applyModernObjectStyles as applyCustomModernStyles, applyModernStyleToObject } from '@/lib/fabricCustomControls';
+import GarmentPlacementGuide from './GarmentPlacementGuide';
+import { PlacementSpec, getPlacementById, isFaceMatching } from '@/lib/printPlacementConfig';
 
 const COLOR_MAP: Record<string, string> = {
   white: '#FFFFFF',
@@ -245,6 +247,37 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const [syncAllColors, setSyncAllColors] = useState<boolean>(false);
   const syncAllColorsRef = useRef(syncAllColors);
   syncAllColorsRef.current = syncAllColors;
+
+  // Per-color placements management with unification toggle
+  const [placementsByColor, setPlacementsByColor] = useState<Record<string, string[]>>({});
+  const [syncPlacementsAcrossColors, setSyncPlacementsAcrossColors] = useState<boolean>(false);
+  const syncPlacementsAcrossColorsRef = useRef(syncPlacementsAcrossColors);
+  syncPlacementsAcrossColorsRef.current = syncPlacementsAcrossColors;
+
+  const normalizeColorKey = useCallback((color?: string | null): string => {
+    if (!color) return 'default';
+    const s = color.trim().toLowerCase();
+    return COLOR_MAP[s]?.toLowerCase() || s;
+  }, []);
+
+  const activeColorKey = normalizeColorKey(selectedColor);
+
+  const currentSelectedPlacementIds = useMemo(() => {
+    if (syncPlacementsAcrossColors) {
+      return placementsByColor['__synced__'] || placementsByColor[activeColorKey] || [];
+    }
+    return placementsByColor[activeColorKey] || [];
+  }, [placementsByColor, activeColorKey, syncPlacementsAcrossColors]);
+
+  const allSelectedPlacements = useMemo(() => {
+    return currentSelectedPlacementIds
+      .map(id => getPlacementById(id, productData?.config?.garmentType))
+      .filter((p): p is PlacementSpec => !!p);
+  }, [currentSelectedPlacementIds, productData]);
+
+  const activeFaceSelectedPlacements = useMemo(() => {
+    return allSelectedPlacements.filter(p => isFaceMatching(p.targetFace, activeFace));
+  }, [allSelectedPlacements, activeFace]);
 
   const uniqueSelectedColors = useMemo(() => {
     const list: string[] = [];
@@ -636,6 +669,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           variantMatrix,
           totalOrderQuantity,
           activeFace,
+          placementsByColor,
+          syncPlacementsAcrossColors,
+          selectedPlacementIds: currentSelectedPlacementIds,
           updatedAt: new Date().toISOString()
         };
         try {
@@ -1513,6 +1549,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             }
             if (typeof parsed.totalPrice === 'number') setTotalPrice(parsed.totalPrice);
             if (parsed.priceBreakdown) setPriceBreakdown(parsed.priceBreakdown);
+            if (parsed.placementsByColor && typeof parsed.placementsByColor === 'object') {
+              setPlacementsByColor(parsed.placementsByColor);
+            } else if (Array.isArray(parsed.selectedPlacementIds)) {
+              const initialKey = normalizeColorKey(parsed.selectedColor || resolvedInitialColor);
+              setPlacementsByColor({ [initialKey]: parsed.selectedPlacementIds });
+            }
+            if (typeof parsed.syncPlacementsAcrossColors === 'boolean') {
+              setSyncPlacementsAcrossColors(parsed.syncPlacementsAcrossColors);
+            }
             recalculatePrice(undefined, parsed.faces);
             console.log("📥 Draft memory loaded with matrix & pricing.");
           }
@@ -1815,6 +1860,109 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     }
     setActiveFace(face);
   }, [canvas, activeFace, selectedColor, getFaceStateKey]);
+
+  const handleTogglePlacement = useCallback((placement: PlacementSpec) => {
+    const targetFace = placement.targetFace;
+
+    setPlacementsByColor(prev => {
+      const currentList = syncPlacementsAcrossColorsRef.current
+        ? (prev['__synced__'] || prev[activeColorKey] || [])
+        : (prev[activeColorKey] || []);
+
+      const exists = currentList.includes(placement.id);
+      const updatedList = exists
+        ? currentList.filter(id => id !== placement.id)
+        : [...currentList, placement.id];
+
+      if (syncPlacementsAcrossColorsRef.current) {
+        const nextMap: Record<string, string[]> = {
+          ...prev,
+          ['__synced__']: updatedList,
+          [activeColorKey]: updatedList,
+        };
+        availableColors.forEach((c: string) => {
+          nextMap[normalizeColorKey(c)] = updatedList;
+        });
+        uniqueSelectedColors.forEach((c: string) => {
+          nextMap[normalizeColorKey(c)] = updatedList;
+        });
+        return nextMap;
+      } else {
+        return {
+          ...prev,
+          [activeColorKey]: updatedList,
+        };
+      }
+    });
+
+    if (!currentSelectedPlacementIds.includes(placement.id)) {
+      if (targetFace && !isFaceMatching(targetFace, activeFace)) {
+        switchFace(targetFace);
+      }
+    }
+
+    if (canvas) {
+      const activeObj = canvas.getActiveObject();
+      if (activeObj) {
+        canvas.centerObject(activeObj);
+        activeObj.setCoords();
+        canvas.requestRenderAll();
+      }
+    }
+  }, [activeColorKey, activeFace, canvas, currentSelectedPlacementIds, switchFace, availableColors, uniqueSelectedColors, normalizeColorKey]);
+
+  const handleToggleSyncPlacements = useCallback(() => {
+    setSyncPlacementsAcrossColors(prev => {
+      const next = !prev;
+      if (next) {
+        // Propagate current color's placements to all colors
+        const currentList = placementsByColor[activeColorKey] || [];
+        setPlacementsByColor(oldMap => {
+          const newMap: Record<string, string[]> = {
+            ...oldMap,
+            ['__synced__']: currentList,
+          };
+          availableColors.forEach((c: string) => {
+            newMap[normalizeColorKey(c)] = currentList;
+          });
+          uniqueSelectedColors.forEach((c: string) => {
+            newMap[normalizeColorKey(c)] = currentList;
+          });
+          return newMap;
+        });
+      }
+      return next;
+    });
+  }, [activeColorKey, placementsByColor, availableColors, uniqueSelectedColors, normalizeColorKey]);
+
+  const handleApplyToAllColors = useCallback(() => {
+    const currentList = placementsByColor[activeColorKey] || [];
+    setPlacementsByColor(oldMap => {
+      const newMap: Record<string, string[]> = {
+        ...oldMap,
+        ['__synced__']: currentList,
+      };
+      availableColors.forEach((c: string) => {
+        newMap[normalizeColorKey(c)] = currentList;
+      });
+      uniqueSelectedColors.forEach((c: string) => {
+        newMap[normalizeColorKey(c)] = currentList;
+      });
+      return newMap;
+    });
+    showToast(
+      locale === 'tr' ? 'Konumlar tüm renklere uygulandı' : locale === 'en' ? 'Placements copied to all colors' : 'تم تعميم مواضع هذا اللون على كافة الألوان',
+      'success'
+    );
+  }, [activeColorKey, placementsByColor, availableColors, uniqueSelectedColors, normalizeColorKey, showToast, locale]);
+
+  const handleClearPlacements = useCallback(() => {
+    setPlacementsByColor(prev => ({
+      ...prev,
+      [activeColorKey]: [],
+      ['__synced__']: [],
+    }));
+  }, [activeColorKey]);
 
   const switchColor = useCallback((newColor: string) => {
     if (isColorEqual(selectedColor, newColor)) return;
@@ -2604,6 +2752,26 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         );
       };
       
+      const selectedPlacementsData = allSelectedPlacements.map(p => ({
+        id: p.id,
+        targetFace: p.targetFace,
+        nameAr: p.nameAr,
+        nameEn: p.nameEn,
+        nameTr: p.nameTr,
+        descriptionAr: p.descriptionAr,
+        offsetFromCollarCm: p.offsetFromCollarCm,
+        dimensions: {
+          recommended: {
+            widthCm: p.dimensions.recommended.widthCm,
+            heightCm: p.dimensions.recommended.heightCm,
+          }
+        }
+      }));
+
+      const placementNamesSummary = allSelectedPlacements.map(p => 
+        locale === 'tr' ? p.nameTr : locale === 'en' ? p.nameEn : p.nameAr
+      ).join(' + ');
+
       // NOTE: canvas_json & production_snapshot are stored as JSON strings to prevent Firestore nested entity & dot-notation key errors. Use JSON.parse() when retrieving.
       const docData = sanitizeForFirestore({
         user_id: auth.currentUser?.uid || 'guest_user',
@@ -2628,6 +2796,13 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         preview_image_url: primaryPreviewUrl,
         print_ready_url: primaryPreviewUrl,
         preview_images: previewImagesByFace,
+        placements_by_color: placementsByColor,
+        sync_placements_across_colors: syncPlacementsAcrossColors,
+        selected_placement_ids: currentSelectedPlacementIds,
+        selected_placements: selectedPlacementsData,
+        placement_id: currentSelectedPlacementIds.join(','),
+        placement_title: placementNamesSummary || null,
+        placement_offset_collar_cm: allSelectedPlacements[0]?.offsetFromCollarCm ?? null,
         totalPrice: Number(totalPrice) || basePrice,
         status: action === 'save' ? 'saved' : 'draft',
         updated_at: new Date().toISOString()
@@ -2650,6 +2825,35 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
         for (const item of itemsToCart) {
           const itemVariantId = `${item.color}_${item.size}`;
+          const itemColorKey = normalizeColorKey(item.color);
+          const itemPlacementIds = syncPlacementsAcrossColors
+            ? (placementsByColor['__synced__'] || placementsByColor[activeColorKey] || [])
+            : (placementsByColor[itemColorKey] || placementsByColor[activeColorKey] || []);
+
+          const itemPlacements = itemPlacementIds
+            .map(id => getPlacementById(id, productData?.config?.garmentType))
+            .filter((p): p is PlacementSpec => !!p);
+
+          const itemPlacementsData = itemPlacements.map(p => ({
+            id: p.id,
+            targetFace: p.targetFace,
+            nameAr: p.nameAr,
+            nameEn: p.nameEn,
+            nameTr: p.nameTr,
+            descriptionAr: p.descriptionAr,
+            offsetFromCollarCm: p.offsetFromCollarCm,
+            dimensions: {
+              recommended: {
+                widthCm: p.dimensions.recommended.widthCm,
+                heightCm: p.dimensions.recommended.heightCm,
+              }
+            }
+          }));
+
+          const itemPlacementNames = itemPlacements.map(p =>
+            locale === 'tr' ? p.nameTr : locale === 'en' ? p.nameEn : p.nameAr
+          ).join(' + ');
+
           const itemColorFrontKey = getFaceStateKey('front', item.color);
           const itemColorActiveKey = getFaceStateKey(activeFace, item.color);
           const itemPreview = previewImagesByFace[itemColorFrontKey] || previewImagesByFace[itemColorActiveKey] || primaryPreviewUrl;
@@ -2659,6 +2863,11 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             variant_id: itemVariantId,
             design_id: currentDesignIdRef.current || 'unknown_design',
             design_type: 'custom',
+            selected_placement_ids: itemPlacementIds,
+            selected_placements: itemPlacementsData,
+            placement_id: itemPlacementIds.join(','),
+            placement_name: itemPlacementNames || null,
+            placement_offset_collar_cm: itemPlacements[0]?.offsetFromCollarCm ?? null,
             quantity: item.quantity,
             unit_price: Number(totalPrice) || basePrice,
             preview_image_url: itemPreview,
@@ -3115,39 +3324,73 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               }}
             >
               <div className="w-full h-full relative origin-top-left" style={{ transform: `scale(1)` }}>
-                {/* Visual Print Area Boundary Frame */}
-                <div
-                  className={cn(
-                    "absolute pointer-events-none z-10 border-2 border-dashed transition-all duration-200",
-                    isObjectOutOfBounds 
-                      ? "border-red-500 ring-2 ring-red-400/40" 
-                      : "border-gray-400/80"
-                  )}
-                  style={{
-                    left: `${printAreaLeftPercent}%`,
-                    top: `${printAreaTopPercent}%`,
-                    width: `${printAreaWidthPercent}%`,
-                    height: `${printAreaHeightPercent}%`,
-                    borderRadius: currentPrintArea.shape === 'circle' ? '50%' : '0px',
-                  }}
-                />
-
-                {/* Safe Area Guide Line */}
-                {currentPrintArea.safeArea && (
+                {/* Visual Guides & Overlays Container (Isolated from Canvas DOM to prevent insertBefore collision) */}
+                <div className="w-full h-full absolute inset-0 pointer-events-none z-25">
+                  {/* Visual Print Area Boundary Frame */}
                   <div
-                    className="absolute border border-dashed border-amber-400/70 pointer-events-none z-15"
+                    className={cn(
+                      "absolute pointer-events-none z-10 border-2 border-dashed transition-all duration-200",
+                      isObjectOutOfBounds 
+                        ? "border-red-500 ring-2 ring-red-400/40" 
+                        : "border-gray-400/80"
+                    )}
                     style={{
-                      left: `${((PAD_X + currentPrintArea.safeArea.left) / totalCanvasWidth) * 100}%`,
-                      top: `${((PAD_Y + currentPrintArea.safeArea.top) / totalCanvasHeight) * 100}%`,
-                      width: `${(currentPrintArea.safeArea.width / totalCanvasWidth) * 100}%`,
-                      height: `${(currentPrintArea.safeArea.height / totalCanvasHeight) * 100}%`,
-                      borderRadius: currentPrintArea.safeArea.shape === 'circle' ? '50%' : '0px'
+                      left: `${printAreaLeftPercent}%`,
+                      top: `${printAreaTopPercent}%`,
+                      width: `${printAreaWidthPercent}%`,
+                      height: `${printAreaHeightPercent}%`,
+                      borderRadius: currentPrintArea.shape === 'circle' ? '50%' : '0px',
                     }}
                   />
-                )}
 
-                {/* Extended Fabric Canvas */}
-                <canvas ref={canvasRef} className="w-full h-full relative z-20 bg-transparent" />
+                  {/* Safe Area Guide Line */}
+                  {currentPrintArea.safeArea && (
+                    <div
+                      className="absolute border border-dashed border-amber-400/70 pointer-events-none z-15"
+                      style={{
+                        left: `${((PAD_X + currentPrintArea.safeArea.left) / totalCanvasWidth) * 100}%`,
+                        top: `${((PAD_Y + currentPrintArea.safeArea.top) / totalCanvasHeight) * 100}%`,
+                        width: `${(currentPrintArea.safeArea.width / totalCanvasWidth) * 100}%`,
+                        height: `${(currentPrintArea.safeArea.height / totalCanvasHeight) * 100}%`,
+                        borderRadius: currentPrintArea.safeArea.shape === 'circle' ? '50%' : '0px'
+                      }}
+                    />
+                  )}
+
+                  {/* Active Face Selected Placements Boundaries & Badges */}
+                  {activeFaceSelectedPlacements.map((spec) => {
+                    const box = spec.canvasBox;
+                    return (
+                      <div
+                        key={spec.id}
+                        className="absolute border-2 border-dashed border-amber-500/90 bg-amber-500/10 rounded-2xl pointer-events-none transition-all duration-300 animate-in fade-in z-25"
+                        style={{
+                          left: `${box.leftPercent}%`,
+                          top: `${box.topPercent}%`,
+                          width: `${box.maxWidthPercent}%`,
+                          height: `${box.maxHeightPercent}%`,
+                        }}
+                      >
+                        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-600/95 backdrop-blur-xs text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-amber-300 whitespace-nowrap">
+                          <span>📍</span>
+                          <span>{locale === 'tr' ? spec.nameTr : locale === 'en' ? spec.nameEn : spec.nameAr}</span>
+                          <span>•</span>
+                          <span dir="ltr">{spec.dimensions.recommended.widthCm}×{spec.dimensions.recommended.heightCm} cm</span>
+                          <span>•</span>
+                          <span className="flex items-center gap-0.5 text-amber-100">
+                            <Ruler size={9} />
+                            {locale === 'tr' ? `${spec.offsetFromCollarCm} cm` : locale === 'en' ? `${spec.offsetFromCollarCm} cm` : `${spec.offsetFromCollarCm} سم`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Isolated Extended Fabric Canvas Container (Sole child is canvas, completely safe from React DOM diffing) */}
+                <div className="w-full h-full absolute inset-0 z-20 pointer-events-auto">
+                  <canvas ref={canvasRef} className="w-full h-full relative bg-transparent" />
+                </div>
               </div>
             </div>
           </div>
@@ -3293,6 +3536,27 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                 </span>
               </button>
             </div>
+          </div>
+
+          {/* Approved Heat Transfer Print Placement Guide (دليل مواضع وقياسات الطباعة الحرارية المعتمدة) */}
+          <div className={cn(
+            "absolute left-1/2 -translate-x-1/2 z-35 pointer-events-auto max-w-[95%] w-auto",
+            availableFaces.length > 1 ? "bottom-14 sm:bottom-15" : "bottom-3 sm:bottom-4"
+          )}>
+            <GarmentPlacementGuide
+              garmentType={productData?.config?.garmentType || productData?.category || 'tshirt'}
+              allowedPlacements={productData?.config?.allowedPlacements}
+              activeFace={activeFace}
+              selectedColor={selectedColor}
+              selectedPlacementIds={currentSelectedPlacementIds}
+              syncPlacementsAcrossColors={syncPlacementsAcrossColors}
+              onToggleSyncPlacements={handleToggleSyncPlacements}
+              onApplyToAllColors={handleApplyToAllColors}
+              onTogglePlacement={handleTogglePlacement}
+              onSelectFace={switchFace}
+              onClearAll={handleClearPlacements}
+              locale={locale}
+            />
           </div>
 
           {/* Product Faces / View Switcher (Positioned at bottom center, compact gap for zero mobile scrolling) */}

@@ -18,6 +18,8 @@ export interface ProductImageItem {
     targetDPI?: number;
     printMethod?: string;
     bleed?: number;
+    placementId?: string;
+    offsetFromCollarCm?: number;
   };
 }
 
@@ -50,6 +52,8 @@ export interface PrintArea {
   physicalHeightCm?: number;  // Physical print height in centimeters (e.g. 40 cm)
   targetDPI?: number;         // Print DPI resolution for factory output (e.g. 300 DPI)
   printMethod?: 'DTF' | 'DTG' | 'Sublimation' | 'ScreenPrint' | 'Embroidery' | string;
+  placementId?: string;       // ID of approved placement (e.g. left_chest, center_chest, full_front)
+  offsetFromCollarCm?: number;// Distance from collar in centimeters
 }
 
 export interface ImageSpecificGeometry {
@@ -78,6 +82,9 @@ export interface CustomizationConfig {
   allowFreeMode?: boolean;
 
   productType?: string; // The normalized product category (e.g. 't-shirt', 'mug', 'hat')
+  garmentType?: 'tshirt' | 'hoodie' | 'sweatshirt' | 'generic';
+  allowedPlacements?: string[]; // IDs of approved placements allowed for this product
+  defaultPlacementId?: string;
   
   // Legacy / fallback face configurations
   faces: {
@@ -160,6 +167,12 @@ export function normalizePrintArea(pa?: Partial<PrintArea> | null, defaultId: st
   }
   if (pa?.printMethod) {
     result.printMethod = pa.printMethod;
+  }
+  if (pa?.placementId) {
+    result.placementId = pa.placementId;
+  }
+  if (typeof pa?.offsetFromCollarCm === 'number') {
+    result.offsetFromCollarCm = pa.offsetFromCollarCm;
   }
 
   if (pa?.clipPath) {
