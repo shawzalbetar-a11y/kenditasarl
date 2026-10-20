@@ -138,8 +138,9 @@ function GarmentMiniature({
 
 /**
  * Dynamic Typewriter Animated Onboarding Hint
- * Types letter-by-letter rapidly and elegantly above the placement buttons
- * to guide and captivate the user on where and how to start.
+ * Anchored to left-0 so it never clips past screen boundaries,
+ * with an intelligent sliding arrow pointer that shifts to point
+ * directly at [المعتمد] or [الوضع الحر] based on the current tip.
  */
 function TypewriterHint({
   locale,
@@ -160,19 +161,19 @@ function TypewriterHint({
   const phrases = useMemo(() => {
     if (locale === 'tr') {
       return [
-        { type: 'placements', text: '👇 Baskı yerlerini seçmek için dokunun!' },
-        { type: 'free', text: '⚡ Veya serbest mod ile tam yüzey tasarlayın!' },
+        { type: 'placements', text: '👇 Baskı yerlerini seçmek için dokunun' },
+        { type: 'free', text: '⚡ Veya serbest mod ile özgürce tasarlayın' },
       ];
     }
     if (locale === 'en') {
       return [
-        { type: 'placements', text: '👇 Tap here to choose print placements!' },
-        { type: 'free', text: '⚡ Or switch to Free Mode to design anywhere!' },
+        { type: 'placements', text: '👇 Tap here to choose print placements' },
+        { type: 'free', text: '⚡ Or design freely with Free Mode' },
       ];
     }
     return [
-      { type: 'placements', text: '👇 اضغط هنا لاختيار مواضع الطباعة (الصدر، الظهر)!' },
-      { type: 'free', text: '⚡ أو اضغط (الوضع الحر) للتصميم بكامل القطعة!' },
+      { type: 'placements', text: '👇 اضغط هنا لاختيار مواضع الطباعة' },
+      { type: 'free', text: '⚡ أو صمّم بحرية مع "الوضع الحر"' },
     ];
   }, [locale]);
 
@@ -218,10 +219,12 @@ function TypewriterHint({
     }
   };
 
+  const isPlacementTip = currentItem.type === 'placements';
+
   return (
     <div
       onClick={handleClick}
-      className="absolute -top-9 sm:-top-10 start-0 z-40 flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white rounded-full shadow-lg shadow-orange-500/25 border border-amber-300/60 animate-in fade-in slide-in-from-bottom-2 duration-300 cursor-pointer select-none whitespace-nowrap active:scale-95 group hover:shadow-xl hover:scale-[1.02] transition-all"
+      className="absolute -top-9 sm:-top-10 left-0 z-40 flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white rounded-full shadow-lg shadow-orange-500/25 border border-amber-300/60 animate-in fade-in slide-in-from-bottom-2 duration-300 cursor-pointer select-none whitespace-nowrap max-w-[calc(100vw-36px)] sm:max-w-md active:scale-95 group hover:shadow-xl hover:scale-[1.02] transition-all"
     >
       {/* Dynamic Sparkle */}
       <span className="flex items-center text-amber-200 animate-spin shrink-0" style={{ animationDuration: '4s' }}>
@@ -229,15 +232,20 @@ function TypewriterHint({
       </span>
 
       {/* Typed Text */}
-      <span className="text-[10px] sm:text-[11px] font-black tracking-wide text-white drop-shadow-xs">
+      <span className="text-[10px] sm:text-[11px] font-black tracking-wide text-white drop-shadow-xs truncate">
         {text}
       </span>
 
       {/* Blinking Cursor */}
       <span className="inline-block w-1 h-3 bg-white rounded-full animate-pulse opacity-90 shrink-0" />
 
-      {/* Speech-bubble pointer tail */}
-      <div className="absolute -bottom-1 start-6 w-2 h-2 bg-orange-600 rotate-45 border-r border-b border-amber-300/60" />
+      {/* Dynamic Sliding Speech-Bubble Pointer Tail (Points to [المعتمد] when discussing placements, and slides to [الحر] when discussing free mode) */}
+      <div 
+        className="absolute -bottom-1 w-2.5 h-2.5 bg-orange-600 rotate-45 border-r border-b border-amber-300/60 transition-all duration-300"
+        style={{
+          left: isPlacementTip ? '88px' : '22px'
+        }}
+      />
 
       {/* Dismiss Button */}
       <button
@@ -246,7 +254,7 @@ function TypewriterHint({
           e.stopPropagation();
           setDismissed(true);
         }}
-        className="ms-1 p-0.5 rounded-full hover:bg-black/20 text-amber-100 hover:text-white transition-colors cursor-pointer"
+        className="ms-1 p-0.5 rounded-full hover:bg-black/20 text-amber-100 hover:text-white transition-colors cursor-pointer shrink-0"
         title={locale === 'tr' ? 'Kapat' : locale === 'en' ? 'Close' : 'إغلاق التلميح'}
       >
         <X size={10} />
