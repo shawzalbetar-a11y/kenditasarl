@@ -3299,6 +3299,52 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none rounded-lg shadow-sm"
             />
 
+            {/* Approved Print Placements Overlays (Positioned relative to the entire garment mockup 0-100%) */}
+            {activeFaceSelectedPlacements.length > 0 && (
+              <div className="absolute inset-0 w-full h-full pointer-events-none z-15">
+                {activeFaceSelectedPlacements.map((spec) => {
+                  const box = spec.canvasBox;
+                  const isFullCoverage = spec.id === 'full_front' || spec.id === 'full_back' || spec.id === 'full_back_hoodie';
+
+                  return (
+                    <div
+                      key={spec.id}
+                      className={cn(
+                        "absolute border-2 border-dashed pointer-events-none transition-all duration-300 animate-in fade-in",
+                        isFullCoverage
+                          ? "border-amber-600/80 bg-amber-500/5 rounded-3xl"
+                          : "border-amber-500/90 bg-amber-500/10 rounded-2xl"
+                      )}
+                      style={{
+                        left: `${box.leftPercent}%`,
+                        top: `${box.topPercent}%`,
+                        width: `${box.maxWidthPercent}%`,
+                        height: `${box.maxHeightPercent}%`,
+                      }}
+                    >
+                      {/* Badge positioning: inside top corner for full-front to prevent collision with center_chest, or above top for smaller placements */}
+                      <div className={cn(
+                        "absolute bg-amber-600/95 backdrop-blur-xs text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-amber-300 whitespace-nowrap z-20",
+                        isFullCoverage
+                          ? "top-2 start-2"
+                          : "-top-3 sm:-top-3.5 left-1/2 -translate-x-1/2"
+                      )}>
+                        <span>📍</span>
+                        <span>{locale === 'tr' ? spec.nameTr : locale === 'en' ? spec.nameEn : spec.nameAr}</span>
+                        <span>•</span>
+                        <span dir="ltr">{spec.dimensions.recommended.widthCm}×{spec.dimensions.recommended.heightCm} cm</span>
+                        <span>•</span>
+                        <span className="flex items-center gap-0.5 text-amber-100">
+                          <Ruler size={9} />
+                          {locale === 'tr' ? `${spec.offsetFromCollarCm} cm` : locale === 'en' ? `${spec.offsetFromCollarCm} cm` : `${spec.offsetFromCollarCm} سم`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* 
               ARCHITECTURAL NOTE FOR CURVED PRODUCTS (Mugs / Hats / Tumblers):
               To achieve photorealistic 3D cylindrical displacement and reflections without heavy WebGL:
@@ -3357,34 +3403,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                     />
                   )}
 
-                  {/* Active Face Selected Placements Boundaries & Badges */}
-                  {activeFaceSelectedPlacements.map((spec) => {
-                    const box = spec.canvasBox;
-                    return (
-                      <div
-                        key={spec.id}
-                        className="absolute border-2 border-dashed border-amber-500/90 bg-amber-500/10 rounded-2xl pointer-events-none transition-all duration-300 animate-in fade-in z-25"
-                        style={{
-                          left: `${box.leftPercent}%`,
-                          top: `${box.topPercent}%`,
-                          width: `${box.maxWidthPercent}%`,
-                          height: `${box.maxHeightPercent}%`,
-                        }}
-                      >
-                        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-600/95 backdrop-blur-xs text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-amber-300 whitespace-nowrap">
-                          <span>📍</span>
-                          <span>{locale === 'tr' ? spec.nameTr : locale === 'en' ? spec.nameEn : spec.nameAr}</span>
-                          <span>•</span>
-                          <span dir="ltr">{spec.dimensions.recommended.widthCm}×{spec.dimensions.recommended.heightCm} cm</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-0.5 text-amber-100">
-                            <Ruler size={9} />
-                            {locale === 'tr' ? `${spec.offsetFromCollarCm} cm` : locale === 'en' ? `${spec.offsetFromCollarCm} cm` : `${spec.offsetFromCollarCm} سم`}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+
                 </div>
 
                 {/* Isolated Extended Fabric Canvas Container (Sole child is canvas, completely safe from React DOM diffing) */}
