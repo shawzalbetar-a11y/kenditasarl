@@ -256,9 +256,17 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   // Free Placement Mode state (الوضع الحر)
   const [isFreeMode, setIsFreeMode] = useState<boolean>(false);
+  const isFreeModeRef = useRef<boolean>(isFreeMode);
+  isFreeModeRef.current = isFreeMode;
+
   const handleToggleFreeMode = useCallback((enabled: boolean) => {
     setIsFreeMode(enabled);
   }, []);
+
+  // Hovered placement during drag & drop snapping
+  const [hoveredPlacementId, setHoveredPlacementId] = useState<string | null>(null);
+  const hoveredPlacementIdRef = useRef<string | null>(null);
+  hoveredPlacementIdRef.current = hoveredPlacementId;
 
   const normalizeColorKey = useCallback((color?: string | null): string => {
     if (!color) return 'default';
@@ -284,6 +292,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const activeFaceSelectedPlacements = useMemo(() => {
     return allSelectedPlacements.filter(p => isFaceMatching(p.targetFace, activeFace));
   }, [allSelectedPlacements, activeFace]);
+
+  const activeFaceSelectedPlacementsRef = useRef<PlacementSpec[]>(activeFaceSelectedPlacements);
+  activeFaceSelectedPlacementsRef.current = activeFaceSelectedPlacements;
 
   const uniqueSelectedColors = useMemo(() => {
     const list: string[] = [];
@@ -1191,12 +1202,109 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const overlayWidth = (currentPrintArea.width / nativeWidth) * 100;
   const overlayHeight = (currentPrintArea.height / nativeHeight) * 100;
 
-  // Helper to format controls, auto-scale within 80% bounds, and center object
+  // Helper to resolve precise placement coordinates in Fabric virtual canvas space
+  const getPlacementFabricBounds = useCallback((spec: PlacementSpec) => {
+    const calibrated = productData?.config?.calibratedPlacements?.[spec.id];
+    const hasCalibrated = !!calibrated && !!calibrated.nativeWidth && calibrated.nativeWidth > 0;
+    
+    const nw = nativeWidth || 2000;
+    const nh = nativeHeight || 2000;
+
+    const mockupX = hasCalibrated ? calibrated.x : (spec.canvasBox.leftPercent / 100) * nw;
+    const mockupY = hasCalibrated ? calibrated.y : (spec.canvasBox.topPercent / 100) * nh;
+    const mockupW = hasCalibrated ? calibrated.width : (spec.canvasBox.maxWidthPercent / 100) * nw;
+    const mockupH = hasCalibrated ? calibrated.height : (spec.canvasBox.maxHeightPercent / 100) * nh;
+
+    // Coordinate in Fabric Canvas space (where origin 0,0 is at currentPrintArea.left, currentPrintArea.top)
+    const fabricLeft = mockupX - currentPrintArea.left;
+    const fabricTop = mockupY - currentPrintArea.top;
+    const fabricWidth = mockupW;
+    const fabricHeight = mockupH;
+    const fabricCenterX = fabricLeft + fabricWidth / 2;
+    const fabricCenterY = fabricTop + fabricHeight / 2;
+
+    return {
+      spec,
+      id: spec.id,
+      nameAr: spec.nameAr,
+      nameEn: spec.nameEn,
+      nameTr: spec.nameTr,
+      mockupX,
+      mockupY,
+      mockupW,
+      mockupH,
+      fabricLeft,
+      fabricTop,
+      fabricWidth,
+      fabricHeight,
+      fabricCenterX,
+      fabricCenterY,
+    };
+  }, [productData?.config?.calibratedPlacements, nativeWidth, nativeHeight, currentPrintArea.left, currentPrintArea.top]);
+
+  // Helper to format controls, auto-scale within placement or free bounds, and position object
   const prepareAndAddObject = (obj: fabric.Object, canvasInstance?: fabric.Canvas) => {
     const c = canvasInstance || canvas;
     if (!c) return;
 
-    // 1. Auto-Fit (Scale down if larger than 80% of canvas width or height)
+    // Approved Standards Mode: Automatically insert into target approved placement!
+    if (!isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
+      const existingObjects = c.getObjects().filter(o => o.name !== 'background' && o.name !== 'mockup' && o.name !== 'print_area_guide');
+      let targetPlacement = activeFaceSelectedPlacementsRef.current[0];
+
+      // If multiple placements exist, look for an empty placement without objects
+      for (const spec of activeFaceSelectedPlacementsRef.current) {
+        const bounds = getPlacementFabricBounds(spec);
+        const hasObj = existingObjects.some(o => {
+          const pt = o.getCenterPoint();
+          return (
+            pt.x >= bounds.fabricLeft &&
+            pt.x <= bounds.fabricLeft + bounds.fabricWidth &&
+            pt.y >= bounds.fabricTop &&
+            pt.y <= bounds.fabricTop + bounds.fabricHeight
+          );
+        });
+        if (!hasObj) {
+          targetPlacement = spec;
+          break;
+        }
+      }
+
+      const pBounds = getPlacementFabricBounds(targetPlacement);
+      const maxWidth = pBounds.fabricWidth * 0.85;
+      const maxHeight = pBounds.fabricHeight * 0.85;
+      const currentWidth = obj.getScaledWidth();
+      const currentHeight = obj.getScaledHeight();
+
+      if (currentWidth > maxWidth || currentHeight > maxHeight) {
+        const scaleFactor = Math.min(maxWidth / (obj.width || 1), maxHeight / (obj.height || 1));
+        obj.scale(scaleFactor);
+      }
+
+      obj.set({
+        originX: 'center',
+        originY: 'center',
+        left: pBounds.fabricCenterX,
+        top: pBounds.fabricCenterY,
+      });
+      (obj as any).assignedPlacementId = targetPlacement.id;
+
+      c.add(obj);
+      c.setActiveObject(obj);
+      obj.setCoords();
+      applyCustomModernStyles(c);
+      c.renderAll();
+
+      setToastNotification({
+        type: 'info',
+        text: locale === 'tr' ? `Tasarım ${targetPlacement.nameTr} konumuna yerleştirildi` :
+              locale === 'en' ? `Design placed in ${targetPlacement.nameEn}` :
+              `تم وضع التصميم داخل: ${targetPlacement.nameAr}`,
+      });
+      return;
+    }
+
+    // Free Mode: Scale within 80% of full printable face
     const maxWidth = currentPrintArea.width * 0.8;
     const maxHeight = currentPrintArea.height * 0.8;
     const currentWidth = obj.getScaledWidth();
@@ -1207,7 +1315,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       obj.scale(scaleFactor);
     }
 
-    // 2. Add to Canvas and Center
     c.add(obj);
     c.centerObject(obj);
     c.setActiveObject(obj);
@@ -1551,14 +1658,107 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       }
     };
 
-    initCanvas.on('object:moving', validateAndSnap);
-    initCanvas.on('object:scaling', validateAndSnap);
-    initCanvas.on('object:modified', () => {
+    // Real-time hover detection over approved placement boxes during object drag
+    const handleObjectMoving = (e: fabric.IEvent) => {
+      const activeObj = e.target || initCanvas.getActiveObject();
+      if (!activeObj) return;
+
+      if (!isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
+        const centerPt = activeObj.getCenterPoint();
+        let matchedPlacementId: string | null = null;
+
+        for (const spec of activeFaceSelectedPlacementsRef.current) {
+          const p = getPlacementFabricBounds(spec);
+          if (
+            centerPt.x >= p.fabricLeft - 30 &&
+            centerPt.x <= p.fabricLeft + p.fabricWidth + 30 &&
+            centerPt.y >= p.fabricTop - 30 &&
+            centerPt.y <= p.fabricTop + p.fabricHeight + 30
+          ) {
+            matchedPlacementId = spec.id;
+            break;
+          }
+        }
+
+        if (matchedPlacementId !== hoveredPlacementIdRef.current) {
+          hoveredPlacementIdRef.current = matchedPlacementId;
+          setHoveredPlacementId(matchedPlacementId);
+        }
+      }
+
+      validateAndSnap();
+    };
+
+    // Magnetic Snapping on drop into the nearest / hovered placement
+    const handleObjectModified = (e: fabric.IEvent) => {
+      const activeObj = e.target || initCanvas.getActiveObject();
+      if (activeObj && !isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
+        const centerPt = activeObj.getCenterPoint();
+        let targetSpec: PlacementSpec | null = null;
+        let minDistance = Infinity;
+
+        for (const spec of activeFaceSelectedPlacementsRef.current) {
+          const p = getPlacementFabricBounds(spec);
+          const dx = centerPt.x - p.fabricCenterX;
+          const dy = centerPt.y - p.fabricCenterY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          const isInside =
+            centerPt.x >= p.fabricLeft - 40 &&
+            centerPt.x <= p.fabricLeft + p.fabricWidth + 40 &&
+            centerPt.y >= p.fabricTop - 40 &&
+            centerPt.y <= p.fabricTop + p.fabricHeight + 40;
+
+          if (isInside || dist < minDistance) {
+            minDistance = dist;
+            targetSpec = spec;
+          }
+        }
+
+        if (targetSpec) {
+          const p = getPlacementFabricBounds(targetSpec);
+          activeObj.set({
+            originX: 'center',
+            originY: 'center',
+            left: p.fabricCenterX,
+            top: p.fabricCenterY,
+          });
+
+          // Scale down if larger than placement bounds
+          const maxW = p.fabricWidth * 0.9;
+          const maxH = p.fabricHeight * 0.9;
+          const curW = activeObj.getScaledWidth();
+          const curH = activeObj.getScaledHeight();
+          if (curW > maxW || curH > maxH) {
+            const scaleFactor = Math.min(maxW / (activeObj.width || 1), maxH / (activeObj.height || 1));
+            activeObj.scale(scaleFactor);
+          }
+
+          (activeObj as any).assignedPlacementId = targetSpec.id;
+          activeObj.setCoords();
+          initCanvas.renderAll();
+
+          setToastNotification({
+            type: 'success',
+            text: locale === 'tr' ? `Tasarım ${targetSpec.nameTr} konumuna kilitlendi 🎯` :
+                  locale === 'en' ? `Design snapped to ${targetSpec.nameEn} 🎯` :
+                  `تم إدخال وتثبيت التصميم في: ${targetSpec.nameAr} 🎯`,
+          });
+        }
+
+        hoveredPlacementIdRef.current = null;
+        setHoveredPlacementId(null);
+      }
+
       validateAndSnap();
       if (!isRestoring.current) {
         saveHistoryStateCanvas(initCanvas);
       }
-    });
+    };
+
+    initCanvas.on('object:moving', handleObjectMoving);
+    initCanvas.on('object:scaling', validateAndSnap);
+    initCanvas.on('object:modified', handleObjectModified);
     initCanvas.on('object:added', (opt) => {
       if (!isRestoring.current && opt?.target?.name !== 'background' && opt?.target?.name !== 'mockup' && opt?.target?.name !== 'print_area_guide') {
         saveHistoryStateCanvas(initCanvas);
@@ -2056,17 +2256,62 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       cursorColor: '#2563EB',
     } as any);
 
-    // تكبير أبعاد النص الفعلي ليملأ العرض المخصص تاركاً 3 ملم يميناً ويساراً
-    text.scaleToWidth(targetTextWidth);
-    const maxHeight = currentPrintArea.height * 0.35;
-    if (text.getScaledHeight() > maxHeight) {
-      text.scaleToHeight(maxHeight);
+    let targetLeft = currentPrintArea.width / 2;
+    let targetTop = currentPrintArea.height / 2;
+    let assignedPlacementId: string | undefined = undefined;
+
+    if (!isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
+      const existingObjects = canvas.getObjects().filter(o => o.name !== 'background' && o.name !== 'mockup' && o.name !== 'print_area_guide');
+      let targetPlacement = activeFaceSelectedPlacementsRef.current[0];
+      for (const spec of activeFaceSelectedPlacementsRef.current) {
+        const bounds = getPlacementFabricBounds(spec);
+        const hasObj = existingObjects.some(o => {
+          const pt = o.getCenterPoint();
+          return (
+            pt.x >= bounds.fabricLeft &&
+            pt.x <= bounds.fabricLeft + bounds.fabricWidth &&
+            pt.y >= bounds.fabricTop &&
+            pt.y <= bounds.fabricTop + bounds.fabricHeight
+          );
+        });
+        if (!hasObj) {
+          targetPlacement = spec;
+          break;
+        }
+      }
+
+      const pBounds = getPlacementFabricBounds(targetPlacement);
+      targetLeft = pBounds.fabricCenterX;
+      targetTop = pBounds.fabricCenterY;
+      assignedPlacementId = targetPlacement.id;
+
+      const maxTextW = pBounds.fabricWidth * 0.85;
+      const maxTextH = pBounds.fabricHeight * 0.45;
+      text.scaleToWidth(Math.min(targetTextWidth, maxTextW));
+      if (text.getScaledHeight() > maxTextH) {
+        text.scaleToHeight(maxTextH);
+      }
+    } else {
+      text.scaleToWidth(targetTextWidth);
+      const maxHeight = currentPrintArea.height * 0.35;
+      if (text.getScaledHeight() > maxHeight) {
+        text.scaleToHeight(maxHeight);
+      }
+    }
+
+    text.set({
+      left: targetLeft,
+      top: targetTop,
+      originX: 'center',
+      originY: 'center',
+    });
+    if (assignedPlacementId) {
+      (text as any).assignedPlacementId = assignedPlacementId;
     }
 
     canvas.add(text);
-    canvas.centerObject(text);
-    text.setCoords();
     canvas.setActiveObject(text);
+    text.setCoords();
     applyCustomModernStyles(canvas);
     canvas.renderAll();
     saveHistoryState();
@@ -3348,6 +3593,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                 {activeFaceSelectedPlacements.map((spec) => {
                   const box = spec.canvasBox;
                   const isFullCoverage = spec.id === 'full_front' || spec.id === 'full_back' || spec.id === 'full_back_hoodie';
+                  const isHovered = hoveredPlacementId === spec.id;
 
                   // Dynamic Admin Calibration Snap: If admin calibrated this placement for this product via drag & drop, snap to calibrated coordinates!
                   const calibrated = productData?.config?.calibratedPlacements?.[spec.id];
@@ -3364,10 +3610,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                     <div
                       key={spec.id}
                       className={cn(
-                        "absolute border-2 border-dashed pointer-events-none transition-all duration-300 animate-in fade-in",
-                        isFullCoverage
-                          ? "border-amber-600/80 bg-amber-500/5 rounded-3xl"
-                          : "border-amber-500/90 bg-amber-500/10 rounded-2xl"
+                        "absolute border-2 border-dashed pointer-events-none transition-all duration-200 animate-in fade-in",
+                        isHovered
+                          ? "border-amber-500 bg-amber-400/25 ring-4 ring-amber-400/60 shadow-xl scale-[1.01]"
+                          : isFullCoverage
+                            ? "border-amber-600/80 bg-amber-500/5 rounded-3xl"
+                            : "border-amber-500/90 bg-amber-500/10 rounded-2xl"
                       )}
                       style={{
                         left: `${leftPercent}%`,
@@ -3378,20 +3626,31 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                     >
                       {/* Badge positioning */}
                       <div className={cn(
-                        "absolute bg-amber-600/95 backdrop-blur-xs text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-amber-300 whitespace-nowrap z-20",
+                        "absolute text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border whitespace-nowrap z-20 transition-all",
+                        isHovered
+                          ? "bg-amber-500 border-white text-white ring-2 ring-amber-300 animate-pulse"
+                          : "bg-amber-600/95 backdrop-blur-xs border-amber-300",
                         isFullCoverage
                           ? "top-2 start-2"
                           : "-top-3 sm:-top-3.5 left-1/2 -translate-x-1/2"
                       )}>
-                        <span>📍</span>
+                        <span>{isHovered ? '🎯' : '📍'}</span>
                         <span>{locale === 'tr' ? spec.nameTr : locale === 'en' ? spec.nameEn : spec.nameAr}</span>
-                        <span>•</span>
-                        <span dir="ltr">{displayWidthCm}×{displayHeightCm} cm</span>
-                        <span>•</span>
-                        <span className="flex items-center gap-0.5 text-amber-100">
-                          <Ruler size={9} />
-                          {locale === 'tr' ? `${displayOffsetCm} cm` : locale === 'en' ? `${displayOffsetCm} cm` : `${displayOffsetCm} سم`}
-                        </span>
+                        {isHovered ? (
+                          <span className="font-black text-amber-100">
+                            ({locale === 'tr' ? 'Bırak ve Yerleştir' : locale === 'en' ? 'Drop Here' : 'إفلات لتثبيت التصميم'})
+                          </span>
+                        ) : (
+                          <>
+                            <span>•</span>
+                            <span dir="ltr">{displayWidthCm}×{displayHeightCm} cm</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-0.5 text-amber-100">
+                              <Ruler size={9} />
+                              {locale === 'tr' ? `${displayOffsetCm} cm` : locale === 'en' ? `${displayOffsetCm} cm` : `${displayOffsetCm} سم`}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   );
@@ -3403,7 +3662,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             {isFreeMode && (
               <div className="absolute inset-0 w-full h-full pointer-events-none z-15">
                 <div
-                  className="absolute border-2 border-dashed border-amber-500/80 bg-amber-500/5 rounded-3xl pointer-events-none transition-all duration-300"
+                  className={cn(
+                    "absolute border-2 border-dashed pointer-events-none transition-all duration-300",
+                    isObjectOutOfBounds
+                      ? "border-red-500 ring-4 ring-red-400/40 bg-red-500/5 rounded-3xl"
+                      : "border-amber-500/80 bg-amber-500/5 rounded-3xl"
+                  )}
                   style={{
                     left: `${(currentPrintArea.left / nativeWidth) * 100}%`,
                     top: `${(currentPrintArea.top / nativeHeight) * 100}%`,
@@ -3446,27 +3710,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               }}
             >
               <div className="w-full h-full relative origin-top-left" style={{ transform: `scale(1)` }}>
-                {/* Visual Guides & Overlays Container (Isolated from Canvas DOM to prevent insertBefore collision) */}
+                {/* Visual Guides & Overlays Container (Safe from diff collisions) */}
                 <div className="w-full h-full absolute inset-0 pointer-events-none z-25">
-                  {/* Visual Print Area Boundary Frame */}
-                  <div
-                    className={cn(
-                      "absolute pointer-events-none z-10 border-2 border-dashed transition-all duration-200",
-                      isObjectOutOfBounds 
-                        ? "border-red-500 ring-2 ring-red-400/40" 
-                        : "border-gray-400/80"
-                    )}
-                    style={{
-                      left: `${printAreaLeftPercent}%`,
-                      top: `${printAreaTopPercent}%`,
-                      width: `${printAreaWidthPercent}%`,
-                      height: `${printAreaHeightPercent}%`,
-                      borderRadius: currentPrintArea.shape === 'circle' ? '50%' : '0px',
-                    }}
-                  />
-
-                  {/* Safe Area Guide Line */}
-                  {currentPrintArea.safeArea && (
+                  {/* Safe Area Guide Line (Free Mode Only) */}
+                  {isFreeMode && currentPrintArea.safeArea && (
                     <div
                       className="absolute border border-dashed border-amber-400/70 pointer-events-none z-15"
                       style={{
@@ -3478,8 +3725,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                       }}
                     />
                   )}
-
-
                 </div>
 
                 {/* Isolated Extended Fabric Canvas Container (Sole child is canvas, completely safe from React DOM diffing) */}
