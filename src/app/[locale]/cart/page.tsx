@@ -327,12 +327,22 @@ export default function CartPage() {
                             <span>{t('size')}: <strong className="text-gray-700">{size}</strong></span>
                           </div>
                         )}
-                        {item.placement_name && (
+                        {item.placement_mode === 'free' ? (
+                          <div className="w-full flex items-center justify-between gap-1.5 bg-amber-500/10 text-amber-900 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-amber-300 mt-1">
+                            <span className="flex items-center gap-1">
+                              <span>⚡</span>
+                              <span>{locale === 'tr' ? 'Serbest Konumlandırma Modu' : locale === 'en' ? 'Free Placement Mode' : 'الوضع الحر (تصميم حر بكامل الواجهة)'}</span>
+                            </span>
+                            <span className="text-[10px] text-amber-800 font-semibold bg-amber-100/90 border border-amber-200 px-2 py-0.5 rounded-md">
+                              {locale === 'tr' ? 'Sorumluluk Reddi Onaylı ✓' : locale === 'en' ? 'Disclaimer Acknowledged ✓' : 'إخلاء المسؤولية مقبول ✓'}
+                            </span>
+                          </div>
+                        ) : item.placement_name ? (
                           <div className="w-full flex items-center gap-1.5 bg-amber-50/90 text-amber-900 text-xs font-semibold px-2.5 py-1 rounded-lg border border-amber-200 mt-1">
                             <span>🎯</span>
                             <span className="font-bold">{item.placement_name}</span>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                     

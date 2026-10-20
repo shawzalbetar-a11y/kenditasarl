@@ -66,6 +66,19 @@ export interface ImageSpecificGeometry {
   printArea: PrintArea;
 }
 
+export interface CalibratedPlacementRect {
+  placementId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  nativeWidth: number;
+  nativeHeight: number;
+  physicalWidthCm?: number;
+  physicalHeightCm?: number;
+  offsetFromCollarCm?: number;
+}
+
 export interface FaceConfig {
   name: string;
   enabled?: boolean;
@@ -86,6 +99,23 @@ export interface CustomizationConfig {
   allowedPlacements?: string[]; // IDs of approved placements allowed for this product
   defaultPlacementId?: string;
   
+  // Custom calibrated placement coordinates per product (mapped by placementId)
+  calibratedPlacements?: {
+    [placementId: string]: CalibratedPlacementRect;
+  };
+
+  // Full face boundary configured for Free Mode per face
+  freeModeBounds?: {
+    [faceId: string]: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      nativeWidth: number;
+      nativeHeight: number;
+    };
+  };
+
   // Legacy / fallback face configurations
   faces: {
     [faceId: string]: FaceConfig;

@@ -254,6 +254,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const syncPlacementsAcrossColorsRef = useRef(syncPlacementsAcrossColors);
   syncPlacementsAcrossColorsRef.current = syncPlacementsAcrossColors;
 
+  // Free Placement Mode state (الوضع الحر)
+  const [isFreeMode, setIsFreeMode] = useState<boolean>(false);
+  const handleToggleFreeMode = useCallback((enabled: boolean) => {
+    setIsFreeMode(enabled);
+  }, []);
+
   const normalizeColorKey = useCallback((color?: string | null): string => {
     if (!color) return 'default';
     const s = color.trim().toLowerCase();
@@ -1101,8 +1107,41 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const currentFaceMockupUrl = getFaceMockupForColor(activeFace, selectedColor);
 
-  // Current Print Area dynamically resolved for activeFace and current mockup image
+  // Current Print Area dynamically resolved for activeFace and current mockup image (or expanded in Free Mode)
   const currentPrintArea: PrintArea = React.useMemo(() => {
+    if (isFreeMode) {
+      const freeBounds = productData?.config?.freeModeBounds?.[activeFace];
+      const nw = 2000;
+      const nh = 2000;
+      if (freeBounds) {
+        return {
+          id: `free_${activeFace}`,
+          name: `FREE_${activeFace.toUpperCase()}`,
+          left: freeBounds.x,
+          top: freeBounds.y,
+          width: freeBounds.width,
+          height: freeBounds.height,
+          nativeWidth: freeBounds.nativeWidth || nw,
+          nativeHeight: freeBounds.nativeHeight || nh,
+        };
+      } else {
+        const isSleeve = activeFace === 'left' || activeFace === 'right' || activeFace === 'left_shoulder' || activeFace === 'right_shoulder';
+        const fw = Math.round(nw * (isSleeve ? 0.45 : 0.54));
+        const fh = Math.round(nh * (isSleeve ? 0.65 : 0.68));
+        const fx = Math.round((nw - fw) / 2);
+        const fy = Math.round(nh * (isSleeve ? 0.18 : 0.18));
+        return {
+          id: `free_${activeFace}`,
+          name: `FREE_${activeFace.toUpperCase()}`,
+          left: fx,
+          top: fy,
+          width: fw,
+          height: fh,
+          nativeWidth: nw,
+          nativeHeight: nh,
+        };
+      }
+    }
     if (productData?.config) {
       return resolveImagePrintAreaGeometry({
         config: productData.config,
@@ -1120,7 +1159,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       nativeWidth: 400,
       nativeHeight: 500
     };
-  }, [productData?.config, activeFace, currentFaceMockupUrl, configFaces]);
+  }, [isFreeMode, productData?.config, activeFace, currentFaceMockupUrl, configFaces]);
 
   // Extract dynamic native image dimensions with safe fallbacks
   const nativeWidth = currentPrintArea.nativeWidth || 400;
@@ -2803,6 +2842,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         placement_id: currentSelectedPlacementIds.join(','),
         placement_title: placementNamesSummary || null,
         placement_offset_collar_cm: allSelectedPlacements[0]?.offsetFromCollarCm ?? null,
+        placement_mode: isFreeMode ? 'free' : 'standard',
+        free_mode_disclaimer_accepted: isFreeMode,
         totalPrice: Number(totalPrice) || basePrice,
         status: action === 'save' ? 'saved' : 'draft',
         updated_at: new Date().toISOString()
@@ -2868,6 +2909,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             placement_id: itemPlacementIds.join(','),
             placement_name: itemPlacementNames || null,
             placement_offset_collar_cm: itemPlacements[0]?.offsetFromCollarCm ?? null,
+            placement_mode: isFreeMode ? 'free' : 'standard',
+            free_mode_disclaimer_accepted: isFreeMode,
             quantity: item.quantity,
             unit_price: Number(totalPrice) || basePrice,
             preview_image_url: itemPreview,
@@ -3300,11 +3343,22 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             />
 
             {/* Approved Print Placements Overlays (Positioned relative to the entire garment mockup 0-100%) */}
-            {activeFaceSelectedPlacements.length > 0 && (
+            {!isFreeMode && activeFaceSelectedPlacements.length > 0 && (
               <div className="absolute inset-0 w-full h-full pointer-events-none z-15">
                 {activeFaceSelectedPlacements.map((spec) => {
                   const box = spec.canvasBox;
                   const isFullCoverage = spec.id === 'full_front' || spec.id === 'full_back' || spec.id === 'full_back_hoodie';
+
+                  // Dynamic Admin Calibration Snap: If admin calibrated this placement for this product via drag & drop, snap to calibrated coordinates!
+                  const calibrated = productData?.config?.calibratedPlacements?.[spec.id];
+                  const hasCalibrated = !!calibrated && !!calibrated.nativeWidth && calibrated.nativeWidth > 0;
+                  const leftPercent = hasCalibrated ? (calibrated.x / calibrated.nativeWidth) * 100 : box.leftPercent;
+                  const topPercent = hasCalibrated ? (calibrated.y / calibrated.nativeHeight) * 100 : box.topPercent;
+                  const widthPercent = hasCalibrated ? (calibrated.width / calibrated.nativeWidth) * 100 : box.maxWidthPercent;
+                  const heightPercent = hasCalibrated ? (calibrated.height / calibrated.nativeHeight) * 100 : box.maxHeightPercent;
+                  const displayWidthCm = calibrated?.physicalWidthCm || spec.dimensions.recommended.widthCm;
+                  const displayHeightCm = calibrated?.physicalHeightCm || spec.dimensions.recommended.heightCm;
+                  const displayOffsetCm = calibrated?.offsetFromCollarCm ?? spec.offsetFromCollarCm;
 
                   return (
                     <div
@@ -3316,13 +3370,13 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                           : "border-amber-500/90 bg-amber-500/10 rounded-2xl"
                       )}
                       style={{
-                        left: `${box.leftPercent}%`,
-                        top: `${box.topPercent}%`,
-                        width: `${box.maxWidthPercent}%`,
-                        height: `${box.maxHeightPercent}%`,
+                        left: `${leftPercent}%`,
+                        top: `${topPercent}%`,
+                        width: `${widthPercent}%`,
+                        height: `${heightPercent}%`,
                       }}
                     >
-                      {/* Badge positioning: inside top corner for full-front to prevent collision with center_chest, or above top for smaller placements */}
+                      {/* Badge positioning */}
                       <div className={cn(
                         "absolute bg-amber-600/95 backdrop-blur-xs text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-amber-300 whitespace-nowrap z-20",
                         isFullCoverage
@@ -3332,16 +3386,38 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                         <span>📍</span>
                         <span>{locale === 'tr' ? spec.nameTr : locale === 'en' ? spec.nameEn : spec.nameAr}</span>
                         <span>•</span>
-                        <span dir="ltr">{spec.dimensions.recommended.widthCm}×{spec.dimensions.recommended.heightCm} cm</span>
+                        <span dir="ltr">{displayWidthCm}×{displayHeightCm} cm</span>
                         <span>•</span>
                         <span className="flex items-center gap-0.5 text-amber-100">
                           <Ruler size={9} />
-                          {locale === 'tr' ? `${spec.offsetFromCollarCm} cm` : locale === 'en' ? `${spec.offsetFromCollarCm} cm` : `${spec.offsetFromCollarCm} سم`}
+                          {locale === 'tr' ? `${displayOffsetCm} cm` : locale === 'en' ? `${displayOffsetCm} cm` : `${displayOffsetCm} سم`}
                         </span>
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Free Mode Full Face Active Guideline Overlay */}
+            {isFreeMode && (
+              <div className="absolute inset-0 w-full h-full pointer-events-none z-15">
+                <div
+                  className="absolute border-2 border-dashed border-amber-500/80 bg-amber-500/5 rounded-3xl pointer-events-none transition-all duration-300"
+                  style={{
+                    left: `${(currentPrintArea.left / nativeWidth) * 100}%`,
+                    top: `${(currentPrintArea.top / nativeHeight) * 100}%`,
+                    width: `${(currentPrintArea.width / nativeWidth) * 100}%`,
+                    height: `${(currentPrintArea.height / nativeHeight) * 100}%`,
+                  }}
+                >
+                  <div className="absolute top-2 start-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[9px] sm:text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 border border-amber-300 z-20">
+                    <Sparkles size={10} className="text-amber-200" />
+                    <span>
+                      {locale === 'tr' ? 'Serbest Mod (Tam Yüzey)' : locale === 'en' ? 'Free Mode (Full Face)' : 'الوضع الحر (كامل الواجهة)'}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -3575,6 +3651,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               onSelectFace={switchFace}
               onClearAll={handleClearPlacements}
               locale={locale}
+              isFreeMode={isFreeMode}
+              onToggleFreeMode={handleToggleFreeMode}
+              allowFreeMode={productData?.config?.allowFreeMode !== false}
             />
           </div>
 
