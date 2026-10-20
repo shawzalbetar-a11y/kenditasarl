@@ -3878,10 +3878,13 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             </div>
           </div>
 
-          {/* Approved Heat Transfer Print Placement Guide (دليل مواضع وقياسات الطباعة الحرارية المعتمدة) */}
+          {/* Approved Heat Transfer Print Placement Guide & Mode Switcher (Anchored bottom-left on desktop below 'تصاميمي', streamlined above faces on mobile) */}
           <div className={cn(
-            "absolute left-1/2 -translate-x-1/2 z-35 pointer-events-auto max-w-[95%] w-auto",
-            availableFaces.length > 1 ? "bottom-14 sm:bottom-15" : "bottom-3 sm:bottom-4"
+            "absolute z-35 pointer-events-auto transition-all duration-300",
+            // Desktop: Anchored at bottom-left below "تصاميمي", aligned with bottom of canvas area
+            "sm:bottom-3 sm:left-3 sm:right-auto sm:translate-x-0 sm:max-w-xs",
+            // Mobile: Streamlined single-row bar centered right above the view switcher
+            availableFaces.length > 1 ? "bottom-13.5 left-1/2 -translate-x-1/2 max-w-[95%] w-auto" : "bottom-3 left-1/2 -translate-x-1/2 max-w-[95%] w-auto"
           )}>
             <GarmentPlacementGuide
               garmentType={productData?.config?.garmentType || productData?.category || 'tshirt'}

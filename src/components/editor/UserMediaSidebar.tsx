@@ -128,7 +128,7 @@ export default function UserMediaSidebar({
 
   // Render Expanded 2-Column Grid Drawer Panel
   return (
-    <div className="absolute top-14 left-3 z-30 w-60 sm:w-68 max-w-[calc(100vw-24px)] max-h-[calc(100%-80px)] bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200/80 flex flex-col transition-all duration-300 animate-in fade-in slide-in-from-left-3 select-none">
+    <div className="absolute top-14 left-3 z-30 w-60 sm:w-68 max-w-[calc(100vw-24px)] max-h-[calc(100%-195px)] bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200/80 flex flex-col transition-all duration-300 animate-in fade-in slide-in-from-left-3 select-none">
       {/* Panel Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100">
         <div className="flex items-center gap-1.5 min-w-0">
