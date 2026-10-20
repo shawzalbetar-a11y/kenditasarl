@@ -224,34 +224,52 @@ export default function GarmentPlacementGuide({
   if (allPlacementsList.length === 0) return null;
 
   return (
-    <div className={`relative ${className}`}>
-      {/* 1. Quick Trigger Pill Bar on the Canvas (Compact, thumb-friendly, no overlap) */}
-      <button
-        type="button"
-        onClick={() => setIsExpanded(true)}
-        className="bg-white/95 backdrop-blur-md rounded-2xl p-1.5 sm:p-2 border border-gray-200/90 shadow-md hover:shadow-lg flex items-center justify-between gap-2 max-w-full cursor-pointer select-none active:scale-[0.98] transition-all text-right"
-        title={locale === 'tr' ? 'Baskı Konumlarını Seç' : locale === 'en' ? 'Select Print Placements' : 'فتح دليل واختيار مواضع الطباعة'}
-      >
-        {isFreeMode ? (
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="p-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 shadow-xs animate-pulse">
-              <Zap size={15} />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] sm:text-xs font-black text-amber-700 truncate">
-                  {locale === 'tr' ? 'Serbest Mod Aktif ⚡' : locale === 'en' ? 'Free Mode Active ⚡' : 'الوضع الحر مفعّل ⚡'}
-                </span>
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 border border-amber-300">
-                  {locale === 'tr' ? 'Tam Yüzey' : locale === 'en' ? 'Full Face' : 'كامل الواجهة'}
-                </span>
-              </div>
-              <span className="text-[10px] text-gray-500 truncate mt-0.5">
-                {locale === 'tr' ? 'Tasarım serbestçe konumlandırılabilir' : locale === 'en' ? 'Free placement anywhere' : 'حرية التحريك والتكبير بكامل القطعة'}
-              </span>
-            </div>
-          </div>
-        ) : (
+    <div className={`relative flex flex-col items-center gap-1.5 ${className}`}>
+      {/* 1. Permanent Segmented Mode Switcher (Always visible directly on the canvas preview!) */}
+      <div className="flex items-center p-1 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200/90 shadow-md gap-1 select-none pointer-events-auto">
+        <button
+          type="button"
+          onClick={() => {
+            if (isFreeMode && onToggleFreeMode) {
+              onToggleFreeMode(false);
+            }
+          }}
+          className={`px-3 sm:px-4 py-1.5 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+            !isFreeMode
+              ? 'bg-amber-500 text-white shadow-xs'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <Shirt size={14} className={!isFreeMode ? 'text-white' : 'text-gray-500'} />
+          <span>{locale === 'tr' ? 'Onaylı Standart Konumlar' : locale === 'en' ? 'Approved Standards' : 'المواضع المعتمدة'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (!isFreeMode) {
+              setShowDisclaimerModal(true);
+            }
+          }}
+          className={`px-3 sm:px-4 py-1.5 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+            isFreeMode
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/25 ring-2 ring-amber-400/30'
+              : 'text-amber-700 hover:text-amber-800 hover:bg-amber-50/80'
+          }`}
+        >
+          <Zap size={14} className={isFreeMode ? 'text-white' : 'text-amber-500'} />
+          <span>{locale === 'tr' ? 'Serbest Mod ⚡' : locale === 'en' ? 'Free Mode ⚡' : 'الوضع الحر ⚡'}</span>
+        </button>
+      </div>
+
+      {/* 2. Placements Selection Trigger Pill or Free Mode Status Pill */}
+      {!isFreeMode ? (
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          className="bg-white/95 backdrop-blur-md rounded-2xl p-1.5 sm:p-2 border border-gray-200/90 shadow-md hover:shadow-lg flex items-center justify-between gap-2 max-w-full cursor-pointer select-none active:scale-[0.98] transition-all text-right pointer-events-auto"
+          title={locale === 'tr' ? 'Baskı Konumlarını Seç' : locale === 'en' ? 'Select Print Placements' : 'فتح دليل واختيار مواضع الطباعة'}
+        >
           <div className="flex items-center gap-2 min-w-0">
             <div className="p-1.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 shrink-0">
               <Shirt size={15} />
@@ -300,13 +318,43 @@ export default function GarmentPlacementGuide({
               </div>
             </div>
           </div>
-        )}
 
-        {/* Small Open Arrow */}
-        <div className="p-1 rounded-xl bg-gray-100 text-gray-500 shrink-0">
-          <ChevronUp size={15} />
+          {/* Small Open Arrow */}
+          <div className="p-1 rounded-xl bg-gray-100 text-gray-500 shrink-0">
+            <ChevronUp size={15} />
+          </div>
+        </button>
+      ) : (
+        <div className="bg-amber-50/95 backdrop-blur-md rounded-2xl p-1.5 sm:p-2 border border-amber-300 shadow-md flex items-center justify-between gap-2 max-w-full pointer-events-auto select-none text-right">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 shadow-xs animate-pulse">
+              <Zap size={15} />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] sm:text-xs font-black text-amber-900 truncate">
+                  {locale === 'tr' ? 'Serbest Mod Aktif ⚡' : locale === 'en' ? 'Free Mode Active ⚡' : 'الوضع الحر مفعّل ⚡'}
+                </span>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-amber-200 text-amber-900 border border-amber-400">
+                  {locale === 'tr' ? 'Tam Yüzey' : locale === 'en' ? 'Full Face' : 'كامل الواجهة'}
+                </span>
+              </div>
+              <span className="text-[10px] text-amber-800 font-medium truncate mt-0.5">
+                {locale === 'tr' ? 'Sorumluluk reddi onaylandı • Serbestçe tasarlayın' : locale === 'en' ? 'Disclaimer accepted • Design freely' : 'إخلاء المسؤولية مقبول • صمم بحرية في كامل القطعة'}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onToggleFreeMode && onToggleFreeMode(false)}
+            className="px-2.5 py-1 rounded-xl bg-white hover:bg-gray-100 text-gray-700 text-[10px] font-bold border border-gray-300 shadow-2xs shrink-0 cursor-pointer active:scale-95"
+            title="العودة للمواضع القياسية"
+          >
+            {locale === 'tr' ? 'Standarta Dön' : locale === 'en' ? 'Revert' : 'رجوع'}
+          </button>
         </div>
-      </button>
+      )}
 
       {/* 2. Professional Native-Feel Mobile Bottom Sheet & Desktop Modal (Rendered via React Portal) */}
       {isExpanded && mounted && createPortal(
