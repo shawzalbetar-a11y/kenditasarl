@@ -3878,64 +3878,63 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             </div>
           </div>
 
-          {/* Approved Heat Transfer Print Placement Guide & Mode Switcher (Anchored bottom-left on desktop below 'تصاميمي', streamlined above faces on mobile) */}
-          <div className={cn(
-            "absolute z-35 pointer-events-auto transition-all duration-300",
-            // Desktop: Anchored at bottom-left below "تصاميمي", aligned with bottom of canvas area
-            "sm:bottom-3 sm:left-3 sm:right-auto sm:translate-x-0 sm:max-w-xs",
-            // Mobile: Streamlined single-row bar centered right above the view switcher
-            availableFaces.length > 1 ? "bottom-13.5 left-1/2 -translate-x-1/2 max-w-[95%] w-auto" : "bottom-3 left-1/2 -translate-x-1/2 max-w-[95%] w-auto"
-          )}>
-            <GarmentPlacementGuide
-              garmentType={productData?.config?.garmentType || productData?.category || 'tshirt'}
-              allowedPlacements={productData?.config?.allowedPlacements}
-              activeFace={activeFace}
-              selectedColor={selectedColor}
-              selectedPlacementIds={currentSelectedPlacementIds}
-              syncPlacementsAcrossColors={syncPlacementsAcrossColors}
-              onToggleSyncPlacements={handleToggleSyncPlacements}
-              onApplyToAllColors={handleApplyToAllColors}
-              onTogglePlacement={handleTogglePlacement}
-              onSelectFace={switchFace}
-              onClearAll={handleClearPlacements}
-              locale={locale}
-              isFreeMode={isFreeMode}
-              onToggleFreeMode={handleToggleFreeMode}
-              allowFreeMode={productData?.config?.allowFreeMode !== false}
-            />
-          </div>
-
-          {/* Product Faces / View Switcher (Positioned at bottom center, compact gap for zero mobile scrolling) */}
-          {availableFaces.length > 1 && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto max-w-[95%] overflow-x-auto no-scrollbar">
-              <div className="flex bg-white/95 backdrop-blur-md shadow-lg rounded-full p-0.5 sm:p-1 border border-gray-200/80 items-center gap-0.5 sm:gap-1">
-                {availableFaces.map(face => {
-                  const f = (face || '').trim().toLowerCase();
-                  const label = f === 'front' ? t('front', { fallback: 'Front' }) :
-                                f === 'back' ? t('back', { fallback: 'Back' }) :
-                                f === 'right_shoulder' ? t('right_shoulder', { fallback: 'Right Shoulder' }) :
-                                f === 'left_shoulder' ? t('left_shoulder', { fallback: 'Left Shoulder' }) :
-                                f === 'collar' ? t('collar', { fallback: 'Collar' }) :
-                                f === 'other' ? t('other', { fallback: 'Other' }) :
-                                t(face, { fallback: face });
-                  return (
-                    <button
-                      key={face}
-                      onClick={() => setActiveFace(face)}
-                      className={cn(
-                        "px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all capitalize whitespace-nowrap",
-                        activeFace === face 
-                          ? "bg-[var(--color-primary)] text-white shadow-xs" 
-                          : "text-[var(--color-text-secondary)] hover:text-[var(--color-secondary)] hover:bg-gray-100/80"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
+          {/* Bottom Controls Bar (Mobile: Single bottom row side-by-side with Faces on right & Placements on left. Desktop: Placements at bottom-left, Faces centered) */}
+          <div className="absolute bottom-2.5 sm:bottom-3 inset-x-2 sm:inset-x-3 z-35 pointer-events-none flex items-center justify-between gap-1 select-none">
+            
+            {/* 1. Faces Switcher (Shifted to right on mobile in RTL, centered on desktop) */}
+            {availableFaces.length > 1 && (
+              <div className="pointer-events-auto sm:absolute sm:bottom-0 sm:left-1/2 sm:-translate-x-1/2 sm:z-30 shrink-0 max-w-[55%] sm:max-w-[95%]">
+                <div className="flex bg-white/95 backdrop-blur-md shadow-md sm:shadow-lg rounded-full p-0.5 sm:p-1 border border-gray-200/80 items-center gap-0.5 sm:gap-1 overflow-x-auto no-scrollbar">
+                  {availableFaces.map(face => {
+                    const f = (face || '').trim().toLowerCase();
+                    const label = f === 'front' ? t('front', { fallback: 'Front' }) :
+                                  f === 'back' ? t('back', { fallback: 'Back' }) :
+                                  f === 'right_shoulder' ? t('right_shoulder', { fallback: 'Right Shoulder' }) :
+                                  f === 'left_shoulder' ? t('left_shoulder', { fallback: 'Left Shoulder' }) :
+                                  f === 'collar' ? t('collar', { fallback: 'Collar' }) :
+                                  f === 'other' ? t('other', { fallback: 'Other' }) :
+                                  t(face, { fallback: face });
+                    return (
+                      <button
+                        key={face}
+                        onClick={() => setActiveFace(face)}
+                        className={cn(
+                          "px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all capitalize whitespace-nowrap cursor-pointer active:scale-95",
+                          activeFace === face 
+                            ? "bg-[var(--color-primary)] text-white shadow-xs" 
+                            : "text-[var(--color-text-secondary)] hover:text-[var(--color-secondary)] hover:bg-gray-100/80"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+            )}
+
+            {/* 2. Placements & Free Mode Guide (Positioned beside Faces on mobile, anchored bottom-left below 'تصاميمي' on desktop) */}
+            <div className="pointer-events-auto sm:absolute sm:bottom-0 sm:left-0 sm:z-35 shrink-0">
+              <GarmentPlacementGuide
+                garmentType={productData?.config?.garmentType || productData?.category || 'tshirt'}
+                allowedPlacements={productData?.config?.allowedPlacements}
+                activeFace={activeFace}
+                selectedColor={selectedColor}
+                selectedPlacementIds={currentSelectedPlacementIds}
+                syncPlacementsAcrossColors={syncPlacementsAcrossColors}
+                onToggleSyncPlacements={handleToggleSyncPlacements}
+                onApplyToAllColors={handleApplyToAllColors}
+                onTogglePlacement={handleTogglePlacement}
+                onSelectFace={switchFace}
+                onClearAll={handleClearPlacements}
+                locale={locale}
+                isFreeMode={isFreeMode}
+                onToggleFreeMode={handleToggleFreeMode}
+                allowFreeMode={productData?.config?.allowFreeMode !== false}
+              />
             </div>
-          )}
+
+          </div>
         </div>
 
         {/* Action CTA Buttons (Buy Now & Add to Cart) - Positioned directly below product preview frame */}

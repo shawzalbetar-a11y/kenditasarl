@@ -226,35 +226,38 @@ export default function GarmentPlacementGuide({
   return (
     <div className={`relative ${className}`}>
       {/* ========================================================= */}
-      {/* 1. MOBILE STREAMLINED VIEW (< sm): Single Compact Pill Row */}
+      {/* 1. MOBILE STREAMLINED VIEW (< sm): Inline Pill Beside Faces */}
       {/* ========================================================= */}
-      <div className="flex sm:hidden items-center p-1 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200/90 shadow-lg gap-1 select-none pointer-events-auto">
+      <div className="flex sm:hidden items-center p-0.5 bg-white/95 backdrop-blur-md rounded-full border border-gray-200/90 shadow-md gap-0.5 select-none pointer-events-auto">
         {!isFreeMode ? (
           <>
-            {/* Approved Placements Trigger */}
+            {/* Approved Placements Trigger with Animated Arrow Hint */}
             <button
               type="button"
               onClick={() => setIsExpanded(true)}
-              className="px-2.5 py-1.5 rounded-xl text-[11px] font-black bg-amber-500 text-white shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title={locale === 'tr' ? 'Baskı Konumlarını Seç' : locale === 'en' ? 'Select Print Placements' : 'فتح مواضع الطباعة المعتمدة'}
+              className="px-2.5 py-1 rounded-full text-[10.5px] font-black bg-amber-500 text-white shadow-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all group shrink-0"
+              title={locale === 'tr' ? 'Baskı Konumlarını Seç' : locale === 'en' ? 'Select Print Placements' : 'اضغط لاختيار وعرض مواضع الطباعة'}
             >
-              <Shirt size={13} className="text-white" />
-              <span>{locale === 'tr' ? 'Mevcut Konumlar' : locale === 'en' ? 'Standards' : 'المواضع المعتمدة'}</span>
-              <span className="bg-amber-600/90 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">
-                {selectedSpecs.length}
-              </span>
-              <ChevronUp size={12} className="text-amber-200" />
+              <Shirt size={12} className="text-white shrink-0" />
+              <span>{locale === 'tr' ? 'Mevcut' : locale === 'en' ? 'Standards' : 'المعتمد'}</span>
+              {selectedSpecs.length > 0 && (
+                <span className="bg-amber-600/90 text-white text-[9px] px-1 py-0.1 rounded-full font-mono font-bold shrink-0">
+                  {selectedSpecs.length}
+                </span>
+              )}
+              {/* Bouncing Arrow Hint */}
+              <ChevronUp size={13} className="text-amber-100 animate-bounce stroke-[2.5] shrink-0" />
             </button>
 
             {/* Switch to Free Mode Button */}
             <button
               type="button"
               onClick={() => setShowDisclaimerModal(true)}
-              className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-amber-700 hover:text-amber-800 hover:bg-amber-50/80 flex items-center gap-1 cursor-pointer active:scale-95"
+              className="px-2 py-1 rounded-full text-[10px] font-bold text-amber-700 hover:text-amber-800 hover:bg-amber-50/80 flex items-center gap-0.5 cursor-pointer active:scale-95 shrink-0"
               title={locale === 'tr' ? 'Serbest Moda Geç' : locale === 'en' ? 'Switch to Free Mode' : 'التحويل للوضع الحر'}
             >
-              <Zap size={13} className="text-amber-500" />
-              <span>{locale === 'tr' ? 'Serbest ⚡' : locale === 'en' ? 'Free ⚡' : 'الوضع الحر ⚡'}</span>
+              <Zap size={11} className="text-amber-500 shrink-0" />
+              <span>{locale === 'tr' ? 'Serbest' : locale === 'en' ? 'Free' : 'الحر ⚡'}</span>
             </button>
           </>
         ) : (
@@ -263,17 +266,17 @@ export default function GarmentPlacementGuide({
             <button
               type="button"
               onClick={() => onToggleFreeMode && onToggleFreeMode(false)}
-              className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-gray-700 hover:bg-gray-100 flex items-center gap-1 cursor-pointer active:scale-95"
+              className="px-2 py-1 rounded-full text-[10px] font-bold text-gray-700 hover:bg-gray-100 flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
               title={locale === 'tr' ? 'Standart Konumlara Dön' : locale === 'en' ? 'Revert to Standards' : 'العودة للمواضع القياسية'}
             >
-              <Shirt size={13} className="text-gray-500" />
-              <span>{locale === 'tr' ? 'Standarta Dön' : locale === 'en' ? 'Revert' : 'المواضع المعتمدة'}</span>
+              <Shirt size={11} className="text-gray-500 shrink-0" />
+              <span>{locale === 'tr' ? 'Standarta Dön' : locale === 'en' ? 'Standards' : 'المعتمد'}</span>
             </button>
 
             {/* Active Free Mode Pill */}
-            <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs flex items-center gap-1 animate-pulse">
-              <Zap size={13} className="text-white" />
-              <span>{locale === 'tr' ? 'Serbest (Tam Yüzey)' : locale === 'en' ? 'Free (Full)' : 'الوضع الحر (كامل القطعة)'}</span>
+            <div className="px-2.5 py-1 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs flex items-center gap-1 animate-pulse shrink-0">
+              <Zap size={11} className="text-white shrink-0" />
+              <span>{locale === 'tr' ? 'Serbest Mod' : locale === 'en' ? 'Free Mode' : 'الوضع الحر ⚡'}</span>
             </div>
           </>
         )}
