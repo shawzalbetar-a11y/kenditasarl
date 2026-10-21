@@ -1118,24 +1118,50 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const currentFaceMockupUrl = getFaceMockupForColor(activeFace, selectedColor);
 
-  // Standardized High-Fidelity Canvas Space (2000x2000 1:1 with garment mockup frame)
-  const nativeWidth = 2000;
-  const nativeHeight = 2000;
-  const nativeAspectRatio = 1;
+  // 1. Resolve face geometry from product configuration
+  const resolvedFaceConfig = configFaces[activeFace]?.printArea;
+
+  // 2. Dynamic tracking of the current mockup image's true natural dimensions
+  const [mockupNaturalSize, setMockupNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
+  useEffect(() => {
+    if (!currentFaceMockupUrl) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setMockupNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+      }
+    };
+    img.src = currentFaceMockupUrl;
+  }, [currentFaceMockupUrl]);
+
+  // True Native Mockup Dimensions (Priority: Image Natural Size -> Resolved Config -> High-Res Standard 1792x2400)
+  const nativeWidth = mockupNaturalSize.width > 0 
+    ? mockupNaturalSize.width 
+    : (Number(resolvedFaceConfig?.nativeWidth) || 1792);
+
+  const nativeHeight = mockupNaturalSize.height > 0 
+    ? mockupNaturalSize.height 
+    : (Number(resolvedFaceConfig?.nativeHeight) || 2400);
+
+  const nativeAspectRatio = nativeWidth / nativeHeight;
 
   // Free Mode Printable Area bounds (per garment face)
   const freePrintZone = React.useMemo(() => {
     const freeBounds = productData?.config?.freeModeBounds?.[activeFace];
-    const nw = 2000;
-    const nh = 2000;
+    const nw = nativeWidth;
+    const nh = nativeHeight;
     if (freeBounds) {
+      const fbNw = freeBounds.nativeWidth || nw;
+      const fbNh = freeBounds.nativeHeight || nh;
       return {
-        left: freeBounds.x,
-        top: freeBounds.y,
-        width: freeBounds.width,
-        height: freeBounds.height,
-        nativeWidth: freeBounds.nativeWidth || nw,
-        nativeHeight: freeBounds.nativeHeight || nh,
+        left: (freeBounds.x / fbNw) * nw,
+        top: (freeBounds.y / fbNh) * nh,
+        width: (freeBounds.width / fbNw) * nw,
+        height: (freeBounds.height / fbNh) * nh,
+        nativeWidth: nw,
+        nativeHeight: nh,
       };
     }
     const isSleeve = activeFace === 'left' || activeFace === 'right' || activeFace === 'left_shoulder' || activeFace === 'right_shoulder';
@@ -1151,9 +1177,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       nativeWidth: nw,
       nativeHeight: nh,
     };
-  }, [productData?.config?.freeModeBounds, activeFace]);
+  }, [productData?.config?.freeModeBounds, activeFace, nativeWidth, nativeHeight]);
 
-  // Current Print Area spans the entire garment face (0,0 to 2000,2000)
+  // Current Print Area spans the entire garment face (0,0 to nativeWidth, nativeHeight)
   // Completely eliminates legacy boundary walls, clipping, and coordinate offset shifts!
   const currentPrintArea: PrintArea = React.useMemo(() => {
     return {
@@ -1166,13 +1192,25 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       nativeWidth,
       nativeHeight,
     };
-  }, [isFreeMode, activeFace]);
+  }, [isFreeMode, activeFace, nativeWidth, nativeHeight]);
 
   // Fabric Canvas covers 100% of the mockup image directly (Zero offset, zero padding distortion)
   const PAD_X = 0;
   const PAD_Y = 0;
   const totalCanvasWidth = nativeWidth;
   const totalCanvasHeight = nativeHeight;
+
+  // Sync canvas internal resolution when native dimensions change
+  useEffect(() => {
+    if (!canvas) return;
+    if (canvas.getWidth() !== totalCanvasWidth || canvas.getHeight() !== totalCanvasHeight) {
+      canvas.setWidth(totalCanvasWidth);
+      canvas.setHeight(totalCanvasHeight);
+      (canvas as any).printAreaWidth = totalCanvasWidth;
+      (canvas as any).printAreaHeight = totalCanvasHeight;
+      canvas.renderAll();
+    }
+  }, [canvas, totalCanvasWidth, totalCanvasHeight]);
 
   const extendedOverlayLeft = 0;
   const extendedOverlayTop = 0;
@@ -1194,8 +1232,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const calibrated = productData?.config?.calibratedPlacements?.[spec.id];
     const hasCalibrated = !!calibrated && !!calibrated.nativeWidth && calibrated.nativeWidth > 0;
     
-    const nw = 2000;
-    const nh = 2000;
+    const nw = nativeWidth;
+    const nh = nativeHeight;
 
     const mockupX = hasCalibrated ? (calibrated.x / calibrated.nativeWidth) * nw : (spec.canvasBox.leftPercent / 100) * nw;
     const mockupY = hasCalibrated ? (calibrated.y / calibrated.nativeHeight) * nh : (spec.canvasBox.topPercent / 100) * nh;
@@ -1227,7 +1265,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       fabricCenterX,
       fabricCenterY,
     };
-  }, [productData?.config?.calibratedPlacements]);
+  }, [productData?.config?.calibratedPlacements, nativeWidth, nativeHeight]);
 
   // Helper to format controls, auto-scale within placement or free bounds, and position object
   const prepareAndAddObject = (obj: fabric.Object, canvasInstance?: fabric.Canvas) => {
@@ -1419,8 +1457,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       enableRetinaScaling: true,
     });
 
-    (initCanvas as any).printAreaWidth = 2000;
-    (initCanvas as any).printAreaHeight = 2000;
+    (initCanvas as any).printAreaWidth = totalCanvasWidth;
+    (initCanvas as any).printAreaHeight = totalCanvasHeight;
     initCanvas.viewportTransform = [1, 0, 0, 1, 0, 0];
 
     // Ensure 100% full canvas clean wipe on every frame to prevent any trailing, smearing or ghosting
@@ -1575,14 +1613,14 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       if (bound.left + bound.width < minVisible) {
         newLeft += (minVisible - (bound.left + bound.width));
       }
-      if (bound.left > 2000 - minVisible) {
-        newLeft -= (bound.left - (2000 - minVisible));
+      if (bound.left > nativeWidth - minVisible) {
+        newLeft -= (bound.left - (nativeWidth - minVisible));
       }
       if (bound.top + bound.height < minVisible) {
         newTop += (minVisible - (bound.top + bound.height));
       }
-      if (bound.top > 2000 - minVisible) {
-        newTop -= (bound.top - (2000 - minVisible));
+      if (bound.top > nativeHeight - minVisible) {
+        newTop -= (bound.top - (nativeHeight - minVisible));
       }
 
       if (newLeft !== activeObj.left || newTop !== activeObj.top) {
@@ -1590,9 +1628,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         activeObj.setCoords();
       }
 
-      // 2. Centerline Snapping
-      const centerX = 1000;
-      const SNAP_ZONE = 10;
+      // 2. Centerline Snapping (Dynamic based on true garment width)
+      const centerX = nativeWidth / 2;
+      const SNAP_ZONE = Math.round(nativeWidth * 0.008);
       const centerPt = activeObj.getCenterPoint();
 
       if (Math.abs(centerPt.x - centerX) < SNAP_ZONE) {
@@ -2780,13 +2818,17 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         return productMockupUrl || '';
       }
 
-      // Render design inside a 2000x2000 offscreen canvas 1:1 with garment space
+      const facePrintArea = configFaces[faceName]?.printArea;
+      const fnw = facePrintArea?.nativeWidth || nativeWidth;
+      const fnh = facePrintArea?.nativeHeight || nativeHeight;
+
+      // Render design inside offscreen canvas 1:1 with garment space
       const offscreenEl = document.createElement('canvas');
-      offscreenEl.width = 2000;
-      offscreenEl.height = 2000;
+      offscreenEl.width = fnw;
+      offscreenEl.height = fnh;
       const staticCanvas = new fabric.StaticCanvas(offscreenEl, {
-        width: 2000,
-        height: 2000,
+        width: fnw,
+        height: fnh,
         backgroundColor: 'transparent'
       });
 
@@ -3533,12 +3575,19 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
             }}
           >
-            {/* Base Product Mockup Image */}
+            {/* Base Product Mockup Image (Natural aspect ratio with dynamic dimensions detection) */}
             <img
               src={currentFaceMockupUrl}
               alt={`${activeFace} view`}
               crossOrigin="anonymous"
-              className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none rounded-lg shadow-sm"
+              onLoad={(e) => {
+                const nw = e.currentTarget.naturalWidth;
+                const nh = e.currentTarget.naturalHeight;
+                if (nw > 0 && nh > 0) {
+                  setMockupNaturalSize(prev => (prev.width === nw && prev.height === nh ? prev : { width: nw, height: nh }));
+                }
+              }}
+              className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none rounded-lg shadow-sm"
             />
 
             {/* Approved Print Placements Overlays (Positioned relative to the entire garment mockup 0-100%) */}
@@ -3623,10 +3672,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                       : "border-amber-500/80 bg-amber-500/5 rounded-3xl"
                   )}
                   style={{
-                    left: `${(freePrintZone.left / 2000) * 100}%`,
-                    top: `${(freePrintZone.top / 2000) * 100}%`,
-                    width: `${(freePrintZone.width / 2000) * 100}%`,
-                    height: `${(freePrintZone.height / 2000) * 100}%`,
+                    left: `${(freePrintZone.left / nativeWidth) * 100}%`,
+                    top: `${(freePrintZone.top / nativeHeight) * 100}%`,
+                    width: `${(freePrintZone.width / nativeWidth) * 100}%`,
+                    height: `${(freePrintZone.height / nativeHeight) * 100}%`,
                   }}
                 >
                   {/* Badge positioned OUTSIDE / ABOVE the bounding box so the entire printable area remains 100% clear */}
