@@ -3735,9 +3735,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                   const isFocused = activeFocusedId === spec.id;
 
                   // Visibility Strategy:
-                  // 1. While actively dragging a design: show ALL selected placements on this face as available drop targets!
-                  // 2. While resting: show ONLY the currently focused/active placement! Zero clutter, zero stacked boxes!
-                  const isVisible = isObjectDragging ? true : isFocused;
+                  // Show placement drop zones ONLY while actively dragging a design across the canvas!
+                  // At rest / when editing: ZERO clutter, NO orange boxes, NO badges obstructing the artwork or garment!
+                  const isVisible = isObjectDragging || (hoveredPlacementId === spec.id);
 
                   if (!isVisible) return null;
 
@@ -3760,11 +3760,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                         // 100% TRANSPARENT BACKGROUND: Zero orange/brown tint over the garment fabric!
                         isHovered
                           ? "border-amber-400 bg-amber-400/20 ring-4 ring-amber-400/60 shadow-xl scale-[1.01] z-20"
-                          : isFocused
-                            ? isFullCoverage
-                              ? "border-amber-500/80 bg-transparent rounded-3xl z-10"
-                              : "border-amber-500/90 bg-transparent rounded-2xl z-10"
-                            : "border-amber-400/40 bg-transparent opacity-60 rounded-2xl z-5"
+                          : "border-amber-500/80 bg-transparent rounded-2xl z-10"
                       )}
                       style={{
                         left: `${leftPercent}%`,
@@ -3773,15 +3769,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                         height: `${heightPercent}%`,
                       }}
                     >
-                      {/* Badge positioning */}
+                      {/* Badge positioning - Floats ABOVE the box so it never cuts into the artwork */}
                       <div className={cn(
-                        "absolute text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border whitespace-nowrap z-20 transition-all",
+                        "absolute text-white text-[9px] sm:text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 border whitespace-nowrap z-20 transition-all",
                         isHovered
                           ? "bg-amber-500 border-white text-white ring-2 ring-amber-300 animate-pulse"
                           : "bg-amber-600/95 backdrop-blur-xs border-amber-300",
                         isFullCoverage
                           ? "top-2 start-2"
-                          : "-top-3 sm:-top-3.5 left-1/2 -translate-x-1/2"
+                          : "-top-7 sm:-top-8 left-1/2 -translate-x-1/2"
                       )}>
                         <span>{isHovered ? '🎯' : '📍'}</span>
                         <span>{locale === 'tr' ? spec.nameTr : locale === 'en' ? spec.nameEn : spec.nameAr}</span>
@@ -3807,8 +3803,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               </div>
             )}
 
-            {/* Free Mode Full Face Active Guideline Overlay */}
-            {isFreeMode && (
+            {/* Free Mode Full Face Active Guideline Overlay - ONLY visible during active drag */}
+            {isFreeMode && isObjectDragging && (
               <div className="absolute inset-0 w-full h-full pointer-events-none z-15">
                 <div
                   className={cn(
@@ -3825,7 +3821,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                   }}
                 >
                   {/* Badge positioned OUTSIDE / ABOVE the bounding box so the entire printable area remains 100% clear */}
-                  <div className="absolute -top-3.5 sm:-top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[9px] sm:text-[10px] font-black px-3 py-0.5 rounded-full shadow-md flex items-center gap-1.5 border border-amber-300 z-20 whitespace-nowrap">
+                  <div className="absolute -top-7 sm:-top-8 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[9px] sm:text-[10px] font-black px-3 py-0.5 rounded-full shadow-md flex items-center gap-1.5 border border-amber-300 z-20 whitespace-nowrap">
                     <Sparkles size={11} className="text-amber-200" />
                     <span>
                       {locale === 'tr' ? 'Serbest Mod (Tam Yüzey)' : locale === 'en' ? 'Free Mode (Full Face)' : 'الوضع الحر (كامل الواجهة)'}
