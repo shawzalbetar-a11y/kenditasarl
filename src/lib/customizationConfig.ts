@@ -234,24 +234,26 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
   'tshirts': {
     enabled: true,
     productType: 't-shirt',
+    garmentType: 'tshirt',
     allowCustomerUpload: true,
     allowText: true,
     allowStickers: true,
+    allowFreeMode: true,
+    allowedPlacements: ['center_chest', 'left_chest', 'full_front', 'back_collar', 'full_back', 'right_sleeve', 'left_sleeve'],
+    defaultPlacementId: 'center_chest',
     faces: {
       front: {
         name: 'Front',
         enabled: true,
         printArea: {
           id: 'front',
-          name: 'Front Chest',
-          width: 200,
-          height: 280,
-          top: 120,
-          left: 100,
-          bleed: 5,
-          physicalWidthCm: 30,
-          physicalHeightCm: 37.5,
-          targetDPI: 300,
+          name: 'Front Area',
+          width: 1000,
+          height: 1000,
+          top: 0,
+          left: 0,
+          nativeWidth: 1000,
+          nativeHeight: 1000,
           printMethod: 'DTF'
         }
       },
@@ -261,14 +263,12 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
         printArea: {
           id: 'back',
           name: 'Back Area',
-          width: 200,
-          height: 250,
-          top: 100,
-          left: 100,
-          bleed: 5,
-          physicalWidthCm: 30,
-          physicalHeightCm: 37.5,
-          targetDPI: 300,
+          width: 1000,
+          height: 1000,
+          top: 0,
+          left: 0,
+          nativeWidth: 1000,
+          nativeHeight: 1000,
           printMethod: 'DTF'
         }
       },
@@ -277,15 +277,13 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
         enabled: true,
         printArea: {
           id: 'left',
-          name: 'Left Sleeve',
-          width: 80,
-          height: 100,
-          top: 150,
-          left: 260,
-          bleed: 5,
-          physicalWidthCm: 10,
-          physicalHeightCm: 12,
-          targetDPI: 300,
+          name: 'Left Sleeve Area',
+          width: 1000,
+          height: 1000,
+          top: 0,
+          left: 0,
+          nativeWidth: 1000,
+          nativeHeight: 1000,
           printMethod: 'DTF'
         }
       },
@@ -294,15 +292,13 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
         enabled: true,
         printArea: {
           id: 'right',
-          name: 'Right Sleeve',
-          width: 80,
-          height: 100,
-          top: 150,
-          left: 60,
-          bleed: 5,
-          physicalWidthCm: 10,
-          physicalHeightCm: 12,
-          targetDPI: 300,
+          name: 'Right Sleeve Area',
+          width: 1000,
+          height: 1000,
+          top: 0,
+          left: 0,
+          nativeWidth: 1000,
+          nativeHeight: 1000,
           printMethod: 'DTF'
         }
       }
@@ -311,24 +307,26 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
   'hoodies': {
     enabled: true,
     productType: 'hoodie',
+    garmentType: 'hoodie',
     allowCustomerUpload: true,
     allowText: true,
     allowStickers: true,
+    allowFreeMode: true,
+    allowedPlacements: ['left_chest_hoodie', 'center_chest_hoodie', 'front_pocket_hoodie', 'full_back_hoodie', 'back_collar_hoodie', 'left_sleeve_hoodie', 'right_sleeve_hoodie'],
+    defaultPlacementId: 'center_chest_hoodie',
     faces: {
       front: {
         name: 'Front',
         enabled: true,
         printArea: {
           id: 'front',
-          name: 'Front Chest',
-          width: 180,
-          height: 220,
-          top: 140,
-          left: 110,
-          bleed: 5,
-          physicalWidthCm: 28,
-          physicalHeightCm: 35,
-          targetDPI: 300,
+          name: 'Front Area',
+          width: 1000,
+          height: 1000,
+          top: 0,
+          left: 0,
+          nativeWidth: 1000,
+          nativeHeight: 1000,
           printMethod: 'DTF'
         }
       },
@@ -338,14 +336,42 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
         printArea: {
           id: 'back',
           name: 'Back Area',
-          width: 220,
-          height: 280,
-          top: 90,
-          left: 90,
-          bleed: 5,
-          physicalWidthCm: 30,
-          physicalHeightCm: 38,
-          targetDPI: 300,
+          width: 1000,
+          height: 1000,
+          top: 0,
+          left: 0,
+          nativeWidth: 1000,
+          nativeHeight: 1000,
+          printMethod: 'DTF'
+        }
+      },
+      left: {
+        name: 'Left Sleeve',
+        enabled: true,
+        printArea: {
+          id: 'left',
+          name: 'Left Sleeve Area',
+          width: 1000,
+          height: 1000,
+          top: 0,
+          left: 0,
+          nativeWidth: 1000,
+          nativeHeight: 1000,
+          printMethod: 'DTF'
+        }
+      },
+      right: {
+        name: 'Right Sleeve',
+        enabled: true,
+        printArea: {
+          id: 'right',
+          name: 'Right Sleeve Area',
+          width: 1000,
+          height: 1000,
+          top: 0,
+          left: 0,
+          nativeWidth: 1000,
+          nativeHeight: 1000,
           printMethod: 'DTF'
         }
       }

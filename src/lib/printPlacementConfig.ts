@@ -293,10 +293,10 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 79,
-          topPercent: 28,
-          maxWidthPercent: 8,
-          maxHeightPercent: 8
+          leftPercent: 40,
+          topPercent: 25,
+          maxWidthPercent: 20,
+          maxHeightPercent: 20
         },
         supportedMethods: ['DTF', 'Sublimation']
       },
@@ -334,10 +334,10 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 13,
-          topPercent: 28,
-          maxWidthPercent: 8,
-          maxHeightPercent: 8
+          leftPercent: 40,
+          topPercent: 25,
+          maxWidthPercent: 20,
+          maxHeightPercent: 20
         },
         supportedMethods: ['DTF', 'Sublimation']
       }
@@ -547,9 +547,9 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 82,
-          topPercent: 30,
-          maxWidthPercent: 14,
+          leftPercent: 40,
+          topPercent: 28,
+          maxWidthPercent: 20,
           maxHeightPercent: 35
         },
         supportedMethods: ['DTF']
@@ -588,9 +588,9 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 4,
-          topPercent: 30,
-          maxWidthPercent: 14,
+          leftPercent: 40,
+          topPercent: 28,
+          maxWidthPercent: 20,
           maxHeightPercent: 35
         },
         supportedMethods: ['DTF']

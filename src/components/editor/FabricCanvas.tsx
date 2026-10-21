@@ -202,7 +202,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const [activeObject, setActiveObject] = useState<fabric.Object | null>(null);
   
   // The faces we support depending on the product
-  const configFaces = productData?.config?.faces || { front: { printArea: { width: 200, height: 280, top: 120, left: 100 } } };
+  const configFaces = productData?.config?.faces || { front: { name: 'Front', printArea: { id: 'front', name: 'Front', left: 0, top: 0, width: 1000, height: 1000 } } };
   const availableFaces = Object.keys(configFaces);
   
   const [activeFace, setActiveFace] = useState<string>(availableFaces[0] || 'front');
@@ -1185,14 +1185,14 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     img.src = currentFaceMockupUrl;
   }, [currentFaceMockupUrl]);
 
-  // True Native Mockup Dimensions (Priority: Image Natural Size -> Resolved Config -> High-Res Standard 1792x2400)
+  // True Native Mockup Dimensions (Priority: Image Natural Size -> Resolved Config -> Standard 1000x1000)
   const nativeWidth = mockupNaturalSize.width > 0 
     ? mockupNaturalSize.width 
-    : (Number(resolvedFaceConfig?.nativeWidth) || 1792);
+    : (Number(resolvedFaceConfig?.nativeWidth) || 1000);
 
   const nativeHeight = mockupNaturalSize.height > 0 
     ? mockupNaturalSize.height 
-    : (Number(resolvedFaceConfig?.nativeHeight) || 2400);
+    : (Number(resolvedFaceConfig?.nativeHeight) || 1000);
 
   const nativeAspectRatio = nativeWidth / nativeHeight;
 
