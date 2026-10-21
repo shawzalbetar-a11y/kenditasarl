@@ -268,6 +268,11 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const hoveredPlacementIdRef = useRef<string | null>(null);
   hoveredPlacementIdRef.current = hoveredPlacementId;
 
+  // Active / Focused placement (Single placement focus strategy: only 1 placement visible at rest, all visible while dragging)
+  const [focusedPlacementId, setFocusedPlacementId] = useState<string | null>(null);
+  const [isObjectDragging, setIsObjectDragging] = useState<boolean>(false);
+  const isObjectDraggingRef = useRef<boolean>(false);
+
   const normalizeColorKey = useCallback((color?: string | null): string => {
     if (!color) return 'default';
     const s = color.trim().toLowerCase();
@@ -1316,6 +1321,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         top: pBounds.fabricCenterY,
       });
       (obj as any).assignedPlacementId = targetPlacement.id;
+      setFocusedPlacementId(targetPlacement.id);
 
       c.add(obj);
       c.setActiveObject(obj);
@@ -1700,6 +1706,11 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       const activeObj = e.target || initCanvas.getActiveObject();
       if (!activeObj) return;
 
+      if (!isObjectDraggingRef.current) {
+        isObjectDraggingRef.current = true;
+        setIsObjectDragging(true);
+      }
+
       if (!isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
         const centerPt = activeObj.getCenterPoint();
         let matchedPlacementId: string | null = null;
@@ -1798,8 +1809,16 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           initCanvas.renderAll();
         }
 
+        if (targetSpec) {
+          setFocusedPlacementId(targetSpec.id);
+        }
         hoveredPlacementIdRef.current = null;
         setHoveredPlacementId(null);
+      }
+
+      if (isObjectDraggingRef.current) {
+        isObjectDraggingRef.current = false;
+        setIsObjectDragging(false);
       }
 
       validateAndSnap();
@@ -1811,6 +1830,22 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     initCanvas.on('object:moving', handleObjectMoving);
     initCanvas.on('object:scaling', validateAndSnap);
     initCanvas.on('object:modified', handleObjectModified);
+
+    initCanvas.on('mouse:up', () => {
+      if (isObjectDraggingRef.current) {
+        isObjectDraggingRef.current = false;
+        setIsObjectDragging(false);
+      }
+    });
+
+    const handleSelectionFocus = (e: fabric.IEvent) => {
+      const selected = (e as any).selected?.[0] || e.target;
+      if (selected && (selected as any).assignedPlacementId) {
+        setFocusedPlacementId((selected as any).assignedPlacementId);
+      }
+    };
+    initCanvas.on('selection:created', handleSelectionFocus);
+    initCanvas.on('selection:updated', handleSelectionFocus);
     initCanvas.on('object:added', (opt) => {
       if (!isRestoring.current && opt?.target?.name !== 'background' && opt?.target?.name !== 'mockup' && opt?.target?.name !== 'print_area_guide') {
         saveHistoryStateCanvas(initCanvas);
@@ -2187,6 +2222,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     });
 
     const wasSelected = currentSelectedPlacementIds.includes(placement.id);
+    setFocusedPlacementId(placement.id);
     if (!wasSelected) {
       if (targetFace && !isFaceMatching(targetFace, activeFace)) {
         switchFace(targetFace);
@@ -3590,13 +3626,22 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none rounded-lg shadow-sm"
             />
 
-            {/* Approved Print Placements Overlays (Positioned relative to the entire garment mockup 0-100%) */}
+            {/* Approved Print Placements Overlays (Clean Single-Placement Focus + Drag Reveal Strategy) */}
             {!isFreeMode && activeFaceSelectedPlacements.length > 0 && (
               <div className="absolute inset-0 w-full h-full pointer-events-none z-15">
                 {activeFaceSelectedPlacements.map((spec) => {
                   const box = spec.canvasBox;
                   const isFullCoverage = spec.id === 'full_front' || spec.id === 'full_back' || spec.id === 'full_back_hoodie';
                   const isHovered = hoveredPlacementId === spec.id;
+                  const activeFocusedId = focusedPlacementId || activeFaceSelectedPlacements[0]?.id;
+                  const isFocused = activeFocusedId === spec.id;
+
+                  // Visibility Strategy:
+                  // 1. While actively dragging a design: show ALL selected placements on this face as available drop targets!
+                  // 2. While resting: show ONLY the currently focused/active placement! Zero clutter, zero stacked boxes!
+                  const isVisible = isObjectDragging ? true : isFocused;
+
+                  if (!isVisible) return null;
 
                   // Dynamic Admin Calibration Snap: If admin calibrated this placement for this product via drag & drop, snap to calibrated coordinates!
                   const calibrated = productData?.config?.calibratedPlacements?.[spec.id];
@@ -3614,11 +3659,14 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                       key={spec.id}
                       className={cn(
                         "absolute border-2 border-dashed pointer-events-none transition-all duration-200 animate-in fade-in",
+                        // 100% TRANSPARENT BACKGROUND: Zero orange/brown tint over the garment fabric!
                         isHovered
-                          ? "border-amber-500 bg-amber-400/25 ring-4 ring-amber-400/60 shadow-xl scale-[1.01]"
-                          : isFullCoverage
-                            ? "border-amber-600/80 bg-amber-500/5 rounded-3xl"
-                            : "border-amber-500/90 bg-amber-500/10 rounded-2xl"
+                          ? "border-amber-400 bg-amber-400/20 ring-4 ring-amber-400/60 shadow-xl scale-[1.01] z-20"
+                          : isFocused
+                            ? isFullCoverage
+                              ? "border-amber-500/80 bg-transparent rounded-3xl z-10"
+                              : "border-amber-500/90 bg-transparent rounded-2xl z-10"
+                            : "border-amber-400/40 bg-transparent opacity-60 rounded-2xl z-5"
                       )}
                       style={{
                         left: `${leftPercent}%`,
@@ -3668,8 +3716,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                   className={cn(
                     "absolute border-2 border-dashed pointer-events-none transition-all duration-300",
                     isObjectOutOfBounds
-                      ? "border-red-500 ring-4 ring-red-400/40 bg-red-500/5 rounded-3xl"
-                      : "border-amber-500/80 bg-amber-500/5 rounded-3xl"
+                      ? "border-red-500 ring-4 ring-red-400/40 bg-transparent rounded-3xl"
+                      : "border-amber-500/80 bg-transparent rounded-3xl"
                   )}
                   style={{
                     left: `${(freePrintZone.left / nativeWidth) * 100}%`,
@@ -3935,6 +3983,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                 isFreeMode={isFreeMode}
                 onToggleFreeMode={handleToggleFreeMode}
                 allowFreeMode={productData?.config?.allowFreeMode !== false}
+                focusedPlacementId={focusedPlacementId || activeFaceSelectedPlacements[0]?.id}
+                onFocusPlacement={setFocusedPlacementId}
               />
             </div>
 

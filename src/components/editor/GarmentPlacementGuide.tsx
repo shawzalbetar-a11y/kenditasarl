@@ -29,6 +29,8 @@ interface GarmentPlacementGuideProps {
   isFreeMode?: boolean;
   onToggleFreeMode?: (enabled: boolean) => void;
   allowFreeMode?: boolean;
+  focusedPlacementId?: string | null;
+  onFocusPlacement?: (placementId: string) => void;
 }
 
 /**
@@ -295,6 +297,8 @@ export default function GarmentPlacementGuide({
   isFreeMode = false,
   onToggleFreeMode,
   allowFreeMode = true,
+  focusedPlacementId,
+  onFocusPlacement,
 }: GarmentPlacementGuideProps) {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'all' | 'front' | 'back' | 'sleeves'>('all');
@@ -520,9 +524,32 @@ export default function GarmentPlacementGuide({
                       {locale === 'tr' ? 'Konum seçmek için tıklayın' : locale === 'en' ? 'Tap to select placements' : 'اضغط لاختيار موضع أو أكثر'}
                     </span>
                   ) : (
-                    <span className="truncate text-amber-700 font-semibold">
-                      {selectedSpecs.map((s) => (locale === 'tr' ? s.nameTr : locale === 'en' ? s.nameEn : s.nameAr)).join(' • ')}
-                    </span>
+                    <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar max-w-full">
+                      {selectedSpecs.map((s) => {
+                        const isFocused = s.id === focusedPlacementId;
+                        return (
+                          <span
+                            key={s.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onFocusPlacement?.(s.id);
+                              if (onSelectFace && !isFaceMatching(s.targetFace, activeFace)) {
+                                onSelectFace(s.targetFace);
+                              }
+                            }}
+                            className={cn(
+                              "px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold transition-all shrink-0 cursor-pointer",
+                              isFocused
+                                ? "bg-amber-500 text-white shadow-2xs scale-105"
+                                : "bg-amber-100/80 text-amber-800 hover:bg-amber-200"
+                            )}
+                            title={locale === 'tr' ? 'Bu konuma odaklan' : locale === 'en' ? 'Focus this placement' : 'التركيز على هذا الموضع'}
+                          >
+                            {locale === 'tr' ? s.nameTr : locale === 'en' ? s.nameEn : s.nameAr}
+                          </span>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
