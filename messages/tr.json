@@ -461,6 +461,9 @@
     "confirmDesignAndAddToCart": "Tasarımı Onayla ve Sepete Ekle",
     "backToEditor": "Tasarımı Düzenlemeye Dön",
     "close": "Kapat",
+    "nextFace": "Sonraki Görsel",
+    "prevFace": "Önceki Görsel",
+    "faceCount": "Görsel {current} / {total}",
     "zoomHint": "Yakınlaştırmak ve detayları incelemek için kaydırın",
     "totalPrice": "Toplam"
   },

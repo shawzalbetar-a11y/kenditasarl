@@ -461,6 +461,9 @@
     "confirmDesignAndAddToCart": "Confirm Design & Add to Cart",
     "backToEditor": "Return to Continue Designing",
     "close": "Close",
+    "nextFace": "Next Face",
+    "prevFace": "Previous Face",
+    "faceCount": "Face {current} of {total}",
     "zoomHint": "Pinch or scroll to zoom and inspect details",
     "totalPrice": "Total"
   },

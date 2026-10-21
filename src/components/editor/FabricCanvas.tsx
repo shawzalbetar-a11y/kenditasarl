@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { fabric } from 'fabric';
-import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw, Shirt, ChevronDown, Loader2 } from 'lucide-react';
+import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw, Shirt, ChevronDown, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import AuthModal from '@/components/auth/AuthModal';
 import { auth, db } from '@/lib/firebase';
@@ -219,6 +219,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewSlides, setPreviewSlides] = useState<{ face: string; label: string; imageUrl: string; hasDesign: boolean }[]>([]);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
   const [previewIntent, setPreviewIntent] = useState<'cart_confirm' | 'inspect' | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [modalZoom, setModalZoom] = useState<number>(1);
@@ -2922,155 +2924,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     }
   };
 
-  const openCartConfirmationPreview = async () => {
-    if (!canvas) return;
-    setIsPreviewLoading(true);
-    try {
-      const data = await exportDesignData();
-      if (data?.mockupImage) {
-        setPreviewIntent('cart_confirm');
-        setPreviewImage(data.mockupImage);
-      } else {
-        if (!auth?.currentUser) {
-          setPendingAction('cart');
-          setIsAuthModalOpen(true);
-        } else {
-          executeAction('cart');
-        }
-      }
-    } catch (err) {
-      console.error("Cart preview generation error:", err);
-      if (!auth?.currentUser) {
-        setPendingAction('cart');
-        setIsAuthModalOpen(true);
-      } else {
-        executeAction('cart');
-      }
-    } finally {
-      setIsPreviewLoading(false);
-    }
-  };
-
-  const handlePreview = async () => {
-    if (!canvas) return;
-    setIsPreviewLoading(true);
-    try {
-      const data = await exportDesignData();
-      if (data?.mockupImage) {
-        setPreviewIntent('inspect');
-        setPreviewImage(data.mockupImage);
-      }
-    } catch (err) {
-      console.error("Preview Generation Error:", err);
-    } finally {
-      setIsPreviewLoading(false);
-    }
-  };
-
-  const closePreviewModal = () => {
-    setPreviewImage(null);
-    setPreviewIntent(null);
-    setModalZoom(1);
-    setModalPan({ x: 0, y: 0 });
-  };
-
-  const handleConfirmDesignAndAddToCart = async () => {
-    if (!auth?.currentUser) {
-      setPreviewImage(null);
-      setPreviewIntent(null);
-      setPendingAction('cart');
-      setIsAuthModalOpen(true);
-      return;
-    }
-
-    try {
-      await executeAction('cart');
-      setPreviewImage(null);
-      setPreviewIntent(null);
-    } catch (err) {
-      console.error("Confirm Design Cart Error:", err);
-    }
-  };
-
-  const handleModalTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      modalTouchDistRef.current = dist;
-    } else if (e.touches.length === 1 && modalZoom > 1) {
-      isModalDraggingRef.current = true;
-      modalLastTouchPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-  };
-
-  const handleModalTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && modalTouchDistRef.current !== null) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      const factor = dist / modalTouchDistRef.current;
-      setModalZoom(prev => Math.min(4, Math.max(1, parseFloat((prev * factor).toFixed(2)))));
-      modalTouchDistRef.current = dist;
-    } else if (e.touches.length === 1 && isModalDraggingRef.current && modalZoom > 1) {
-      const dx = e.touches[0].clientX - modalLastTouchPosRef.current.x;
-      const dy = e.touches[0].clientY - modalLastTouchPosRef.current.y;
-      setModalPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-      modalLastTouchPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-  };
-
-  const handleModalTouchEnd = () => {
-    modalTouchDistRef.current = null;
-    isModalDraggingRef.current = false;
-  };
-
-  const handleModalMouseDown = (e: React.MouseEvent) => {
-    if (modalZoom > 1) {
-      isModalDraggingRef.current = true;
-      modalLastTouchPosRef.current = { x: e.clientX, y: e.clientY };
-    }
-  };
-
-  const handleModalMouseMove = (e: React.MouseEvent) => {
-    if (isModalDraggingRef.current && modalZoom > 1) {
-      const dx = e.clientX - modalLastTouchPosRef.current.x;
-      const dy = e.clientY - modalLastTouchPosRef.current.y;
-      setModalPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-      modalLastTouchPosRef.current = { x: e.clientX, y: e.clientY };
-    }
-  };
-
-  const handleModalMouseUp = () => {
-    isModalDraggingRef.current = false;
-  };
-
-  const handleModalWheel = (e: React.WheelEvent) => {
-    if (e.deltaY < 0) {
-      setModalZoom(prev => Math.min(4, parseFloat((prev + 0.25).toFixed(2))));
-    } else {
-      setModalZoom(prev => {
-        const next = Math.max(1, parseFloat((prev - 0.25).toFixed(2)));
-        if (next === 1) setModalPan({ x: 0, y: 0 });
-        return next;
-      });
-    }
-  };
-
-  const dataURLtoBlob = (dataurl: string) => {
-    const arr = dataurl.split(',');
-    const mime = arr[0].match(/:(.*?);/)![1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-  };
-
   const generateFaceMockupPreview = async (
     faceName: string,
     faceJsonStr: string,
@@ -3179,6 +3032,309 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       console.warn("generateFaceMockupPreview error for face:", faceName, err);
       return '';
     }
+  };
+
+  const getFaceDisplayName = useCallback((face: string): string => {
+    const f = (face || '').trim().toLowerCase();
+    if (f === 'front') return locale === 'tr' ? 'Ön Yüz' : locale === 'en' ? 'Front Side' : 'الواجهة الأمامية';
+    if (f === 'back') return locale === 'tr' ? 'Arka Yüz' : locale === 'en' ? 'Back Side' : 'الواجهة الخلفية';
+    if (f === 'right_shoulder' || f === 'right') return locale === 'tr' ? 'Sağ Kol' : locale === 'en' ? 'Right Shoulder' : 'الكتف الأيمن';
+    if (f === 'left_shoulder' || f === 'left') return locale === 'tr' ? 'Sol Kol' : locale === 'en' ? 'Left Shoulder' : 'الكتف الأيسر';
+    if (f === 'collar') return locale === 'tr' ? 'Yaka' : locale === 'en' ? 'Collar' : 'الياقة';
+    return face;
+  }, [locale]);
+
+  const checkFaceHasDesign = useCallback((face: string, color: string): boolean => {
+    if (face === activeFace && isColorEqual(color, selectedColor)) {
+      if (!canvas) return false;
+      const objs = canvas.getObjects().filter(o => 
+        o.name !== 'background' && o.name !== 'mockup' && o.name !== 'print_area_guide' && o.name !== 'guideline'
+      );
+      return objs.length > 0;
+    }
+    const faceKey = getFaceStateKey(face, color);
+    const jsonStr = facesData.current[faceKey] || facesData.current[face];
+    if (!jsonStr) return false;
+    try {
+      const parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+      const objs = (parsed?.objects || []).filter((o: any) =>
+        o.name !== 'background' && o.name !== 'mockup' && o.name !== 'print_area_guide' && o.name !== 'guideline'
+      );
+      return objs.length > 0;
+    } catch {
+      return false;
+    }
+  }, [activeFace, selectedColor, canvas, getFaceStateKey]);
+
+  const generateAllFacePreviews = useCallback(async (): Promise<{ face: string; label: string; imageUrl: string; hasDesign: boolean }[]> => {
+    if (!canvas) return [];
+
+    // 1. Commit active canvas state to facesData.current immediately
+    try {
+      const currentKey = getFaceStateKey(activeFace, selectedColor);
+      facesData.current[currentKey] = JSON.stringify(canvas.toJSON(['name', 'originalAssetId', 'selectable', 'src', 'crossOrigin']));
+    } catch (e) {
+      console.warn("Could not serialize active canvas face:", e);
+    }
+
+    // 2. Identify which faces have user objects
+    const designedFaces = availableFaces.filter(face => checkFaceHasDesign(face, selectedColor));
+
+    // 3. Determine target faces to display in preview carousel:
+    // If multiple faces have designs, include ALL designed faces!
+    // If only 1 face has a design, include that face.
+    // Fallback: activeFace.
+    let targetFaces: string[] = [];
+    if (designedFaces.length > 1) {
+      const canonicalOrder = ['front', 'back', 'right_shoulder', 'left_shoulder', 'right', 'left', 'collar', 'other'];
+      targetFaces = [...designedFaces].sort((a, b) => {
+        const ia = canonicalOrder.indexOf(a) !== -1 ? canonicalOrder.indexOf(a) : 99;
+        const ib = canonicalOrder.indexOf(b) !== -1 ? canonicalOrder.indexOf(b) : 99;
+        return ia - ib;
+      });
+    } else if (designedFaces.length === 1) {
+      targetFaces = [designedFaces[0]];
+    } else {
+      targetFaces = [activeFace];
+    }
+
+    // 4. Generate high-resolution composites in parallel for all target faces
+    const activeFacePrintData = await exportDesignData();
+    const activeMockupUrl = activeFacePrintData?.mockupImage || '';
+
+    const slidePromises = targetFaces.map(async (face) => {
+      try {
+        let imageUrl = '';
+        if (face === activeFace && activeMockupUrl) {
+          imageUrl = activeMockupUrl;
+        } else {
+          const productMockupUrl = getFaceMockupForColor(face, selectedColor);
+          const faceArea = configFaces[face]?.printArea || currentPrintArea;
+          const faceKey = getFaceStateKey(face, selectedColor);
+          const faceJson = facesData.current[faceKey] || facesData.current[face] || "";
+          imageUrl = await generateFaceMockupPreview(face, faceJson, productMockupUrl, faceArea);
+        }
+
+        if (!imageUrl) return null;
+
+        return {
+          face,
+          label: getFaceDisplayName(face),
+          imageUrl,
+          hasDesign: designedFaces.includes(face)
+        };
+      } catch (err) {
+        console.warn(`Error generating preview slide for face ${face}:`, err);
+        return null;
+      }
+    });
+
+    const slides = (await Promise.all(slidePromises)).filter((s): s is { face: string; label: string; imageUrl: string; hasDesign: boolean } => !!s && !!s.imageUrl);
+    return slides;
+  }, [canvas, activeFace, selectedColor, availableFaces, checkFaceHasDesign, getFaceStateKey, exportDesignData, getFaceMockupForColor, configFaces, currentPrintArea, generateFaceMockupPreview, getFaceDisplayName]);
+
+  const handleNextSlide = useCallback(() => {
+    if (previewSlides.length <= 1) return;
+    const nextIdx = (currentSlideIndex + 1) % previewSlides.length;
+    setCurrentSlideIndex(nextIdx);
+    setPreviewImage(previewSlides[nextIdx].imageUrl);
+    setModalZoom(1);
+    setModalPan({ x: 0, y: 0 });
+  }, [previewSlides, currentSlideIndex]);
+
+  const handlePrevSlide = useCallback(() => {
+    if (previewSlides.length <= 1) return;
+    const prevIdx = (currentSlideIndex - 1 + previewSlides.length) % previewSlides.length;
+    setCurrentSlideIndex(prevIdx);
+    setPreviewImage(previewSlides[prevIdx].imageUrl);
+    setModalZoom(1);
+    setModalPan({ x: 0, y: 0 });
+  }, [previewSlides, currentSlideIndex]);
+
+  const handleSelectSlide = useCallback((index: number) => {
+    if (index >= 0 && index < previewSlides.length) {
+      setCurrentSlideIndex(index);
+      setPreviewImage(previewSlides[index].imageUrl);
+      setModalZoom(1);
+      setModalPan({ x: 0, y: 0 });
+    }
+  }, [previewSlides]);
+
+  const openCartConfirmationPreview = async () => {
+    if (!canvas) return;
+    setIsPreviewLoading(true);
+    try {
+      const slides = await generateAllFacePreviews();
+      if (slides.length > 0) {
+        setPreviewSlides(slides);
+        const initialIdx = slides.findIndex(s => s.face === activeFace);
+        const chosenIdx = initialIdx >= 0 ? initialIdx : 0;
+        setCurrentSlideIndex(chosenIdx);
+        setPreviewImage(slides[chosenIdx].imageUrl);
+        setPreviewIntent('cart_confirm');
+      } else {
+        if (!auth?.currentUser) {
+          setPendingAction('cart');
+          setIsAuthModalOpen(true);
+        } else {
+          executeAction('cart');
+        }
+      }
+    } catch (err) {
+      console.error("Cart preview generation error:", err);
+      if (!auth?.currentUser) {
+        setPendingAction('cart');
+        setIsAuthModalOpen(true);
+      } else {
+        executeAction('cart');
+      }
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!canvas) return;
+    setIsPreviewLoading(true);
+    try {
+      const slides = await generateAllFacePreviews();
+      if (slides.length > 0) {
+        setPreviewSlides(slides);
+        const initialIdx = slides.findIndex(s => s.face === activeFace);
+        const chosenIdx = initialIdx >= 0 ? initialIdx : 0;
+        setCurrentSlideIndex(chosenIdx);
+        setPreviewImage(slides[chosenIdx].imageUrl);
+        setPreviewIntent('inspect');
+      }
+    } catch (err) {
+      console.error("Preview Generation Error:", err);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const closePreviewModal = () => {
+    setPreviewImage(null);
+    setPreviewSlides([]);
+    setCurrentSlideIndex(0);
+    setPreviewIntent(null);
+    setModalZoom(1);
+    setModalPan({ x: 0, y: 0 });
+  };
+
+  const handleConfirmDesignAndAddToCart = async () => {
+    if (!auth?.currentUser) {
+      setPreviewImage(null);
+      setPreviewIntent(null);
+      setPendingAction('cart');
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    try {
+      await executeAction('cart');
+      setPreviewImage(null);
+      setPreviewIntent(null);
+    } catch (err) {
+      console.error("Confirm Design Cart Error:", err);
+    }
+  };
+
+  // Keyboard navigation for multi-face preview carousel
+  useEffect(() => {
+    if (!previewImage || previewSlides.length <= 1) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        if (locale === 'ar') handlePrevSlide();
+        else handleNextSlide();
+      } else if (e.key === 'ArrowLeft') {
+        if (locale === 'ar') handleNextSlide();
+        else handlePrevSlide();
+      } else if (e.key === 'Escape') {
+        closePreviewModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewImage, previewSlides.length, handleNextSlide, handlePrevSlide, locale]);
+
+  const handleModalTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      modalTouchDistRef.current = dist;
+    } else if (e.touches.length === 1 && modalZoom > 1) {
+      isModalDraggingRef.current = true;
+      modalLastTouchPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
+  const handleModalTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && modalTouchDistRef.current !== null) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const factor = dist / modalTouchDistRef.current;
+      setModalZoom(prev => Math.min(4, Math.max(1, parseFloat((prev * factor).toFixed(2)))));
+      modalTouchDistRef.current = dist;
+    } else if (e.touches.length === 1 && isModalDraggingRef.current && modalZoom > 1) {
+      const dx = e.touches[0].clientX - modalLastTouchPosRef.current.x;
+      const dy = e.touches[0].clientY - modalLastTouchPosRef.current.y;
+      setModalPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      modalLastTouchPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
+  const handleModalTouchEnd = () => {
+    modalTouchDistRef.current = null;
+    isModalDraggingRef.current = false;
+  };
+
+  const handleModalMouseDown = (e: React.MouseEvent) => {
+    if (modalZoom > 1) {
+      isModalDraggingRef.current = true;
+      modalLastTouchPosRef.current = { x: e.clientX, y: e.clientY };
+    }
+  };
+
+  const handleModalMouseMove = (e: React.MouseEvent) => {
+    if (isModalDraggingRef.current && modalZoom > 1) {
+      const dx = e.clientX - modalLastTouchPosRef.current.x;
+      const dy = e.clientY - modalLastTouchPosRef.current.y;
+      setModalPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      modalLastTouchPosRef.current = { x: e.clientX, y: e.clientY };
+    }
+  };
+
+  const handleModalMouseUp = () => {
+    isModalDraggingRef.current = false;
+  };
+
+  const handleModalWheel = (e: React.WheelEvent) => {
+    if (e.deltaY < 0) {
+      setModalZoom(prev => Math.min(4, parseFloat((prev + 0.25).toFixed(2))));
+    } else {
+      setModalZoom(prev => {
+        const next = Math.max(1, parseFloat((prev - 0.25).toFixed(2)));
+        if (next === 1) setModalPan({ x: 0, y: 0 });
+        return next;
+      });
+    }
+  };
+
+  const dataURLtoBlob = (dataurl: string) => {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)![1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
   };
 
   // Auth and Save Handlers
@@ -4723,18 +4879,48 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             </span>
             {/* Face */}
             <span className="text-gray-500">•</span>
-            <span className="text-gray-400">
-              {activeFace === 'front' ? (locale === 'tr' ? 'Ön Yüz' : locale === 'en' ? 'Front' : 'الجهة الأمامية') :
-               activeFace === 'back' ? (locale === 'tr' ? 'Arka Yüz' : locale === 'en' ? 'Back' : 'الجهة الخلفية') :
-               activeFace === 'left_shoulder' ? (locale === 'tr' ? 'Sol Kol' : locale === 'en' ? 'Left' : 'الكتف الأيسر') :
-               activeFace === 'right_shoulder' ? (locale === 'tr' ? 'Sağ Kol' : locale === 'en' ? 'Right' : 'الكتف الأيمن') :
-               activeFace}
+            <span className="text-amber-300 font-bold">
+              {previewSlides[currentSlideIndex]?.label || getFaceDisplayName(activeFace)}
             </span>
+            {previewSlides.length > 1 && (
+              <span className="bg-amber-500/25 text-amber-300 border border-amber-400/40 text-[10px] px-2 py-0.5 rounded-full font-mono font-black">
+                {locale === 'ar' 
+                  ? `${currentSlideIndex + 1} من ${previewSlides.length}` 
+                  : `${currentSlideIndex + 1} / ${previewSlides.length}`}
+              </span>
+            )}
           </div>
 
           {/* Centered Realistic Preview Image with GPU-Accelerated Pinch-to-Zoom & Pan */}
-          <div className="flex-1 w-full h-full max-h-[72vh] flex items-center justify-center p-2 overflow-hidden relative select-none">
+          <div className="flex-1 w-full h-full max-h-[66vh] sm:max-h-[70vh] flex items-center justify-center p-2 overflow-hidden relative select-none">
+            {/* Prev Face Slide Button */}
+            {previewSlides.length > 1 && (
+              <button
+                type="button"
+                onClick={locale === 'ar' ? handleNextSlide : handlePrevSlide}
+                className="absolute start-2 sm:start-6 top-1/2 -translate-y-1/2 p-2.5 sm:p-3.5 rounded-full bg-black/70 hover:bg-black/90 active:scale-90 text-white/90 hover:text-white border border-white/20 hover:border-amber-400/60 shadow-2xl backdrop-blur-md transition-all z-40 cursor-pointer group"
+                title={tPreview('prevFace', { fallback: locale === 'tr' ? 'Önceki Yüz' : locale === 'en' ? 'Previous Side' : 'الواجهة السابقة' })}
+                aria-label="Previous face"
+              >
+                <ChevronLeft size={24} className="group-hover:-translate-x-0.5 transition-transform rtl:rotate-180" />
+              </button>
+            )}
+
+            {/* Next Face Slide Button */}
+            {previewSlides.length > 1 && (
+              <button
+                type="button"
+                onClick={locale === 'ar' ? handlePrevSlide : handleNextSlide}
+                className="absolute end-2 sm:end-6 top-1/2 -translate-y-1/2 p-2.5 sm:p-3.5 rounded-full bg-black/70 hover:bg-black/90 active:scale-90 text-white/90 hover:text-white border border-white/20 hover:border-amber-400/60 shadow-2xl backdrop-blur-md transition-all z-40 cursor-pointer group"
+                title={tPreview('nextFace', { fallback: locale === 'tr' ? 'Sonraki Yüz' : locale === 'en' ? 'Next Side' : 'الواجهة التالية' })}
+                aria-label="Next face"
+              >
+                <ChevronRight size={24} className="group-hover:translate-x-0.5 transition-transform rtl:rotate-180" />
+              </button>
+            )}
+
             <TransformWrapper
+              key={previewSlides[currentSlideIndex]?.face || currentSlideIndex}
               initialScale={1}
               minScale={1}
               maxScale={4}
@@ -4752,7 +4938,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                     <button
                       type="button"
                       onClick={() => zoomIn(0.5)}
-                      className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors active:scale-95"
+                      className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors active:scale-95 cursor-pointer"
                       title={t('zoomIn')}
                     >
                       <Plus size={16} />
@@ -4763,7 +4949,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                     <button
                       type="button"
                       onClick={() => zoomOut(0.5)}
-                      className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors active:scale-95"
+                      className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors active:scale-95 cursor-pointer"
                       title={t('zoomOut')}
                     >
                       <Minus size={16} />
@@ -4772,7 +4958,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                       <button
                         type="button"
                         onClick={() => resetTransform()}
-                        className="px-2 py-1 text-[10px] text-amber-400 font-bold hover:bg-white/20 rounded-lg transition-colors active:scale-95"
+                        className="px-2 py-1 text-[10px] text-amber-400 font-bold hover:bg-white/20 rounded-lg transition-colors active:scale-95 cursor-pointer"
                       >
                         100%
                       </button>
@@ -4784,10 +4970,11 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                     contentClass="!w-full !h-full flex items-center justify-center"
                   >
                     <img
+                      key={previewSlides[currentSlideIndex]?.face || previewImage}
                       src={previewImage}
-                      alt={tPreview('title')}
+                      alt={previewSlides[currentSlideIndex]?.label || tPreview('title')}
                       draggable={false}
-                      className="max-h-[66vh] max-w-full object-contain rounded-2xl shadow-2xl border border-white/10 bg-white/5 transform-gpu will-change-transform backface-hidden select-none pointer-events-none"
+                      className="max-h-[62vh] max-w-full object-contain rounded-2xl shadow-2xl border border-white/10 bg-white/5 transform-gpu will-change-transform backface-hidden select-none pointer-events-none"
                     />
                   </TransformComponent>
 
@@ -4801,6 +4988,52 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               )}
             </TransformWrapper>
           </div>
+
+          {/* Multi-Face Carousel Thumbnails Bar */}
+          {previewSlides.length > 1 && (
+            <div className="w-full max-w-2xl z-30 mb-2 px-2">
+              <div className="flex items-center justify-center gap-2 sm:gap-2.5 overflow-x-auto py-1 px-1 no-scrollbar">
+                {previewSlides.map((slide, idx) => {
+                  const isActive = idx === currentSlideIndex;
+                  return (
+                    <button
+                      key={slide.face}
+                      type="button"
+                      onClick={() => handleSelectSlide(idx)}
+                      className={`group relative flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border transition-all cursor-pointer backdrop-blur-md shrink-0 ${
+                        isActive
+                          ? 'bg-amber-500/25 border-amber-400 ring-2 ring-amber-400/50 shadow-lg shadow-amber-500/20 scale-105'
+                          : 'bg-black/50 hover:bg-black/80 border-white/15 hover:border-white/30 text-gray-300'
+                      }`}
+                    >
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 flex items-center justify-center">
+                        <img
+                          src={slide.imageUrl}
+                          alt={slide.label}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div className="flex flex-col text-start leading-none gap-0.5">
+                        <span className={`text-[11px] sm:text-xs font-bold whitespace-nowrap ${isActive ? 'text-amber-300' : 'text-gray-200'}`}>
+                          {slide.label}
+                        </span>
+                        {slide.hasDesign ? (
+                          <span className="text-[9px] text-emerald-400 flex items-center gap-1 font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            {locale === 'tr' ? 'Tasarım Var' : locale === 'en' ? 'Designed' : 'مصممة'}
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-gray-400">
+                            {locale === 'tr' ? 'Boş' : locale === 'en' ? 'Empty' : 'فارغة'}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Modal Bottom CTA Bar */}
           <div className="w-full max-w-2xl flex flex-col sm:flex-row items-center gap-3 sm:gap-4 z-30 bg-black/80 backdrop-blur-xl p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-white/15 shadow-2xl">

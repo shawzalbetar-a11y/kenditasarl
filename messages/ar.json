@@ -461,6 +461,9 @@
     "confirmDesignAndAddToCart": "تأكيد التصميم وإضافة للسلة",
     "backToEditor": "الرجوع لاستكمال التصميم",
     "close": "إغلاق",
+    "nextFace": "الواجهة التالية",
+    "prevFace": "الواجهة السابقة",
+    "faceCount": "الواجهة {current} من {total}",
     "zoomHint": "يمكنك التكبير والسحب لفحص التفاصيل",
     "totalPrice": "الإجمالي"
   },
