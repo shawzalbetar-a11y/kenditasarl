@@ -6,12 +6,12 @@ import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, Align
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import AuthModal from '@/components/auth/AuthModal';
 import { auth, db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, query, orderBy, where, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, getDoc, updateDoc, query, orderBy, where, deleteDoc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { useSearchParams } from 'next/navigation';
-import { CustomizationConfig, PrintArea } from '@/lib/customizationConfig';
+import { PrintArea } from '@/lib/customizationConfig';
 import { resolveImagePrintAreaGeometry } from '@/lib/coordinateMapping';
 import { getCategoryLocalizedName } from '@/lib/categoryTranslations';
 import TextTools from './tools/TextTools';
@@ -1200,8 +1200,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   }, [isFreeMode, activeFace, nativeWidth, nativeHeight]);
 
   // Fabric Canvas covers 100% of the mockup image directly (Zero offset, zero padding distortion)
-  const PAD_X = 0;
-  const PAD_Y = 0;
   const totalCanvasWidth = nativeWidth;
   const totalCanvasHeight = nativeHeight;
 
@@ -1216,21 +1214,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       canvas.renderAll();
     }
   }, [canvas, totalCanvasWidth, totalCanvasHeight]);
-
-  const extendedOverlayLeft = 0;
-  const extendedOverlayTop = 0;
-  const extendedOverlayWidth = 100;
-  const extendedOverlayHeight = 100;
-
-  const printAreaLeftPercent = 0;
-  const printAreaTopPercent = 0;
-  const printAreaWidthPercent = 100;
-  const printAreaHeightPercent = 100;
-
-  const overlayLeft = 0;
-  const overlayTop = 0;
-  const overlayWidth = 100;
-  const overlayHeight = 100;
 
   // Helper to resolve precise placement coordinates in Fabric virtual canvas space (1:1 with mockup space)
   const getPlacementFabricBounds = useCallback((spec: PlacementSpec) => {
@@ -2419,22 +2402,42 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     if (!canvas) return;
     const obj = canvas.getActiveObject();
     if (!obj) return;
-    
-    const maxW = currentPrintArea.width * 0.95;
-    const maxH = currentPrintArea.height * 0.95;
+
+    let targetLeft = freePrintZone.left;
+    let targetTop = freePrintZone.top;
+    let targetW = freePrintZone.width;
+    let targetH = freePrintZone.height;
+
+    if (!isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
+      const assignedId = (obj as any).assignedPlacementId || focusedPlacementId;
+      const activeSpec = activeFaceSelectedPlacementsRef.current.find(s => s.id === assignedId) || activeFaceSelectedPlacementsRef.current[0];
+      const p = getPlacementFabricBounds(activeSpec);
+      targetLeft = p.fabricLeft;
+      targetTop = p.fabricTop;
+      targetW = p.fabricWidth;
+      targetH = p.fabricHeight;
+    }
+
+    const maxW = targetW * 0.9;
+    const maxH = targetH * 0.9;
     const objW = obj.getScaledWidth();
     const objH = obj.getScaledHeight();
-    
+
     if (objW > maxW || objH > maxH) {
       const scaleFactor = Math.min(maxW / (obj.width || 1), maxH / (obj.height || 1));
       obj.scale(scaleFactor);
     }
-    
-    canvas.centerObject(obj);
+
+    obj.set({
+      originX: 'center',
+      originY: 'center',
+      left: targetLeft + targetW / 2,
+      top: targetTop + targetH / 2,
+    });
     obj.setCoords();
-    
+
     applyCustomModernStyles(canvas);
-    
+
     setIsObjectOutOfBounds(false);
     canvas.requestRenderAll();
     canvas.renderAll();
@@ -3243,21 +3246,35 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       if (obj.name === 'background' || obj.name === 'mockup' || obj.name === 'print_area_guide') return;
       const br = obj.getBoundingRect(true, true);
       const tolerance = 6;
-      const safeArea = currentPrintArea.safeArea;
-      if (safeArea) {
-        if (br.left < (safeArea.left - tolerance) || 
-            (br.left + br.width) > (safeArea.left + safeArea.width + tolerance) ||
-            br.top < (safeArea.top - tolerance) || 
-            (br.top + br.height) > (safeArea.top + safeArea.height + tolerance)) {
-          hasOutofBounds = true;
+      let insideBounds = false;
+
+      if (isFreeModeRef.current) {
+        const fz = freePrintZone;
+        insideBounds =
+          br.left >= fz.left - tolerance &&
+          (br.left + br.width) <= fz.left + fz.width + tolerance &&
+          br.top >= fz.top - tolerance &&
+          (br.top + br.height) <= fz.top + fz.height + tolerance;
+      } else if (activeFaceSelectedPlacementsRef.current.length > 0) {
+        for (const spec of activeFaceSelectedPlacementsRef.current) {
+          const p = getPlacementFabricBounds(spec);
+          const tol = 35;
+          if (
+            br.left >= p.fabricLeft - tol &&
+            (br.left + br.width) <= p.fabricLeft + p.fabricWidth + tol &&
+            br.top >= p.fabricTop - tol &&
+            (br.top + br.height) <= p.fabricTop + p.fabricHeight + tol
+          ) {
+            insideBounds = true;
+            break;
+          }
         }
       } else {
-        if (br.left < -tolerance || 
-            (br.left + br.width) > (currentPrintArea.width + tolerance) ||
-            br.top < -tolerance || 
-            (br.top + br.height) > (currentPrintArea.height + tolerance)) {
-          hasOutofBounds = true;
-        }
+        insideBounds = true;
+      }
+
+      if (!insideBounds) {
+        hasOutofBounds = true;
       }
 
       if (obj.type === 'textbox' || obj.type === 'i-text') {
@@ -3764,19 +3781,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               <div className="w-full h-full relative origin-top-left" style={{ transform: `scale(1)` }}>
                 {/* Visual Guides & Overlays Container (Safe from diff collisions) */}
                 <div className="w-full h-full absolute inset-0 pointer-events-none z-25">
-                  {/* Safe Area Guide Line (Free Mode Only) */}
-                  {isFreeMode && currentPrintArea.safeArea && (
-                    <div
-                      className="absolute border border-dashed border-amber-400/70 pointer-events-none z-15"
-                      style={{
-                        left: `${((PAD_X + currentPrintArea.safeArea.left) / totalCanvasWidth) * 100}%`,
-                        top: `${((PAD_Y + currentPrintArea.safeArea.top) / totalCanvasHeight) * 100}%`,
-                        width: `${(currentPrintArea.safeArea.width / totalCanvasWidth) * 100}%`,
-                        height: `${(currentPrintArea.safeArea.height / totalCanvasHeight) * 100}%`,
-                        borderRadius: currentPrintArea.safeArea.shape === 'circle' ? '50%' : '0px'
-                      }}
-                    />
-                  )}
                 </div>
 
                 {/* Isolated Extended Fabric Canvas Container (Sole child is canvas, completely safe from React DOM diffing) */}
