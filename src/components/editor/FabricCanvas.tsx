@@ -74,8 +74,8 @@ if (typeof window !== 'undefined' && fabric) {
     };
 
     fabric.Canvas.prototype.centerObject = function(obj: fabric.Object) {
-      const targetW = (this as any).printAreaWidth || this.getWidth();
-      const targetH = (this as any).printAreaHeight || this.getHeight();
+      const targetW = this.getWidth() || 2000;
+      const targetH = this.getHeight() || 2000;
       if (obj.originX === 'center' && obj.originY === 'center') {
         obj.set({
           left: targetW / 2,
@@ -93,7 +93,7 @@ if (typeof window !== 'undefined' && fabric) {
     };
 
     fabric.Canvas.prototype.centerObjectH = function(obj: fabric.Object) {
-      const targetW = (this as any).printAreaWidth || this.getWidth();
+      const targetW = this.getWidth() || 2000;
       if (obj.originX === 'center') {
         obj.set({ left: targetW / 2 });
       } else {
@@ -105,7 +105,7 @@ if (typeof window !== 'undefined' && fabric) {
     };
 
     fabric.Canvas.prototype.centerObjectV = function(obj: fabric.Object) {
-      const targetH = (this as any).printAreaHeight || this.getHeight();
+      const targetH = this.getHeight() || 2000;
       if (obj.originY === 'center') {
         obj.set({ top: targetH / 2 });
       } else {
@@ -1118,106 +1118,93 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const currentFaceMockupUrl = getFaceMockupForColor(activeFace, selectedColor);
 
-  // Current Print Area dynamically resolved for activeFace and current mockup image (or expanded in Free Mode)
-  const currentPrintArea: PrintArea = React.useMemo(() => {
-    if (isFreeMode) {
-      const freeBounds = productData?.config?.freeModeBounds?.[activeFace];
-      const nw = 2000;
-      const nh = 2000;
-      if (freeBounds) {
-        return {
-          id: `free_${activeFace}`,
-          name: `FREE_${activeFace.toUpperCase()}`,
-          left: freeBounds.x,
-          top: freeBounds.y,
-          width: freeBounds.width,
-          height: freeBounds.height,
-          nativeWidth: freeBounds.nativeWidth || nw,
-          nativeHeight: freeBounds.nativeHeight || nh,
-        };
-      } else {
-        const isSleeve = activeFace === 'left' || activeFace === 'right' || activeFace === 'left_shoulder' || activeFace === 'right_shoulder';
-        const fw = Math.round(nw * (isSleeve ? 0.45 : 0.54));
-        const fh = Math.round(nh * (isSleeve ? 0.65 : 0.68));
-        const fx = Math.round((nw - fw) / 2);
-        const fy = Math.round(nh * (isSleeve ? 0.18 : 0.18));
-        return {
-          id: `free_${activeFace}`,
-          name: `FREE_${activeFace.toUpperCase()}`,
-          left: fx,
-          top: fy,
-          width: fw,
-          height: fh,
-          nativeWidth: nw,
-          nativeHeight: nh,
-        };
-      }
+  // Standardized High-Fidelity Canvas Space (2000x2000 1:1 with garment mockup frame)
+  const nativeWidth = 2000;
+  const nativeHeight = 2000;
+  const nativeAspectRatio = 1;
+
+  // Free Mode Printable Area bounds (per garment face)
+  const freePrintZone = React.useMemo(() => {
+    const freeBounds = productData?.config?.freeModeBounds?.[activeFace];
+    const nw = 2000;
+    const nh = 2000;
+    if (freeBounds) {
+      return {
+        left: freeBounds.x,
+        top: freeBounds.y,
+        width: freeBounds.width,
+        height: freeBounds.height,
+        nativeWidth: freeBounds.nativeWidth || nw,
+        nativeHeight: freeBounds.nativeHeight || nh,
+      };
     }
-    if (productData?.config) {
-      return resolveImagePrintAreaGeometry({
-        config: productData.config,
-        faceId: activeFace,
-        currentImage: currentFaceMockupUrl
-      });
-    }
-    return configFaces[activeFace]?.printArea || { 
-      id: activeFace,
-      name: activeFace.toUpperCase(),
-      width: 200, 
-      height: 280, 
-      top: 120, 
-      left: 100,
-      nativeWidth: 400,
-      nativeHeight: 500
+    const isSleeve = activeFace === 'left' || activeFace === 'right' || activeFace === 'left_shoulder' || activeFace === 'right_shoulder';
+    const fw = Math.round(nw * (isSleeve ? 0.45 : 0.54));
+    const fh = Math.round(nh * (isSleeve ? 0.65 : 0.68));
+    const fx = Math.round((nw - fw) / 2);
+    const fy = Math.round(nh * (isSleeve ? 0.18 : 0.18));
+    return {
+      left: fx,
+      top: fy,
+      width: fw,
+      height: fh,
+      nativeWidth: nw,
+      nativeHeight: nh,
     };
-  }, [isFreeMode, productData?.config, activeFace, currentFaceMockupUrl, configFaces]);
+  }, [productData?.config?.freeModeBounds, activeFace]);
 
-  // Extract dynamic native image dimensions with safe fallbacks
-  const nativeWidth = currentPrintArea.nativeWidth || 400;
-  const nativeHeight = currentPrintArea.nativeHeight || 500;
-  const nativeAspectRatio = nativeWidth / nativeHeight;
+  // Current Print Area spans the entire garment face (0,0 to 2000,2000)
+  // Completely eliminates legacy boundary walls, clipping, and coordinate offset shifts!
+  const currentPrintArea: PrintArea = React.useMemo(() => {
+    return {
+      id: isFreeMode ? `free_${activeFace}` : `approved_${activeFace}`,
+      name: (isFreeMode ? `FREE_${activeFace}` : `APPROVED_${activeFace}`).toUpperCase(),
+      left: 0,
+      top: 0,
+      width: nativeWidth,
+      height: nativeHeight,
+      nativeWidth,
+      nativeHeight,
+    };
+  }, [isFreeMode, activeFace]);
 
-  // Extended Canvas Padding to allow graphics to be visible outside the dashed print area
-  const PAD_X = Math.round(currentPrintArea.width * 0.45);
-  const PAD_Y = Math.round(currentPrintArea.height * 0.45);
+  // Fabric Canvas covers 100% of the mockup image directly (Zero offset, zero padding distortion)
+  const PAD_X = 0;
+  const PAD_Y = 0;
+  const totalCanvasWidth = nativeWidth;
+  const totalCanvasHeight = nativeHeight;
 
-  const totalCanvasWidth = currentPrintArea.width + (PAD_X * 2);
-  const totalCanvasHeight = currentPrintArea.height + (PAD_Y * 2);
+  const extendedOverlayLeft = 0;
+  const extendedOverlayTop = 0;
+  const extendedOverlayWidth = 100;
+  const extendedOverlayHeight = 100;
 
-  // Extended Canvas Container Percentage Positioning on Mockup
-  const extendedOverlayLeft = ((currentPrintArea.left - PAD_X) / nativeWidth) * 100;
-  const extendedOverlayTop = ((currentPrintArea.top - PAD_Y) / nativeHeight) * 100;
-  const extendedOverlayWidth = (totalCanvasWidth / nativeWidth) * 100;
-  const extendedOverlayHeight = (totalCanvasHeight / nativeHeight) * 100;
+  const printAreaLeftPercent = 0;
+  const printAreaTopPercent = 0;
+  const printAreaWidthPercent = 100;
+  const printAreaHeightPercent = 100;
 
-  // Print Area Position within the Extended Canvas Container
-  const printAreaLeftPercent = (PAD_X / totalCanvasWidth) * 100;
-  const printAreaTopPercent = (PAD_Y / totalCanvasHeight) * 100;
-  const printAreaWidthPercent = (currentPrintArea.width / totalCanvasWidth) * 100;
-  const printAreaHeightPercent = (currentPrintArea.height / totalCanvasHeight) * 100;
+  const overlayLeft = 0;
+  const overlayTop = 0;
+  const overlayWidth = 100;
+  const overlayHeight = 100;
 
-  // Direct percentage positioning of print area on native image
-  const overlayLeft = (currentPrintArea.left / nativeWidth) * 100;
-  const overlayTop = (currentPrintArea.top / nativeHeight) * 100;
-  const overlayWidth = (currentPrintArea.width / nativeWidth) * 100;
-  const overlayHeight = (currentPrintArea.height / nativeHeight) * 100;
-
-  // Helper to resolve precise placement coordinates in Fabric virtual canvas space
+  // Helper to resolve precise placement coordinates in Fabric virtual canvas space (1:1 with mockup space)
   const getPlacementFabricBounds = useCallback((spec: PlacementSpec) => {
     const calibrated = productData?.config?.calibratedPlacements?.[spec.id];
     const hasCalibrated = !!calibrated && !!calibrated.nativeWidth && calibrated.nativeWidth > 0;
     
-    const nw = nativeWidth || 2000;
-    const nh = nativeHeight || 2000;
+    const nw = 2000;
+    const nh = 2000;
 
-    const mockupX = hasCalibrated ? calibrated.x : (spec.canvasBox.leftPercent / 100) * nw;
-    const mockupY = hasCalibrated ? calibrated.y : (spec.canvasBox.topPercent / 100) * nh;
-    const mockupW = hasCalibrated ? calibrated.width : (spec.canvasBox.maxWidthPercent / 100) * nw;
-    const mockupH = hasCalibrated ? calibrated.height : (spec.canvasBox.maxHeightPercent / 100) * nh;
+    const mockupX = hasCalibrated ? (calibrated.x / calibrated.nativeWidth) * nw : (spec.canvasBox.leftPercent / 100) * nw;
+    const mockupY = hasCalibrated ? (calibrated.y / calibrated.nativeHeight) * nh : (spec.canvasBox.topPercent / 100) * nh;
+    const mockupW = hasCalibrated ? (calibrated.width / calibrated.nativeWidth) * nw : (spec.canvasBox.maxWidthPercent / 100) * nw;
+    const mockupH = hasCalibrated ? (calibrated.height / calibrated.nativeHeight) * nh : (spec.canvasBox.maxHeightPercent / 100) * nh;
 
-    // Coordinate in Fabric Canvas space (where origin 0,0 is at currentPrintArea.left, currentPrintArea.top)
-    const fabricLeft = mockupX - currentPrintArea.left;
-    const fabricTop = mockupY - currentPrintArea.top;
+    // Direct 1:1 mapping with mockup coordinates - No offset drift or artificial barriers!
+    const fabricLeft = mockupX;
+    const fabricTop = mockupY;
     const fabricWidth = mockupW;
     const fabricHeight = mockupH;
     const fabricCenterX = fabricLeft + fabricWidth / 2;
@@ -1240,12 +1227,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       fabricCenterX,
       fabricCenterY,
     };
-  }, [productData?.config?.calibratedPlacements, nativeWidth, nativeHeight, currentPrintArea.left, currentPrintArea.top]);
+  }, [productData?.config?.calibratedPlacements]);
 
   // Helper to format controls, auto-scale within placement or free bounds, and position object
   const prepareAndAddObject = (obj: fabric.Object, canvasInstance?: fabric.Canvas) => {
     const c = canvasInstance || canvas;
     if (!c) return;
+
+    // Mark as intentionally positioned to prevent object:added listener from re-scaling/re-centering
+    (obj as any).__alreadyPositioned = true;
 
     // Approved Standards Mode: Automatically insert into target approved placement!
     if (!isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
@@ -1304,9 +1294,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       return;
     }
 
-    // Free Mode: Scale within 80% of full printable face
-    const maxWidth = currentPrintArea.width * 0.8;
-    const maxHeight = currentPrintArea.height * 0.8;
+    // Free Mode: Scale within 75% of full printable zone
+    const maxWidth = freePrintZone.width * 0.75;
+    const maxHeight = freePrintZone.height * 0.75;
     const currentWidth = obj.getScaledWidth();
     const currentHeight = obj.getScaledHeight();
 
@@ -1315,9 +1305,16 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       obj.scale(scaleFactor);
     }
 
+    obj.set({
+      originX: 'center',
+      originY: 'center',
+      left: freePrintZone.left + freePrintZone.width / 2,
+      top: freePrintZone.top + freePrintZone.height / 2,
+    });
+
     c.add(obj);
-    c.centerObject(obj);
     c.setActiveObject(obj);
+    obj.setCoords();
     applyCustomModernStyles(c);
     c.renderAll();
   };
@@ -1422,9 +1419,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       enableRetinaScaling: true,
     });
 
-    (initCanvas as any).printAreaWidth = currentPrintArea.width;
-    (initCanvas as any).printAreaHeight = currentPrintArea.height;
-    initCanvas.viewportTransform = [1, 0, 0, 1, PAD_X, PAD_Y];
+    (initCanvas as any).printAreaWidth = 2000;
+    (initCanvas as any).printAreaHeight = 2000;
+    initCanvas.viewportTransform = [1, 0, 0, 1, 0, 0];
 
     // Ensure 100% full canvas clean wipe on every frame to prevent any trailing, smearing or ghosting
     initCanvas.clearContext = function(ctx: CanvasRenderingContext2D) {
@@ -1462,30 +1459,31 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         // Apply Global Brand Modern Selection Controls & Dimensions
         applyCustomModernStyles(initCanvas);
 
-        // 2. التحجيم الذكي لملء 95% من مساحة الطباعة والتوسيط الدقيق
-        if (!isRestoring.current) {
+        // Smart sizing for raw objects that were not already positioned by prepareAndAddObject or addText
+        if (!isRestoring.current && !(obj as any).__alreadyPositioned && !(obj as any).assignedPlacementId) {
           const isText = obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text';
           if (isText) {
-            const marginPx = Math.max(8, Math.round(currentPrintArea.width * 0.03));
-            const targetTextWidth = Math.max(80, currentPrintArea.width - (marginPx * 2));
-            
-            // تكبير أحرف النص نفسه ليمتد عبر المساحة المتاحة مع ترك 3 مم على الجوانب
+            const marginPx = 40;
+            const targetTextWidth = Math.max(120, freePrintZone.width - (marginPx * 2));
             obj.scaleToWidth(targetTextWidth);
-            const maxHeight = currentPrintArea.height * 0.4;
+            const maxHeight = freePrintZone.height * 0.35;
             if (obj.getScaledHeight() > maxHeight) {
               obj.scaleToHeight(maxHeight);
             }
-            initCanvas.centerObject(obj);
           } else {
-            // Fill 95% of print area while preserving aspect ratio
-            const maxW = currentPrintArea.width * 0.95;
-            const maxH = currentPrintArea.height * 0.95;
+            const maxW = freePrintZone.width * 0.75;
+            const maxH = freePrintZone.height * 0.75;
             const originalW = obj.width || 1;
             const originalH = obj.height || 1;
             const scaleFactor = Math.min(maxW / originalW, maxH / originalH);
             obj.scale(scaleFactor);
-            initCanvas.centerObject(obj);
           }
+          obj.set({
+            left: freePrintZone.left + freePrintZone.width / 2,
+            top: freePrintZone.top + freePrintZone.height / 2,
+            originX: 'center',
+            originY: 'center',
+          });
           obj.setCoords();
         }
       }
@@ -1568,26 +1566,23 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         return;
       }
 
-      // 1. Boundary Clamping (Keep at least 20px visible inside canvas)
+      // 1. Boundary Clamping: Keep at least 20px visible inside the garment canvas
       const minVisible = 20;
       const bound = activeObj.getBoundingRect(true, true);
       let newLeft = activeObj.left || 0;
       let newTop = activeObj.top || 0;
 
-      // Check left/right boundaries
       if (bound.left + bound.width < minVisible) {
         newLeft += (minVisible - (bound.left + bound.width));
       }
-      if (bound.left > currentPrintArea.width - minVisible) {
-        newLeft -= (bound.left - (currentPrintArea.width - minVisible));
+      if (bound.left > 2000 - minVisible) {
+        newLeft -= (bound.left - (2000 - minVisible));
       }
-
-      // Check top/bottom boundaries
       if (bound.top + bound.height < minVisible) {
         newTop += (minVisible - (bound.top + bound.height));
       }
-      if (bound.top > currentPrintArea.height - minVisible) {
-        newTop -= (bound.top - (currentPrintArea.height - minVisible));
+      if (bound.top > 2000 - minVisible) {
+        newTop -= (bound.top - (2000 - minVisible));
       }
 
       if (newLeft !== activeObj.left || newTop !== activeObj.top) {
@@ -1595,27 +1590,44 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         activeObj.setCoords();
       }
 
-      // 2. Snapping to center
-      const centerX = currentPrintArea.width / 2;
-      const centerY = currentPrintArea.height / 2;
-      const SNAP_ZONE = 8;
+      // 2. Centerline Snapping
+      const centerX = 1000;
+      const SNAP_ZONE = 10;
       const centerPt = activeObj.getCenterPoint();
 
       if (Math.abs(centerPt.x - centerX) < SNAP_ZONE) {
         activeObj.set({ left: (activeObj.left || 0) + (centerX - centerPt.x) });
       }
-      if (Math.abs(centerPt.y - centerY) < SNAP_ZONE) {
-        activeObj.set({ top: (activeObj.top || 0) + (centerY - centerPt.y) });
-      }
 
-      // 3. Print Area & Safe Area Boundary Validation (Real-time Red Warning on Overflow)
+      // 3. Print Area & Placement Boundary Validation
       const br = activeObj.getBoundingRect(true, true);
-      const tolerance = 2;
-      const isOutOfBounds = 
-        br.left < -tolerance || 
-        (br.left + br.width) > (currentPrintArea.width + tolerance) ||
-        br.top < -tolerance || 
-        (br.top + br.height) > (currentPrintArea.height + tolerance);
+      const tolerance = 6;
+      let isOutOfBounds = false;
+
+      if (isFreeModeRef.current) {
+        const fz = freePrintZone;
+        isOutOfBounds = 
+          br.left < fz.left - tolerance || 
+          (br.left + br.width) > (fz.left + fz.width + tolerance) ||
+          br.top < fz.top - tolerance || 
+          (br.top + br.height) > (fz.top + fz.height + tolerance);
+      } else if (activeFaceSelectedPlacementsRef.current.length > 0) {
+        let insidePlacement = false;
+        for (const spec of activeFaceSelectedPlacementsRef.current) {
+          const p = getPlacementFabricBounds(spec);
+          const tol = 35;
+          if (
+            br.left >= p.fabricLeft - tol &&
+            (br.left + br.width) <= p.fabricLeft + p.fabricWidth + tol &&
+            br.top >= p.fabricTop - tol &&
+            (br.top + br.height) <= p.fabricTop + p.fabricHeight + tol
+          ) {
+            insidePlacement = true;
+            break;
+          }
+        }
+        isOutOfBounds = !insidePlacement;
+      }
 
       const scale = Math.max(1, initCanvas.getWidth() / 400);
 
@@ -1643,19 +1655,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         setIsObjectOutOfBounds(false);
         setIsWarningDismissed(false);
       }
-
-      if (currentPrintArea.safeArea) {
-        const safeAreaObj = currentPrintArea.safeArea;
-        const safeTol = 4;
-        const isOutsideSafeX = br.left < (safeAreaObj.left - safeTol) || (br.left + br.width) > (safeAreaObj.left + safeAreaObj.width + safeTol);
-        const isOutsideSafeY = br.top < (safeAreaObj.top - safeTol) || (br.top + br.height) > (safeAreaObj.top + safeAreaObj.height + safeTol);
-        
-        if (isOutsideSafeX || isOutsideSafeY) {
-          setValidationWarning(t('outOfSafeArea', { fallback: 'Warning: Element is outside the safe print area.' }));
-        } else {
-          setValidationWarning(null);
-        }
-      }
     };
 
     // Real-time hover detection over approved placement boxes during object drag
@@ -1670,10 +1669,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         for (const spec of activeFaceSelectedPlacementsRef.current) {
           const p = getPlacementFabricBounds(spec);
           if (
-            centerPt.x >= p.fabricLeft - 30 &&
-            centerPt.x <= p.fabricLeft + p.fabricWidth + 30 &&
-            centerPt.y >= p.fabricTop - 30 &&
-            centerPt.y <= p.fabricTop + p.fabricHeight + 30
+            centerPt.x >= p.fabricLeft - 40 &&
+            centerPt.x <= p.fabricLeft + p.fabricWidth + 40 &&
+            centerPt.y >= p.fabricTop - 40 &&
+            centerPt.y <= p.fabricTop + p.fabricHeight + 40
           ) {
             matchedPlacementId = spec.id;
             break;
@@ -1695,55 +1694,70 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       if (activeObj && !isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
         const centerPt = activeObj.getCenterPoint();
         let targetSpec: PlacementSpec | null = null;
-        let minDistance = Infinity;
+        let isInsideTarget = false;
 
         for (const spec of activeFaceSelectedPlacementsRef.current) {
           const p = getPlacementFabricBounds(spec);
-          const dx = centerPt.x - p.fabricCenterX;
-          const dy = centerPt.y - p.fabricCenterY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
           const isInside =
             centerPt.x >= p.fabricLeft - 40 &&
             centerPt.x <= p.fabricLeft + p.fabricWidth + 40 &&
             centerPt.y >= p.fabricTop - 40 &&
             centerPt.y <= p.fabricTop + p.fabricHeight + 40;
 
-          if (isInside || dist < minDistance) {
-            minDistance = dist;
+          if (isInside) {
             targetSpec = spec;
+            isInsideTarget = true;
+            break;
+          }
+        }
+
+        // If not directly inside, find closest within snap radius (250px)
+        if (!targetSpec) {
+          let minDistance = 250;
+          for (const spec of activeFaceSelectedPlacementsRef.current) {
+            const p = getPlacementFabricBounds(spec);
+            const dist = Math.hypot(centerPt.x - p.fabricCenterX, centerPt.y - p.fabricCenterY);
+            if (dist < minDistance) {
+              minDistance = dist;
+              targetSpec = spec;
+            }
           }
         }
 
         if (targetSpec) {
           const p = getPlacementFabricBounds(targetSpec);
-          activeObj.set({
-            originX: 'center',
-            originY: 'center',
-            left: p.fabricCenterX,
-            top: p.fabricCenterY,
-          });
+          const previousPlacementId = (activeObj as any).assignedPlacementId;
 
-          // Scale down if larger than placement bounds
-          const maxW = p.fabricWidth * 0.9;
-          const maxH = p.fabricHeight * 0.9;
-          const curW = activeObj.getScaledWidth();
-          const curH = activeObj.getScaledHeight();
-          if (curW > maxW || curH > maxH) {
-            const scaleFactor = Math.min(maxW / (activeObj.width || 1), maxH / (activeObj.height || 1));
-            activeObj.scale(scaleFactor);
+          // Only snap to center if switching placements or dropped from outside
+          if (!previousPlacementId || previousPlacementId !== targetSpec.id || !isInsideTarget) {
+            activeObj.set({
+              originX: 'center',
+              originY: 'center',
+              left: p.fabricCenterX,
+              top: p.fabricCenterY,
+            });
+
+            // Scale down if larger than placement bounds
+            const maxW = p.fabricWidth * 0.9;
+            const maxH = p.fabricHeight * 0.9;
+            const curW = activeObj.getScaledWidth();
+            const curH = activeObj.getScaledHeight();
+            if (curW > maxW || curH > maxH) {
+              const scaleFactor = Math.min(maxW / (activeObj.width || 1), maxH / (activeObj.height || 1));
+              activeObj.scale(scaleFactor);
+            }
+
+            setToastNotification({
+              type: 'success',
+              text: locale === 'tr' ? `Tasarım ${targetSpec.nameTr} konumuna kilitlendi 🎯` :
+                    locale === 'en' ? `Design snapped to ${targetSpec.nameEn} 🎯` :
+                    `تم إدخال وتثبيت التصميم في: ${targetSpec.nameAr} 🎯`,
+            });
           }
 
           (activeObj as any).assignedPlacementId = targetSpec.id;
           activeObj.setCoords();
           initCanvas.renderAll();
-
-          setToastNotification({
-            type: 'success',
-            text: locale === 'tr' ? `Tasarım ${targetSpec.nameTr} konumuna kilitlendi 🎯` :
-                  locale === 'en' ? `Design snapped to ${targetSpec.nameEn} 🎯` :
-                  `تم إدخال وتثبيت التصميم في: ${targetSpec.nameAr} 🎯`,
-          });
         }
 
         hoveredPlacementIdRef.current = null;
@@ -1874,7 +1888,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       if (restoreTimer) clearTimeout(restoreTimer);
       try { initCanvas.dispose(); } catch(e) {}
     };
-  }, [activeFace, selectedColor, currentPrintArea.width, currentPrintArea.height]); // Re-initialize when print area, active face or color changes
+  }, [activeFace, selectedColor]); // Re-initialize when active face or color changes
 
   const SERIALIZE_PROPERTIES = [
     'id', 'name', 'selectable', 'src', 'originalAssetId', 'crossOrigin',
@@ -2134,7 +2148,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       }
     });
 
-    if (!currentSelectedPlacementIds.includes(placement.id)) {
+    const wasSelected = currentSelectedPlacementIds.includes(placement.id);
+    if (!wasSelected) {
       if (targetFace && !isFaceMatching(targetFace, activeFace)) {
         switchFace(targetFace);
       }
@@ -2142,8 +2157,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
     if (canvas) {
       const activeObj = canvas.getActiveObject();
-      if (activeObj) {
-        canvas.centerObject(activeObj);
+      if (activeObj && !wasSelected) {
+        const pBounds = getPlacementFabricBounds(placement);
+        activeObj.set({
+          originX: 'center',
+          originY: 'center',
+          left: pBounds.fabricCenterX,
+          top: pBounds.fabricCenterY,
+        });
+        (activeObj as any).assignedPlacementId = placement.id;
         activeObj.setCoords();
         canvas.requestRenderAll();
       }
@@ -2256,9 +2278,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       cursorColor: '#2563EB',
     } as any);
 
-    let targetLeft = currentPrintArea.width / 2;
-    let targetTop = currentPrintArea.height / 2;
+    let targetLeft = freePrintZone.left + freePrintZone.width / 2;
+    let targetTop = freePrintZone.top + freePrintZone.height / 2;
     let assignedPlacementId: string | undefined = undefined;
+    (text as any).__alreadyPositioned = true;
 
     if (!isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
       const existingObjects = canvas.getObjects().filter(o => o.name !== 'background' && o.name !== 'mockup' && o.name !== 'print_area_guide');
@@ -2292,10 +2315,11 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         text.scaleToHeight(maxTextH);
       }
     } else {
-      text.scaleToWidth(targetTextWidth);
-      const maxHeight = currentPrintArea.height * 0.35;
-      if (text.getScaledHeight() > maxHeight) {
-        text.scaleToHeight(maxHeight);
+      const maxTextW = freePrintZone.width * 0.85;
+      const maxTextH = freePrintZone.height * 0.35;
+      text.scaleToWidth(Math.min(targetTextWidth, maxTextW));
+      if (text.getScaledHeight() > maxTextH) {
+        text.scaleToHeight(maxTextH);
       }
     }
 
@@ -2551,42 +2575,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         }
       }
 
-      // Crop the precise Print Area without extended padding so mockup and print files match editor 100%
-      let printReadyImage = fullCanvasDataUrl;
-      if (fullCanvasDataUrl) {
-        try {
-          const cropCanvas = document.createElement('canvas');
-          const targetW = currentPrintArea.width * 2;
-          const targetH = currentPrintArea.height * 2;
-          cropCanvas.width = targetW;
-          cropCanvas.height = targetH;
-          const cropCtx = cropCanvas.getContext('2d');
-          if (cropCtx) {
-            await new Promise<void>((resolveCrop) => {
-              const fullImg = new Image();
-              fullImg.crossOrigin = 'anonymous';
-              fullImg.onload = () => {
-                const mult = fullImg.naturalWidth > totalCanvasWidth * 1.5 ? 2 : 1;
-                const sx = PAD_X * mult;
-                const sy = PAD_Y * mult;
-                const sw = currentPrintArea.width * mult;
-                const sh = currentPrintArea.height * mult;
-                cropCtx.drawImage(fullImg, sx, sy, sw, sh, 0, 0, targetW, targetH);
-                printReadyImage = cropCanvas.toDataURL('image/png');
-                resolveCrop();
-              };
-              fullImg.onerror = () => {
-                resolveCrop();
-              };
-              fullImg.src = fullCanvasDataUrl;
-            });
-          }
-        } catch (cropErr) {
-          console.warn("Error cropping printReadyImage:", cropErr);
-        }
-      }
+      // Print-Ready Graphic (Full high-res transparent artwork 1:1 with garment space)
+      const printReadyImage = fullCanvasDataUrl;
 
-      // 4. Generate Photorealistic Mockup Composite JPEG (Clean preview with background garment/product)
+      // 4. Generate Photorealistic Mockup Composite JPEG (Clean 1:1 overlay with garment image)
       let mockupImage = '';
       const mockupUrl = getFaceMockupForColor(activeFace, selectedColor);
       if (mockupUrl) {
@@ -2614,25 +2606,21 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               }
 
               ctx.drawImage(mockupImg, 0, 0, width, height);
-              const printX = (overlayLeft / 100) * width;
-              const printY = (overlayTop / 100) * height;
-              const printW = (overlayWidth / 100) * width;
-              const printH = (overlayHeight / 100) * height;
 
-              if (printReadyImage) {
+              if (fullCanvasDataUrl) {
                 const designImg = new Image();
                 designImg.crossOrigin = 'anonymous';
                 designImg.onload = () => {
-                  ctx.drawImage(designImg, printX, printY, printW, printH);
+                  ctx.drawImage(designImg, 0, 0, width, height);
                   resolve(offCanvas.toDataURL('image/jpeg', 0.88));
                 };
-                designImg.onerror = () => resolve(printReadyImage);
-                designImg.src = printReadyImage;
+                designImg.onerror = () => resolve(fullCanvasDataUrl);
+                designImg.src = fullCanvasDataUrl;
               } else {
                 resolve(offCanvas.toDataURL('image/jpeg', 0.88));
               }
             } catch {
-              resolve(printReadyImage || '');
+              resolve(fullCanvasDataUrl || '');
             }
           };
           mockupImg.onerror = () => resolve(printReadyImage || '');
@@ -2792,21 +2780,13 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         return productMockupUrl || '';
       }
 
-      // 1. Extract exact Print Area configuration
-      const pWidth = Number(facePrintArea?.width) || 200;
-      const pHeight = Number(facePrintArea?.height) || 280;
-      const pLeft = Number(facePrintArea?.left ?? facePrintArea?.x ?? 100);
-      const pTop = Number(facePrintArea?.top ?? facePrintArea?.y ?? 120);
-      const pNativeWidth = Number(facePrintArea?.nativeWidth) || 400;
-      const pNativeHeight = Number(facePrintArea?.nativeHeight) || 500;
-
-      // 2. Pass 1: Render design strictly inside an offscreen canvas sized to the Print Area
+      // Render design inside a 2000x2000 offscreen canvas 1:1 with garment space
       const offscreenEl = document.createElement('canvas');
-      offscreenEl.width = pWidth;
-      offscreenEl.height = pHeight;
+      offscreenEl.width = 2000;
+      offscreenEl.height = 2000;
       const staticCanvas = new fabric.StaticCanvas(offscreenEl, {
-        width: pWidth,
-        height: pHeight,
+        width: 2000,
+        height: 2000,
         backgroundColor: 'transparent'
       });
 
@@ -2826,7 +2806,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
       let printDataUrl = '';
       try {
-        printDataUrl = staticCanvas.toDataURL({ format: 'png', multiplier: 2 });
+        printDataUrl = staticCanvas.toDataURL({ format: 'png', multiplier: 1 });
       } catch {
         printDataUrl = '';
       }
@@ -2836,7 +2816,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         return printDataUrl;
       }
 
-      // 3. Pass 2: Composite Garment Mockup Image + Scaled Print Area
+      // Composite Garment Mockup Image + Rendered Design 1:1
       return await new Promise<string>((resolve) => {
         const mockupImg = new Image();
         mockupImg.crossOrigin = 'anonymous';
@@ -2860,43 +2840,17 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               return;
             }
 
-            // Step 1: Draw garment background
             ctx.drawImage(mockupImg, 0, 0, bgWidth, bgHeight);
 
-            // Step 2: Compute exact bounding coordinates for the print area on the composite canvas
-            let printX: number;
-            let printY: number;
-            let printW: number;
-            let printH: number;
-
-            if (pNativeWidth > 0 && pNativeHeight > 0) {
-              // Normalized ratio relative to native garment space
-              printX = (pLeft / pNativeWidth) * bgWidth;
-              printY = (pTop / pNativeHeight) * bgHeight;
-              printW = (pWidth / pNativeWidth) * bgWidth;
-              printH = (pHeight / pNativeHeight) * bgHeight;
-            } else {
-              // Percentage fallback
-              const pctLeft = pLeft > 1 ? pLeft / 100 : pLeft;
-              const pctTop = pTop > 1 ? pTop / 100 : pTop;
-              const pctWidth = pWidth > 1 ? pWidth / 100 : pWidth;
-              const pctHeight = pHeight > 1 ? pHeight / 100 : pHeight;
-
-              printX = pctLeft * bgWidth;
-              printY = pctTop * bgHeight;
-              printW = pctWidth * bgWidth;
-              printH = pctHeight * bgHeight;
-            }
-
             if (printDataUrl) {
-              const designImg = new Image();
-              designImg.crossOrigin = 'anonymous';
-              designImg.onload = () => {
-                ctx.drawImage(designImg, printX, printY, printW, printH);
+              const printImg = new Image();
+              printImg.crossOrigin = 'anonymous';
+              printImg.onload = () => {
+                ctx.drawImage(printImg, 0, 0, bgWidth, bgHeight);
                 resolve(compositeCanvas.toDataURL('image/jpeg', 0.88));
               };
-              designImg.onerror = () => resolve(printDataUrl);
-              designImg.src = printDataUrl;
+              printImg.onerror = () => resolve(printDataUrl);
+              printImg.src = printDataUrl;
             } else {
               resolve(compositeCanvas.toDataURL('image/jpeg', 0.88));
             }
@@ -3669,10 +3623,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                       : "border-amber-500/80 bg-amber-500/5 rounded-3xl"
                   )}
                   style={{
-                    left: `${(currentPrintArea.left / nativeWidth) * 100}%`,
-                    top: `${(currentPrintArea.top / nativeHeight) * 100}%`,
-                    width: `${(currentPrintArea.width / nativeWidth) * 100}%`,
-                    height: `${(currentPrintArea.height / nativeHeight) * 100}%`,
+                    left: `${(freePrintZone.left / 2000) * 100}%`,
+                    top: `${(freePrintZone.top / 2000) * 100}%`,
+                    width: `${(freePrintZone.width / 2000) * 100}%`,
+                    height: `${(freePrintZone.height / 2000) * 100}%`,
                   }}
                 >
                   {/* Badge positioned OUTSIDE / ABOVE the bounding box so the entire printable area remains 100% clear */}
@@ -3693,10 +3647,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               can be placed over this container with `pointer-events-none mix-blend-multiply opacity-60 z-30`.
             */}
 
-            {/* Fabric Canvas Extended Overlay Container */}
+            {/* Fabric Canvas Extended Overlay Container (100% 1:1 with garment mockup frame - No clipping barrier!) */}
             <div
               className={cn(
-                "absolute pointer-events-auto overflow-hidden",
+                "absolute inset-0 w-full h-full pointer-events-auto overflow-hidden",
                 "[&_.canvas-container]:!w-full [&_.canvas-container]:!h-full [&_canvas]:!w-full [&_canvas]:!h-full",
                 // Photorealistic Blend Mode: blends fabric texture & folds through the artwork on lower-canvas while keeping upper-canvas controls crisp
                 (selectedColor === 'black' || selectedColor === 'navy' || selectedColor === '#000000' || selectedColor === '#1E3A8A')
@@ -3704,10 +3658,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                   : "[&_.lower-canvas]:mix-blend-multiply [&_.lower-canvas]:opacity-[0.95] [&_.upper-canvas]:mix-blend-normal"
               )}
               style={{
-                width: `${extendedOverlayWidth}%`,
-                height: `${extendedOverlayHeight}%`,
-                top: `${extendedOverlayTop}%`,
-                left: `${extendedOverlayLeft}%`,
+                width: '100%',
+                height: '100%',
+                top: '0%',
+                left: '0%',
               }}
             >
               <div className="w-full h-full relative origin-top-left" style={{ transform: `scale(1)` }}>
