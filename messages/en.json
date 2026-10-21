@@ -455,6 +455,11 @@
   },
   "Preview": {
     "title": "Design Preview",
+    "confirmTitle": "Design Preview & Order Confirmation",
+    "confirmSubtitle": "Review your design carefully on the product before adding to cart",
+    "confirmDesign": "Confirm Design",
+    "confirmDesignAndAddToCart": "Confirm Design & Add to Cart",
+    "backToEditor": "Return to Continue Designing",
     "close": "Close",
     "zoomHint": "Pinch or scroll to zoom and inspect details",
     "totalPrice": "Total"

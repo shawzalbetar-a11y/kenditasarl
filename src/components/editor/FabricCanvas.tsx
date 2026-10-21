@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { fabric } from 'fabric';
-import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw, Shirt, ChevronDown } from 'lucide-react';
+import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw, Shirt, ChevronDown, Loader2 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import AuthModal from '@/components/auth/AuthModal';
 import { auth, db } from '@/lib/firebase';
@@ -219,6 +219,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewIntent, setPreviewIntent] = useState<'cart_confirm' | 'inspect' | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [modalZoom, setModalZoom] = useState<number>(1);
   const [modalPan, setModalPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -2921,12 +2922,42 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     }
   };
 
+  const openCartConfirmationPreview = async () => {
+    if (!canvas) return;
+    setIsPreviewLoading(true);
+    try {
+      const data = await exportDesignData();
+      if (data?.mockupImage) {
+        setPreviewIntent('cart_confirm');
+        setPreviewImage(data.mockupImage);
+      } else {
+        if (!auth?.currentUser) {
+          setPendingAction('cart');
+          setIsAuthModalOpen(true);
+        } else {
+          executeAction('cart');
+        }
+      }
+    } catch (err) {
+      console.error("Cart preview generation error:", err);
+      if (!auth?.currentUser) {
+        setPendingAction('cart');
+        setIsAuthModalOpen(true);
+      } else {
+        executeAction('cart');
+      }
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
   const handlePreview = async () => {
     if (!canvas) return;
     setIsPreviewLoading(true);
     try {
       const data = await exportDesignData();
       if (data?.mockupImage) {
+        setPreviewIntent('inspect');
         setPreviewImage(data.mockupImage);
       }
     } catch (err) {
@@ -2938,8 +2969,27 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const closePreviewModal = () => {
     setPreviewImage(null);
+    setPreviewIntent(null);
     setModalZoom(1);
     setModalPan({ x: 0, y: 0 });
+  };
+
+  const handleConfirmDesignAndAddToCart = async () => {
+    if (!auth?.currentUser) {
+      setPreviewImage(null);
+      setPreviewIntent(null);
+      setPendingAction('cart');
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    try {
+      await executeAction('cart');
+      setPreviewImage(null);
+      setPreviewIntent(null);
+    } catch (err) {
+      console.error("Confirm Design Cart Error:", err);
+    }
   };
 
   const handleModalTouchStart = (e: React.TouchEvent) => {
@@ -3459,11 +3509,16 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       setIsValidationModalOpen(true);
     } else {
       setCustomizationMode('SAFE');
-      if (!auth?.currentUser) {
-        setPendingAction(pendingAction || 'cart');
-        setIsAuthModalOpen(true);
+      const targetAction = pendingAction || 'cart';
+      if (targetAction === 'cart') {
+        openCartConfirmationPreview();
       } else {
-        executeAction(pendingAction || 'cart');
+        if (!auth?.currentUser) {
+          setPendingAction(targetAction);
+          setIsAuthModalOpen(true);
+        } else {
+          executeAction(targetAction);
+        }
       }
     }
   };
@@ -3501,22 +3556,32 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     setIsValidationModalOpen(false);
     setCustomizationMode('SAFE');
     
-    if (!auth?.currentUser) {
-      setPendingAction(pendingAction || 'cart');
-      setIsAuthModalOpen(true);
+    const targetAction = pendingAction || 'cart';
+    if (targetAction === 'cart') {
+      openCartConfirmationPreview();
     } else {
-      executeAction(pendingAction || 'cart');
+      if (!auth?.currentUser) {
+        setPendingAction(targetAction);
+        setIsAuthModalOpen(true);
+      } else {
+        executeAction(targetAction);
+      }
     }
   };
 
   const handleFreeMode = () => {
     setIsValidationModalOpen(false);
     setCustomizationMode('FREE');
-    if (!auth?.currentUser) {
-      setPendingAction(pendingAction || 'cart');
-      setIsAuthModalOpen(true);
+    const targetAction = pendingAction || 'cart';
+    if (targetAction === 'cart') {
+      openCartConfirmationPreview();
     } else {
-      executeAction(pendingAction || 'cart');
+      if (!auth?.currentUser) {
+        setPendingAction(targetAction);
+        setIsAuthModalOpen(true);
+      } else {
+        executeAction(targetAction);
+      }
     }
   };
 
@@ -4164,11 +4229,20 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           <button
             type="button"
             onClick={() => handleAction('cart')}
-            disabled={isSaving}
-            className="flex-1 py-3 px-3 md:px-5 bg-[var(--color-primary)] hover:opacity-90 text-white font-bold text-xs md:text-sm rounded-xl md:rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+            disabled={isSaving || isPreviewLoading}
+            className="flex-1 py-3 px-3 md:px-5 bg-[var(--color-primary)] hover:opacity-90 text-white font-bold text-xs md:text-sm rounded-xl md:rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <ShoppingCart size={16} className="shrink-0" />
-            <span className="truncate">{isSaving ? t('processing') : t('addToCart')}</span>
+            {isPreviewLoading && pendingAction === 'cart' ? (
+              <>
+                <Loader2 size={16} className="animate-spin shrink-0" />
+                <span className="truncate">{locale === 'tr' ? 'Önizleme...' : locale === 'en' ? 'Preparing...' : 'جاري تجهيز المعاينة...'}</span>
+              </>
+            ) : (
+              <>
+                <ShoppingCart size={16} className="shrink-0" />
+                <span className="truncate">{isSaving ? t('processing') : t('addToCart')}</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -4523,8 +4597,22 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               <button onClick={() => handleAction('save')} disabled={isSaving} className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 rounded-xl font-bold transition-colors disabled:opacity-50">
                 <Save size={20} />
               </button>
-              <button onClick={() => handleAction('cart')} disabled={isSaving} className="flex-[3] flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:opacity-90 text-white py-3 rounded-xl font-bold transition-all shadow-md disabled:opacity-50">
-                <ShoppingCart size={20} /> {isSaving ? t('processing') : t('addToCart')}
+              <button 
+                onClick={() => handleAction('cart')} 
+                disabled={isSaving || isPreviewLoading} 
+                className="flex-[3] flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:opacity-90 text-white py-3 rounded-xl font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer"
+              >
+                {isPreviewLoading && pendingAction === 'cart' ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin shrink-0" />
+                    <span>{locale === 'tr' ? 'Önizleme Hazırlanıyor...' : locale === 'en' ? 'Preparing Preview...' : 'جاري تجهيز المعاينة...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={20} className="shrink-0" />
+                    <span>{isSaving ? t('processing') : t('addToCart')}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -4584,18 +4672,64 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-3 sm:p-6 animate-in fade-in duration-200">
           {/* Modal Header */}
           <div className="w-full flex items-center justify-between z-30 max-w-4xl px-2">
-            <div className="flex items-center gap-2 text-white">
-              <Eye size={20} className="text-amber-400" />
-              <span className="font-bold text-sm sm:text-base md:text-lg">{tPreview('title')}</span>
+            <div className="flex items-center gap-2.5 text-white">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                {previewIntent === 'cart_confirm' ? (
+                  <CheckCircle2 size={20} className="text-amber-400" />
+                ) : (
+                  <Eye size={20} className="text-amber-400" />
+                )}
+              </div>
+              <div className="flex flex-col">
+                <span className="font-black text-sm sm:text-base md:text-lg leading-tight">
+                  {previewIntent === 'cart_confirm'
+                    ? (tPreview('confirmTitle', { fallback: locale === 'tr' ? 'Ürün Önizleme ve Tasarım Onayı' : locale === 'en' ? 'Product Preview & Design Confirmation' : 'معاينة المنتج وتأكيد التصميم' }))
+                    : tPreview('title')}
+                </span>
+                <span className="text-[11px] sm:text-xs text-gray-400">
+                  {previewIntent === 'cart_confirm'
+                    ? (tPreview('confirmSubtitle', { fallback: locale === 'tr' ? 'Sepete eklemeden önce tasarımınızın ürün üzerindeki görünümünü dikkatlice inceleyin' : locale === 'en' ? 'Review your design carefully on the product before adding to cart' : 'راجع شكل وموضع تصميمك على المنتج بدقة قبل إضافته إلى السلة' }))
+                    : tPreview('zoomHint')}
+                </span>
+              </div>
             </div>
             <button
               type="button"
-              onClick={() => setPreviewImage(null)}
-              className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors flex items-center justify-center"
+              onClick={closePreviewModal}
+              className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors flex items-center justify-center cursor-pointer active:scale-95"
               title={tPreview('close')}
             >
               <X size={22} />
             </button>
+          </div>
+
+          {/* Floating Garment Details Pill */}
+          <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 sm:px-4 py-1.5 rounded-full border border-white/15 text-xs text-white z-30 shadow-md my-1 select-none">
+            {/* Color */}
+            <div className="flex items-center gap-1.5">
+              <span
+                className="w-3.5 h-3.5 rounded-full border border-white/40 shadow-xs shrink-0"
+                style={{ backgroundColor: selectedColor === 'white' ? '#fff' : selectedColor === 'black' ? '#000' : selectedColor === 'navy' ? '#1E3A8A' : selectedColor }}
+              />
+              <span className="font-bold text-gray-200">{getLocalizedColorName(selectedColor, locale)}</span>
+            </div>
+            <span className="text-gray-500">•</span>
+            {/* Size */}
+            <span className="font-black font-mono text-amber-300">{selectedSize}</span>
+            <span className="text-gray-500">•</span>
+            {/* Quantity */}
+            <span className="font-semibold text-gray-300">
+              {totalOrderQuantity} {locale === 'tr' ? 'adet' : locale === 'en' ? 'pcs' : 'قطع'}
+            </span>
+            {/* Face */}
+            <span className="text-gray-500">•</span>
+            <span className="text-gray-400">
+              {activeFace === 'front' ? (locale === 'tr' ? 'Ön Yüz' : locale === 'en' ? 'Front' : 'الجهة الأمامية') :
+               activeFace === 'back' ? (locale === 'tr' ? 'Arka Yüz' : locale === 'en' ? 'Back' : 'الجهة الخلفية') :
+               activeFace === 'left_shoulder' ? (locale === 'tr' ? 'Sol Kol' : locale === 'en' ? 'Left' : 'الكتف الأيسر') :
+               activeFace === 'right_shoulder' ? (locale === 'tr' ? 'Sağ Kol' : locale === 'en' ? 'Right' : 'الكتف الأيمن') :
+               activeFace}
+            </span>
           </div>
 
           {/* Centered Realistic Preview Image with GPU-Accelerated Pinch-to-Zoom & Pan */}
@@ -4669,35 +4803,49 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           </div>
 
           {/* Modal Bottom CTA Bar */}
-          <div className="w-full max-w-xl flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 z-30 bg-white/10 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-white/10">
+          <div className="w-full max-w-2xl flex flex-col sm:flex-row items-center gap-3 sm:gap-4 z-30 bg-black/80 backdrop-blur-xl p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-white/15 shadow-2xl">
             <div className="flex items-center justify-between w-full sm:w-auto sm:flex-col sm:items-start px-2">
-              <span className="text-xs text-gray-300">{t('totalPrice')}</span>
-              <span className="font-black text-lg sm:text-xl text-white font-mono">{totalPrice} ₺</span>
+              <span className="text-xs text-gray-400 font-medium">{t('totalPrice', { fallback: 'السعر الإجمالي' })}</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-black text-xl sm:text-2xl text-amber-400 font-mono">{grandTotalPrice} ₺</span>
+                {totalOrderQuantity > 1 && (
+                  <span className="text-[11px] text-gray-400 font-mono">
+                    ({totalPrice} ₺ × {totalOrderQuantity})
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="flex flex-1 w-full gap-2.5">
+
+            <div className="flex flex-1 w-full gap-2.5 sm:gap-3">
+              {/* 1. Return to Continue Designing Button */}
               <button
                 type="button"
-                onClick={() => {
-                  setPreviewImage(null);
-                  handleAction('buy_now');
-                }}
+                onClick={closePreviewModal}
                 disabled={isSaving}
-                className="flex-1 py-3 px-4 bg-white text-gray-900 hover:bg-gray-100 font-bold text-xs sm:text-sm rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="flex-1 py-3 sm:py-3.5 px-3 sm:px-4 bg-white/10 hover:bg-white/20 active:scale-95 text-white border border-white/20 font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
               >
-                <Zap size={16} className="text-amber-500 fill-amber-500 shrink-0" />
-                <span>{isSaving ? t('processing') : t('buyNow')}</span>
+                <RotateCcw size={16} className="text-gray-300 shrink-0" />
+                <span>{locale === 'tr' ? 'Tasarımı Düzenlemeye Dön' : locale === 'en' ? 'Back to Editor' : 'الرجوع لاستكمال التصميم'}</span>
               </button>
+
+              {/* 2. Confirm Design & Add to Cart Button */}
               <button
                 type="button"
-                onClick={() => {
-                  setPreviewImage(null);
-                  handleAction('cart');
-                }}
+                onClick={handleConfirmDesignAndAddToCart}
                 disabled={isSaving}
-                className="flex-1 py-3 px-4 bg-[var(--color-primary)] hover:opacity-90 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="flex-[1.25] py-3 sm:py-3.5 px-3 sm:px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-95 text-white font-black text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-xl shadow-orange-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <ShoppingCart size={16} className="shrink-0" />
-                <span>{isSaving ? t('processing') : t('addToCart')}</span>
+                {isSaving ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin shrink-0" />
+                    <span>{locale === 'tr' ? 'Sepete Ekleniyor...' : locale === 'en' ? 'Adding to Cart...' : 'جاري الإضافة للسلة...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={18} className="shrink-0" />
+                    <span>{locale === 'tr' ? 'Tasarımı Onayla ve Sepete Ekle' : locale === 'en' ? 'Confirm Design & Add to Cart' : 'تأكيد التصميم'}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

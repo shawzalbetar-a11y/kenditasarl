@@ -455,6 +455,11 @@
   },
   "Preview": {
     "title": "Tasarım Önizlemesi",
+    "confirmTitle": "Ürün Önizleme ve Tasarım Onayı",
+    "confirmSubtitle": "Sepete eklemeden önce tasarımınızın ürün üzerindeki görünümünü dikkatlice inceleyin",
+    "confirmDesign": "Tasarımı Onayla",
+    "confirmDesignAndAddToCart": "Tasarımı Onayla ve Sepete Ekle",
+    "backToEditor": "Tasarımı Düzenlemeye Dön",
     "close": "Kapat",
     "zoomHint": "Yakınlaştırmak ve detayları incelemek için kaydırın",
     "totalPrice": "Toplam"
