@@ -259,9 +259,17 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const isFreeModeRef = useRef<boolean>(isFreeMode);
   isFreeModeRef.current = isFreeMode;
 
+  const checkObjectBoundsRef = useRef<((targetCanvas?: fabric.Canvas | null) => void) | null>(null);
+
   const handleToggleFreeMode = useCallback((enabled: boolean) => {
     setIsFreeMode(enabled);
-  }, []);
+    isFreeModeRef.current = enabled;
+    if (canvas && checkObjectBoundsRef.current) {
+      setTimeout(() => {
+        checkObjectBoundsRef.current?.(canvas);
+      }, 50);
+    }
+  }, [canvas]);
 
   // Hovered placement during drag & drop snapping
   const [hoveredPlacementId, setHoveredPlacementId] = useState<string | null>(null);
@@ -1170,10 +1178,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       };
     }
     const isSleeve = activeFace === 'left' || activeFace === 'right' || activeFace === 'left_shoulder' || activeFace === 'right_shoulder';
-    const fw = Math.round(nw * (isSleeve ? 0.45 : 0.54));
-    const fh = Math.round(nh * (isSleeve ? 0.65 : 0.68));
+    const fw = Math.round(nw * (isSleeve ? 0.48 : 0.62));
+    const fh = Math.round(nh * (isSleeve ? 0.68 : 0.76));
     const fx = Math.round((nw - fw) / 2);
-    const fy = Math.round(nh * (isSleeve ? 0.18 : 0.18));
+    const fy = Math.round(nh * (isSleeve ? 0.16 : 0.13));
     return {
       left: fx,
       top: fy,
@@ -1254,6 +1262,93 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       fabricCenterY,
     };
   }, [productData?.config?.calibratedPlacements, nativeWidth, nativeHeight]);
+
+  // Universal Print Boundary Validator (Used across Drag, Scale, Select, Undo/Redo & Save)
+  const isObjectInsidePrintBounds = useCallback((obj: fabric.Object | null | undefined): boolean => {
+    if (!obj || obj.name === 'background' || obj.name === 'mockup' || obj.name === 'print_area_guide') {
+      return true;
+    }
+
+    const br = obj.getBoundingRect(true, true);
+    if (!br || br.width <= 0 || br.height <= 0) return true;
+
+    const objArea = br.width * br.height;
+    const centerPt = obj.getCenterPoint();
+
+    // Helper to test if object is reasonably contained inside a rectangular print zone
+    const checkZoneContainment = (zone: { left: number; top: number; width: number; height: number }, isStandardPlacement: boolean = false) => {
+      // Proportional tolerance: generous margin based on zone dimensions
+      // In professional print customizers (e.g. Printful / CustomInk), a design isn't out-of-bounds unless it noticeably breaches the area.
+      // 12% tolerance allows slight positioning adjustments and multi-object compositions (e.g. text + graphic).
+      const tolX = Math.max(isStandardPlacement ? 70 : 120, zone.width * 0.12);
+      const tolY = Math.max(isStandardPlacement ? 70 : 120, zone.height * 0.12);
+
+      // Condition A: Entire bounding box is within zone + tolerance margin
+      const withinMargin = 
+        br.left >= zone.left - tolX &&
+        (br.left + br.width) <= zone.left + zone.width + tolX &&
+        br.top >= zone.top - tolY &&
+        (br.top + br.height) <= zone.top + zone.height + tolY;
+
+      if (withinMargin) return true;
+
+      // Condition B: Area overlap test
+      // If object's center is reasonably within the zone and at least 70% of the graphic is inside the zone:
+      const interLeft = Math.max(br.left, zone.left);
+      const interTop = Math.max(br.top, zone.top);
+      const interRight = Math.min(br.left + br.width, zone.left + zone.width);
+      const interBottom = Math.min(br.top + br.height, zone.top + zone.height);
+
+      const interW = Math.max(0, interRight - interLeft);
+      const interH = Math.max(0, interBottom - interTop);
+      const interArea = interW * interH;
+      const overlapRatio = objArea > 0 ? interArea / objArea : 1;
+
+      const centerInside = 
+        centerPt.x >= zone.left - tolX &&
+        centerPt.x <= zone.left + zone.width + tolX &&
+        centerPt.y >= zone.top - tolY &&
+        centerPt.y <= zone.top + zone.height + tolY;
+
+      if (centerInside && overlapRatio >= 0.70) {
+        return true;
+      }
+
+      return false;
+    };
+
+    if (isFreeModeRef.current) {
+      return checkZoneContainment(freePrintZone, false);
+    }
+
+    if (activeFaceSelectedPlacementsRef.current.length > 0) {
+      // Return true if object is inside ANY selected placement on this face
+      for (const spec of activeFaceSelectedPlacementsRef.current) {
+        const p = getPlacementFabricBounds(spec);
+        const zone = {
+          left: p.fabricLeft,
+          top: p.fabricTop,
+          width: p.fabricWidth,
+          height: p.fabricHeight,
+        };
+        if (checkZoneContainment(zone, true)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // Default garment surface bounds (keeps element within canvas margins)
+    return (
+      br.left >= -80 &&
+      (br.left + br.width) <= nativeWidth + 80 &&
+      br.top >= -80 &&
+      (br.top + br.height) <= nativeHeight + 80
+    );
+  }, [freePrintZone, getPlacementFabricBounds, nativeWidth, nativeHeight]);
+
+  const isObjectInsidePrintBoundsRef = useRef(isObjectInsidePrintBounds);
+  isObjectInsidePrintBoundsRef.current = isObjectInsidePrintBounds;
 
   // Helper to format controls, auto-scale within placement or free bounds, and position object
   const prepareAndAddObject = (obj: fabric.Object, canvasInstance?: fabric.Canvas) => {
@@ -1627,34 +1722,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       }
 
       // 3. Print Area & Placement Boundary Validation
-      const br = activeObj.getBoundingRect(true, true);
-      const tolerance = 6;
-      let isOutOfBounds = false;
-
-      if (isFreeModeRef.current) {
-        const fz = freePrintZone;
-        isOutOfBounds = 
-          br.left < fz.left - tolerance || 
-          (br.left + br.width) > (fz.left + fz.width + tolerance) ||
-          br.top < fz.top - tolerance || 
-          (br.top + br.height) > (fz.top + fz.height + tolerance);
-      } else if (activeFaceSelectedPlacementsRef.current.length > 0) {
-        let insidePlacement = false;
-        for (const spec of activeFaceSelectedPlacementsRef.current) {
-          const p = getPlacementFabricBounds(spec);
-          const tol = 35;
-          if (
-            br.left >= p.fabricLeft - tol &&
-            (br.left + br.width) <= p.fabricLeft + p.fabricWidth + tol &&
-            br.top >= p.fabricTop - tol &&
-            (br.top + br.height) <= p.fabricTop + p.fabricHeight + tol
-          ) {
-            insidePlacement = true;
-            break;
-          }
-        }
-        isOutOfBounds = !insidePlacement;
-      }
+      const isOutOfBounds = !isObjectInsidePrintBoundsRef.current(activeObj);
 
       const scale = Math.max(1, initCanvas.getWidth() / 400);
 
@@ -2018,19 +2086,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       setIsObjectOutOfBounds(false);
       return;
     }
-    const br = activeObj.getBoundingRect(true, true);
-    const tolerance = 2;
-    const isOutOfBounds = 
-      br.left < -tolerance || 
-      (br.left + br.width) > (currentPrintArea.width + tolerance) ||
-      br.top < -tolerance || 
-      (br.top + br.height) > (currentPrintArea.height + tolerance);
-
+    const isOutOfBounds = !isObjectInsidePrintBounds(activeObj);
     const scale = Math.max(1, c.getWidth() / 400);
 
     if (isOutOfBounds) {
       (activeObj.set as any)({
-        borderColor: '#EF4444',
+        borderColor: '#dc2626',
+        cornerStrokeColor: '#dc2626',
+        editingBorderColor: '#dc2626',
+        cursorColor: '#dc2626',
         borderDashArray: [Math.round(8 * scale), Math.round(6 * scale)],
         borderScaleFactor: Math.max(2, Math.round(2.5 * scale)),
         padding: Math.round(10 * scale),
@@ -2039,6 +2103,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     } else {
       (activeObj.set as any)({
         borderColor: '#2563EB',
+        cornerStrokeColor: '#2563EB',
+        editingBorderColor: '#2563EB',
+        cursorColor: '#2563EB',
         borderDashArray: [Math.round(8 * scale), Math.round(6 * scale)],
         borderScaleFactor: Math.max(2, Math.round(2.5 * scale)),
         padding: Math.round(10 * scale),
@@ -2046,7 +2113,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       setIsObjectOutOfBounds(false);
       setIsWarningDismissed(false);
     }
-  }, [canvas, currentPrintArea.width, currentPrintArea.height]);
+  }, [canvas, isObjectInsidePrintBounds]);
+
+  checkObjectBoundsRef.current = checkObjectBounds;
 
   const undo = useCallback(() => {
     if (!canvas || !canvas.getContext() || !canvas.getElement() || isRestoring.current || historyStepRef.current <= 0) return;
@@ -2418,27 +2487,66 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       targetH = p.fabricHeight;
     }
 
-    const maxW = targetW * 0.9;
-    const maxH = targetH * 0.9;
-    const objW = obj.getScaledWidth();
-    const objH = obj.getScaledHeight();
+    const maxW = targetW * 0.95;
+    const maxH = targetH * 0.95;
+    let objW = obj.getScaledWidth();
+    let objH = obj.getScaledHeight();
 
+    // 1. Scale down only if genuinely oversized for the target print zone
     if (objW > maxW || objH > maxH) {
       const scaleFactor = Math.min(maxW / (obj.width || 1), maxH / (obj.height || 1));
       obj.scale(scaleFactor);
+      objW = obj.getScaledWidth();
+      objH = obj.getScaledHeight();
     }
 
-    obj.set({
-      originX: 'center',
-      originY: 'center',
-      left: targetLeft + targetW / 2,
-      top: targetTop + targetH / 2,
-    });
-    obj.setCoords();
+    // 2. Intelligent Smart Nudge:
+    // Respect the user's composition! If the user placed text on top and an image below,
+    // gently pull the object back inside the borders rather than jumping on top of the text.
+    const br = obj.getBoundingRect(true, true);
+    const targetRight = targetLeft + targetW;
+    const targetBottom = targetTop + targetH;
 
+    let shiftX = 0;
+    let shiftY = 0;
+
+    if (br.left < targetLeft) {
+      shiftX = targetLeft - br.left;
+    } else if (br.left + br.width > targetRight) {
+      shiftX = targetRight - (br.left + br.width);
+    }
+
+    if (br.top < targetTop) {
+      shiftY = targetTop - br.top;
+    } else if (br.top + br.height > targetBottom) {
+      shiftY = targetBottom - (br.top + br.height);
+    }
+
+    const isCompletelyLost =
+      br.left + br.width < targetLeft ||
+      br.left > targetRight ||
+      br.top + br.height < targetTop ||
+      br.top > targetBottom;
+
+    if (isCompletelyLost) {
+      obj.set({
+        originX: 'center',
+        originY: 'center',
+        left: targetLeft + targetW / 2,
+        top: targetTop + targetH / 2,
+      });
+    } else {
+      obj.set({
+        left: (obj.left || 0) + shiftX,
+        top: (obj.top || 0) + shiftY,
+      });
+    }
+
+    obj.setCoords();
     applyCustomModernStyles(canvas);
 
     setIsObjectOutOfBounds(false);
+    setIsWarningDismissed(false);
     canvas.requestRenderAll();
     canvas.renderAll();
     saveHistoryState();
@@ -3244,34 +3352,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
     objects.forEach(obj => {
       if (obj.name === 'background' || obj.name === 'mockup' || obj.name === 'print_area_guide') return;
-      const br = obj.getBoundingRect(true, true);
-      const tolerance = 6;
-      let insideBounds = false;
-
-      if (isFreeModeRef.current) {
-        const fz = freePrintZone;
-        insideBounds =
-          br.left >= fz.left - tolerance &&
-          (br.left + br.width) <= fz.left + fz.width + tolerance &&
-          br.top >= fz.top - tolerance &&
-          (br.top + br.height) <= fz.top + fz.height + tolerance;
-      } else if (activeFaceSelectedPlacementsRef.current.length > 0) {
-        for (const spec of activeFaceSelectedPlacementsRef.current) {
-          const p = getPlacementFabricBounds(spec);
-          const tol = 35;
-          if (
-            br.left >= p.fabricLeft - tol &&
-            (br.left + br.width) <= p.fabricLeft + p.fabricWidth + tol &&
-            br.top >= p.fabricTop - tol &&
-            (br.top + br.height) <= p.fabricTop + p.fabricHeight + tol
-          ) {
-            insideBounds = true;
-            break;
-          }
-        }
-      } else {
-        insideBounds = true;
-      }
+      const insideBounds = isObjectInsidePrintBounds(obj);
 
       if (!insideBounds) {
         hasOutofBounds = true;
