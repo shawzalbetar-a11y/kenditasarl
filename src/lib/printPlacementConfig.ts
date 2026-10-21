@@ -88,10 +88,10 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 62,
-          topPercent: 26,
-          maxWidthPercent: 18,
-          maxHeightPercent: 18
+          leftPercent: 60,
+          topPercent: 21,
+          maxWidthPercent: 10,
+          maxHeightPercent: 10
         },
         supportedMethods: ['DTF', 'Sublimation']
       },
@@ -107,11 +107,11 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
         offsetFromCollarCm: 8,
         dimensions: {
           recommended: {
-            widthCm: 22,
-            heightCm: 15,
-            widthInches: 8.66,
-            heightInches: 5.9,
-            pixelsAt300Dpi: { width: 2598, height: 1771 }
+            widthCm: 24,
+            heightCm: 16,
+            widthInches: 9.45,
+            heightInches: 6.3,
+            pixelsAt300Dpi: { width: 2835, height: 1890 }
           },
           min: {
             widthCm: 15,
@@ -121,18 +121,18 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
             pixelsAt300Dpi: { width: 1771, height: 1181 }
           },
           max: {
-            widthCm: 25,
-            heightCm: 20,
-            widthInches: 9.84,
-            heightInches: 7.87,
-            pixelsAt300Dpi: { width: 2952, height: 2362 }
+            widthCm: 26,
+            heightCm: 18,
+            widthInches: 10.24,
+            heightInches: 7.08,
+            pixelsAt300Dpi: { width: 3071, height: 2126 }
           }
         },
         canvasBox: {
-          leftPercent: 35,
-          topPercent: 28,
-          maxWidthPercent: 30,
-          maxHeightPercent: 22
+          leftPercent: 38,
+          topPercent: 21,
+          maxWidthPercent: 24,
+          maxHeightPercent: 16
         },
         supportedMethods: ['DTF', 'Sublimation']
       },
@@ -170,10 +170,10 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 28,
-          topPercent: 24,
-          maxWidthPercent: 44,
-          maxHeightPercent: 55
+          leftPercent: 35,
+          topPercent: 19.5,
+          maxWidthPercent: 30,
+          maxHeightPercent: 40
         },
         supportedMethods: ['DTF', 'Sublimation']
       },
@@ -186,7 +186,7 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
         descriptionAr: 'تصميم كامل على الظهر يبدأ 8 إلى 10 سم أسفل الياقة الخلفية',
         descriptionTr: 'Arka yakanın 8-10 cm altından başlayan tam sırt baskısı',
         descriptionEn: 'Full back graphic, starts 8-10 cm below back neckline',
-        offsetFromCollarCm: 9,
+        offsetFromCollarCm: 8,
         dimensions: {
           recommended: {
             widthCm: 32,
@@ -211,10 +211,10 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 27,
-          topPercent: 22,
-          maxWidthPercent: 46,
-          maxHeightPercent: 58
+          leftPercent: 34,
+          topPercent: 20,
+          maxWidthPercent: 32,
+          maxHeightPercent: 42
         },
         supportedMethods: ['DTF', 'Sublimation']
       },
@@ -252,10 +252,10 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 44,
+          leftPercent: 46,
           topPercent: 15,
-          maxWidthPercent: 12,
-          maxHeightPercent: 10
+          maxWidthPercent: 8,
+          maxHeightPercent: 8
         },
         supportedMethods: ['DTF', 'Sublimation']
       },
@@ -268,7 +268,7 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
         descriptionAr: 'شعار كم التيشيرت الأيسر فوق حاشية الكم بـ 3 إلى 5 سم',
         descriptionTr: 'Sol kol dikişinin 3-5 cm üzerinde kol logosu',
         descriptionEn: 'T-shirt left sleeve logo placed 3-5 cm above the sleeve hem',
-        offsetFromCollarCm: 18,
+        offsetFromCollarCm: 10,
         dimensions: {
           recommended: {
             widthCm: 8,
@@ -293,10 +293,10 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 78,
+          leftPercent: 79,
           topPercent: 28,
-          maxWidthPercent: 14,
-          maxHeightPercent: 14
+          maxWidthPercent: 8,
+          maxHeightPercent: 8
         },
         supportedMethods: ['DTF', 'Sublimation']
       },
@@ -309,7 +309,7 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
         descriptionAr: 'شعار كم التيشيرت الأيمن فوق حاشية الكم بـ 3 إلى 5 سم',
         descriptionTr: 'Sağ kol dikişinin 3-5 cm üzerinde kol logosu',
         descriptionEn: 'T-shirt right sleeve logo placed 3-5 cm above the sleeve hem',
-        offsetFromCollarCm: 18,
+        offsetFromCollarCm: 10,
         dimensions: {
           recommended: {
             widthCm: 8,
@@ -334,10 +334,10 @@ export const PRINT_CONFIG: Record<string, GarmentPrintConfig> = {
           }
         },
         canvasBox: {
-          leftPercent: 8,
+          leftPercent: 13,
           topPercent: 28,
-          maxWidthPercent: 14,
-          maxHeightPercent: 14
+          maxWidthPercent: 8,
+          maxHeightPercent: 8
         },
         supportedMethods: ['DTF', 'Sublimation']
       }
@@ -673,3 +673,6 @@ export function placementToNativeRect(
     height: Math.round((maxHeightPercent / 100) * safeNh),
   };
 }
+
+export { STANDARD_GARMENT_L_METRICS } from './garmentNormalizer';
+
