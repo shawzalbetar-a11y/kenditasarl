@@ -10,6 +10,7 @@ import {
 } from '@/lib/printPlacementConfig';
 import { Ruler, Check, ChevronDown, ChevronUp, Shirt, Sparkles, X, Copy, AlertTriangle, ShieldAlert, CheckCircle2, Zap } from 'lucide-react';
 import { getLocalizedColorName } from '@/lib/colorTranslations';
+import { cn } from '@/lib/utils';
 
 interface GarmentPlacementGuideProps {
   garmentType?: string;
@@ -138,9 +139,11 @@ function GarmentMiniature({
 
 /**
  * Dynamic Typewriter Animated Onboarding Hint
- * Anchored to left-0 so it never clips past screen boundaries,
- * with an intelligent sliding arrow pointer that shifts to point
- * directly at [المعتمد] or [الوضع الحر] based on the current tip.
+ * Fully bidirectional: in RTL (Arabic) it anchors left-0 on mobile and expands rightwards;
+ * in LTR (Turkish, English) it anchors right-0 on mobile and expands leftwards (inwards into the canvas),
+ * and on desktop it anchors left-0 expanding rightwards.
+ * The sliding arrow pointer adjusts with pixel-perfect accuracy to point directly
+ * at [المعتمد / Standards] or [الوضع الحر / Free Mode] across all locales and device screens!
  */
 function TypewriterHint({
   locale,
@@ -157,6 +160,8 @@ function TypewriterHint({
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  const isRtl = locale === 'ar';
 
   const phrases = useMemo(() => {
     if (locale === 'tr') {
@@ -224,7 +229,15 @@ function TypewriterHint({
   return (
     <div
       onClick={handleClick}
-      className="absolute -top-9 sm:-top-10 left-0 z-40 flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white rounded-full shadow-lg shadow-orange-500/25 border border-amber-300/60 animate-in fade-in slide-in-from-bottom-2 duration-300 cursor-pointer select-none whitespace-nowrap max-w-[calc(100vw-36px)] sm:max-w-md active:scale-95 group hover:shadow-xl hover:scale-[1.02] transition-all"
+      className={cn(
+        "absolute -top-9 sm:-top-10 z-40 flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white rounded-full shadow-lg shadow-orange-500/25 border border-amber-300/60 animate-in fade-in slide-in-from-bottom-2 duration-300 cursor-pointer select-none whitespace-nowrap max-w-[calc(100vw-36px)] sm:max-w-md active:scale-95 group hover:shadow-xl hover:scale-[1.02] transition-all",
+        // Clamping logic: in RTL, mobile placement is on the left so anchor left-0 to grow rightwards.
+        // in LTR, mobile placement is on the right so anchor right-0 to grow leftwards into the screen.
+        // On desktop, placement is always on the left so anchor sm:left-0 sm:right-auto.
+        isRtl
+          ? "left-0 sm:left-0"
+          : "right-0 left-auto sm:left-0 sm:right-auto"
+      )}
     >
       {/* Dynamic Sparkle */}
       <span className="flex items-center text-amber-200 animate-spin shrink-0" style={{ animationDuration: '4s' }}>
@@ -239,12 +252,14 @@ function TypewriterHint({
       {/* Blinking Cursor */}
       <span className="inline-block w-1 h-3 bg-white rounded-full animate-pulse opacity-90 shrink-0" />
 
-      {/* Dynamic Sliding Speech-Bubble Pointer Tail (Points to [المعتمد] when discussing placements, and slides to [الحر] when discussing free mode) */}
+      {/* Intelligent Bidirectional Sliding Speech-Bubble Pointer Tail */}
       <div 
-        className="absolute -bottom-1 w-2.5 h-2.5 bg-orange-600 rotate-45 border-r border-b border-amber-300/60 transition-all duration-300"
-        style={{
-          left: isPlacementTip ? '88px' : '22px'
-        }}
+        className={cn(
+          "absolute -bottom-1 w-2.5 h-2.5 bg-orange-600 rotate-45 border-r border-b border-amber-300/60 transition-all duration-300",
+          isRtl
+            ? (isPlacementTip ? "left-[88px] sm:left-[190px]" : "left-[22px] sm:left-[65px]")
+            : (isPlacementTip ? "right-[88px] sm:right-auto sm:left-[65px]" : "right-[22px] sm:right-auto sm:left-[190px]")
+        )}
       />
 
       {/* Dismiss Button */}

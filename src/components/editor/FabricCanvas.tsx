@@ -3675,8 +3675,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                     height: `${(currentPrintArea.height / nativeHeight) * 100}%`,
                   }}
                 >
-                  <div className="absolute top-2 start-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[9px] sm:text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 border border-amber-300 z-20">
-                    <Sparkles size={10} className="text-amber-200" />
+                  {/* Badge positioned OUTSIDE / ABOVE the bounding box so the entire printable area remains 100% clear */}
+                  <div className="absolute -top-3.5 sm:-top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[9px] sm:text-[10px] font-black px-3 py-0.5 rounded-full shadow-md flex items-center gap-1.5 border border-amber-300 z-20 whitespace-nowrap">
+                    <Sparkles size={11} className="text-amber-200" />
                     <span>
                       {locale === 'tr' ? 'Serbest Mod (Tam Yüzey)' : locale === 'en' ? 'Free Mode (Full Face)' : 'الوضع الحر (كامل الواجهة)'}
                     </span>
