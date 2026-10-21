@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { fabric } from 'fabric';
-import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw } from 'lucide-react';
+import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw, Shirt, ChevronDown } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import AuthModal from '@/components/auth/AuthModal';
 import { auth, db } from '@/lib/firebase';
@@ -33,7 +33,7 @@ import {
 import { optimizeImageForUpload } from '@/lib/image-optimizer';
 import { setupModernFabricControls, applyModernObjectStyles as applyCustomModernStyles, applyModernStyleToObject } from '@/lib/fabricCustomControls';
 import GarmentPlacementGuide from './GarmentPlacementGuide';
-import { PlacementSpec, getPlacementById, isFaceMatching } from '@/lib/printPlacementConfig';
+import { PlacementSpec, getPlacementById, isFaceMatching, getPlacementsForGarment } from '@/lib/printPlacementConfig';
 
 const COLOR_MAP: Record<string, string> = {
   white: '#FFFFFF',
@@ -308,6 +308,37 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const activeFaceSelectedPlacementsRef = useRef<PlacementSpec[]>(activeFaceSelectedPlacements);
   activeFaceSelectedPlacementsRef.current = activeFaceSelectedPlacements;
+
+  // Placements available for the current garment face
+  const availablePlacementsForActiveFace = useMemo(() => {
+    const gType = productData?.config?.garmentType || productData?.category || 'tshirt';
+    const allForFace = getPlacementsForGarment(gType, activeFace);
+    if (productData?.config?.allowedPlacements && productData.config.allowedPlacements.length > 0) {
+      return allForFace.filter(p => productData.config.allowedPlacements.includes(p.id));
+    }
+    return allForFace;
+  }, [productData, activeFace]);
+
+  // Placement Required Modal state (triggers when user attempts to add art without selecting a placement)
+  const [isPlacementRequiredModalOpen, setIsPlacementRequiredModalOpen] = useState(false);
+  const [pendingAddCallback, setPendingAddCallback] = useState<(() => void) | null>(null);
+  const pendingAddCallbackRef = useRef<(() => void) | null>(null);
+  pendingAddCallbackRef.current = pendingAddCallback;
+
+  const ensurePlacementSelected = useCallback((onProceed: () => void): boolean => {
+    if (isFreeModeRef.current || activeFaceSelectedPlacementsRef.current.length > 0) {
+      return true;
+    }
+
+    if (availablePlacementsForActiveFace.length === 0) {
+      return true;
+    }
+
+    pendingAddCallbackRef.current = onProceed;
+    setPendingAddCallback(() => onProceed);
+    setIsPlacementRequiredModalOpen(true);
+    return false;
+  }, [availablePlacementsForActiveFace]);
 
   const uniqueSelectedColors = useMemo(() => {
     const list: string[] = [];
@@ -630,6 +661,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const handleSelectUpload = (item: UserUploadItem) => {
     if (!canvas) return;
+    if (!ensurePlacementSelected(() => handleSelectUpload(item))) return;
     loadFabricImage(item.url, (fabricImg) => {
       (fabricImg as any).set({ 
         name: 'user_upload', 
@@ -645,6 +677,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   };
 
   const handleSelectRecentAsset = (item: RecentAssetItem) => {
+    if (!ensurePlacementSelected(() => handleSelectRecentAsset(item))) return;
     addSticker(item.url, item);
     showToast(t('itemAddedSuccess', { fallback: 'تمت إضافة العنصر إلى التصميم بنجاح' }), 'success');
   };
@@ -1413,6 +1446,16 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               locale === 'en' ? `Design placed in ${targetPlacement.nameEn}` :
               `تم وضع التصميم داخل: ${targetPlacement.nameAr}`,
       });
+      return;
+    }
+
+    // Guard: If in Approved Mode and no placement is selected yet, trigger placement prompt
+    if (!isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length === 0 && availablePlacementsForActiveFace.length > 0) {
+      if (!isPlacementRequiredModalOpen) {
+        pendingAddCallbackRef.current = () => prepareAndAddObject(obj, canvasInstance);
+        setPendingAddCallback(() => () => prepareAndAddObject(obj, canvasInstance));
+        setIsPlacementRequiredModalOpen(true);
+      }
       return;
     }
 
@@ -2298,6 +2341,35 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     }
   }, [activeColorKey, activeFace, canvas, currentSelectedPlacementIds, switchFace, availableColors, uniqueSelectedColors, normalizeColorKey]);
 
+  const handleSelectPlacementAndProceed = useCallback((placement: PlacementSpec) => {
+    setIsPlacementRequiredModalOpen(false);
+    handleTogglePlacement(placement);
+    activeFaceSelectedPlacementsRef.current = [placement];
+
+    const cb = pendingAddCallbackRef.current;
+    pendingAddCallbackRef.current = null;
+    setPendingAddCallback(null);
+    if (cb) {
+      setTimeout(() => {
+        cb();
+      }, 80);
+    }
+  }, [handleTogglePlacement]);
+
+  const handleEnableFreeModeAndProceed = useCallback(() => {
+    setIsPlacementRequiredModalOpen(false);
+    handleToggleFreeMode(true);
+
+    const cb = pendingAddCallbackRef.current;
+    pendingAddCallbackRef.current = null;
+    setPendingAddCallback(null);
+    if (cb) {
+      setTimeout(() => {
+        cb();
+      }, 80);
+    }
+  }, [handleToggleFreeMode]);
+
   const handleToggleSyncPlacements = useCallback(() => {
     setSyncPlacementsAcrossColors(prev => {
       const next = !prev;
@@ -2385,6 +2457,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const addText = () => {
     if (!canvas) return;
+    if (!ensurePlacementSelected(() => addText())) return;
     const txt = t('newText', { fallback: 'نصك هنا' });
     const isRtl = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(txt);
     const marginPx = Math.max(8, Math.round(currentPrintArea.width * 0.03));
@@ -2554,6 +2627,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const addSticker = (url: string, asset?: { id?: string; name?: string; price?: number; category?: string }) => {
     if (!canvas) return;
+    if (!ensurePlacementSelected(() => addSticker(url, asset))) return;
     recordRecentAsset(url, asset);
     loadFabricImage(
       url,
@@ -2576,6 +2650,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const processImageFile = async (file: File) => {
     if (!canvas) return;
+    if (!ensurePlacementSelected(() => processImageFile(file))) return;
 
     // 1. Check MIME Type
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
@@ -4684,6 +4759,128 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           handleAction('cart');
         }}
       />
+
+      {/* Required Placement Selection Alert Modal */}
+      {isPlacementRequiredModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => {
+            setIsPlacementRequiredModalOpen(false);
+            setPendingAddCallback(null);
+            pendingAddCallbackRef.current = null;
+          }}
+        >
+          <div 
+            className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-lg p-5 sm:p-6 overflow-hidden relative flex flex-col gap-4 text-right animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+            dir={locale === 'ar' ? 'rtl' : 'ltr'}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsPlacementRequiredModalOpen(false);
+                setPendingAddCallback(null);
+                pendingAddCallbackRef.current = null;
+              }}
+              className="absolute top-4 left-4 p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Header with Icon */}
+            <div className="flex items-start gap-3 min-w-0 pr-1">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-600 flex items-center justify-center shrink-0 shadow-xs">
+                <Shirt size={24} className="stroke-[2.2]" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <h3 className="text-base sm:text-lg font-black text-gray-900 leading-snug">
+                  {locale === 'tr'
+                    ? '⚠️ Lütfen Önce Baskı Konumunu Seçin'
+                    : locale === 'en'
+                    ? '⚠️ Please Select a Print Placement First'
+                    : '⚠️ يرجى اختيار موضع الطباعة أولاً'}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                  {locale === 'tr'
+                    ? 'Tasarımınızın ürün üzerinde doğru ve ideal boyutta yerleşmesi için lütfen aşağıdaki onaylı konumlardan birini seçin:'
+                    : locale === 'en'
+                    ? 'To ensure your design is positioned and scaled accurately on the garment, please choose an approved placement below:'
+                    : 'لتثبيت تصميمك بدقة ومحاذاته بشكل احترافي على القطعة، يرجى اختيار أحد مواضع الطباعة المعتمدة التالية:'}
+                </p>
+              </div>
+            </div>
+
+            {/* Available Placements Interactive List */}
+            <div className="flex flex-col gap-2 max-h-[45vh] overflow-y-auto pr-1">
+              {availablePlacementsForActiveFace.map((spec) => {
+                const calibrated = productData?.config?.calibratedPlacements?.[spec.id];
+                const displayW = calibrated?.physicalWidthCm || spec.dimensions.recommended.widthCm;
+                const displayH = calibrated?.physicalHeightCm || spec.dimensions.recommended.heightCm;
+                const displayOffset = calibrated?.offsetFromCollarCm ?? spec.offsetFromCollarCm;
+
+                return (
+                  <button
+                    key={spec.id}
+                    type="button"
+                    onClick={() => handleSelectPlacementAndProceed(spec)}
+                    className="flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border-2 border-gray-200/90 hover:border-amber-500 hover:bg-amber-50/50 transition-all text-right group cursor-pointer active:scale-[0.99] shadow-xs"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                        <Shirt size={20} />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs sm:text-sm font-black text-gray-900 group-hover:text-amber-700">
+                            {locale === 'tr' ? spec.nameTr : locale === 'en' ? spec.nameEn : spec.nameAr}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-100/90 px-2 py-0.2 rounded-full border border-amber-200" dir="ltr">
+                            {displayW}×{displayH} cm
+                          </span>
+                        </div>
+                        <span className="text-[10.5px] text-gray-500 truncate mt-0.5">
+                          {locale === 'tr' ? spec.descriptionTr : locale === 'en' ? spec.descriptionEn : spec.descriptionAr}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] text-gray-400 hidden sm:inline-flex items-center gap-1">
+                        <Ruler size={11} />
+                        {locale === 'tr' ? `${displayOffset} cm` : locale === 'en' ? `${displayOffset} cm` : `${displayOffset} سم`}
+                      </span>
+                      <div className="w-7 h-7 rounded-full bg-gray-100 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center text-gray-400 transition-all">
+                        <ChevronDown size={14} className={locale === 'ar' ? 'rotate-90' : '-rotate-90'} />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Alternative: Free Mode */}
+            {productData?.config?.allowFreeMode !== false && (
+              <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleEnableFreeModeAndProceed}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-black text-xs shadow-md shadow-amber-500/25 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
+                >
+                  <Sparkles size={14} className="text-amber-100" />
+                  <span>
+                    {locale === 'tr'
+                      ? 'Veya Serbest Modu Açarak Tasarımı Ekle ⚡'
+                      : locale === 'en'
+                      ? 'Or Enable Free Mode & Insert Design ⚡'
+                      : 'أو تفعيل الوضع الحر ومتابعة الإضافة ⚡'}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
