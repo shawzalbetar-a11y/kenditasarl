@@ -45,7 +45,7 @@ export default async function LocaleLayout({
       <body className={`${ibmPlexSansArabic.className} bg-background text-textPrimary flex flex-col min-h-screen`}>
         <NextIntlClientProvider messages={messages}>
           <Header />
-          <main className="flex-grow pt-24 md:pt-32">
+          <main className="flex-grow pt-24 md:pt-28">
             {children}
           </main>
           <Footer />

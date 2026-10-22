@@ -112,7 +112,7 @@ export default function CategoryClient({ initialProducts, categoryTitle, categor
   };
 
   return (
-    <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-3 pb-8 sm:pb-12">
       
       {/* Category Header Banner with Typography Hierarchy & Action Controls */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-6 sm:mb-8 pb-6 border-b border-gray-200/80">
