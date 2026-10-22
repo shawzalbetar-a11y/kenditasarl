@@ -35,7 +35,8 @@ export default async function TshirtsPage({ params: { locale } }: { params: { lo
   return (
     <CategoryClient 
       initialProducts={products}
-      categoryTitle={t('tshirts')}
+      categoryTitle={t('tshirtsTitle')}
+      categoryDesc={t('tshirtsDesc')}
     />
   );
 }

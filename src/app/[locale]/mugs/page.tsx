@@ -35,7 +35,8 @@ export default async function MugsPage({ params: { locale } }: { params: { local
   return (
     <CategoryClient 
       initialProducts={products}
-      categoryTitle={t('mugs')}
+      categoryTitle={t('mugsTitle')}
+      categoryDesc={t('mugsDesc')}
     />
   );
 }

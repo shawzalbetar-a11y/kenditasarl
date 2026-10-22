@@ -61,42 +61,42 @@ export default function ProductGrid({ products, emptyMessage, title, description
         {/* Left Side: Title & Description */}
         {(title || description) && (
           <div className="flex-1">
-            {title && <h2 className="text-3xl font-bold text-[var(--color-secondary)]">{title}</h2>}
-            {description && <p className="text-sm text-[var(--color-text-secondary)] mt-1">{description}</p>}
+            {title && <h2 className="text-2xl sm:text-3xl font-black text-gray-900">{title}</h2>}
+            {description && <p className="text-sm sm:text-base text-gray-600 mt-1 font-medium">{description}</p>}
           </div>
         )}
 
         {/* Right Side: View Toggler */}
         <div className="flex justify-end items-center gap-2">
-          <span className="text-sm text-gray-500 hidden sm:inline-block ml-auto mr-4">{t('viewAs')}</span>
-        <button 
-          onClick={() => handleSetCols(1)}
-          className={cn("p-2 rounded-lg transition-colors", cols === 1 ? "bg-[var(--color-primary)] text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600")}
-          title={t('oneColumn')}
-        >
-          <Rows size={18} />
-        </button>
-        <button 
-          onClick={() => handleSetCols(2)}
-          className={cn("p-2 rounded-lg transition-colors", cols === 2 ? "bg-[var(--color-primary)] text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600")}
-          title={t('twoColumns')}
-        >
-          <Columns size={18} />
-        </button>
-        <button 
-          onClick={() => handleSetCols(3)}
-          className={cn("p-2 rounded-lg transition-colors hidden md:block", cols === 3 ? "bg-[var(--color-primary)] text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600")}
-          title={t('threeColumns')}
-        >
-          <LayoutGrid size={18} />
-        </button>
-        <button 
-          onClick={() => handleSetCols(4)}
-          className={cn("p-2 rounded-lg transition-colors hidden lg:block", cols === 4 ? "bg-[var(--color-primary)] text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600")}
-          title={t('fourColumns', { fallback: '4 Columns' })}
-        >
-          <Grid3x3 size={18} />
-        </button>
+          <span className="text-xs sm:text-sm font-bold text-gray-600 hidden sm:inline-block ml-auto mr-3">{t('viewAs')}</span>
+          <button 
+            onClick={() => handleSetCols(1)}
+            className={cn("p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer", cols === 1 ? "bg-primary text-white border-primary shadow-xs" : "bg-white border-gray-200 hover:bg-gray-50 text-gray-700")}
+            title={t('oneColumn')}
+          >
+            <Rows size={18} />
+          </button>
+          <button 
+            onClick={() => handleSetCols(2)}
+            className={cn("p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer", cols === 2 ? "bg-primary text-white border-primary shadow-xs" : "bg-white border-gray-200 hover:bg-gray-50 text-gray-700")}
+            title={t('twoColumns')}
+          >
+            <Columns size={18} />
+          </button>
+          <button 
+            onClick={() => handleSetCols(3)}
+            className={cn("p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer hidden md:block", cols === 3 ? "bg-primary text-white border-primary shadow-xs" : "bg-white border-gray-200 hover:bg-gray-50 text-gray-700")}
+            title={t('threeColumns')}
+          >
+            <LayoutGrid size={18} />
+          </button>
+          <button 
+            onClick={() => handleSetCols(4)}
+            className={cn("p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer hidden lg:block", cols === 4 ? "bg-primary text-white border-primary shadow-xs" : "bg-white border-gray-200 hover:bg-gray-50 text-gray-700")}
+            title={t('fourColumns', { fallback: '4 Columns' })}
+          >
+            <Grid3x3 size={18} />
+          </button>
         </div>
       </div>
 
@@ -113,7 +113,7 @@ export default function ProductGrid({ products, emptyMessage, title, description
         ))}
         
         {products.length === 0 && emptyMessage && (
-          <div className="col-span-full py-10 text-center text-gray-500">
+          <div className="col-span-full">
             {emptyMessage}
           </div>
         )}

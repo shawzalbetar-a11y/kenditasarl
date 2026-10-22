@@ -33,20 +33,10 @@ export default async function HatsPage({ params: { locale } }: { params: { local
   const products = await getHats();
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)] pt-28 pb-16 px-4 md:px-8">
-      <div className="max-w-[100rem] mx-auto flex flex-col gap-8">
-        
-        {/* Header Section */}
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-[var(--color-secondary)]">{t('hatsTitle')}</h1>
-            <p className="text-sm text-[var(--color-text-secondary)] mt-1">{t('hatsDesc')}</p>
-          </div>
-        </div>
-
-        <CategoryClient initialProducts={products} categoryTitle={t('hats')} />
-        
-      </div>
-    </div>
+    <CategoryClient 
+      initialProducts={products} 
+      categoryTitle={t('hatsTitle')}
+      categoryDesc={t('hatsDesc')}
+    />
   );
 }
