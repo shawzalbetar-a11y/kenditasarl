@@ -44,30 +44,30 @@ export default function LanguageSwitcher() {
     <div className="relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 hover:text-primary transition-colors focus:outline-none"
+        className="flex items-center gap-1.5 p-1.5 md:p-2 rounded-full hover:bg-gray-100/80 hover:text-primary transition-colors focus:outline-none cursor-pointer"
         aria-label="Change Language"
       >
-        <Globe className="w-5 h-5" />
-        <span className="text-sm font-medium uppercase">{locale}</span>
+        <Globe className="w-7 h-7 stroke-[2.2]" />
+        <span className="text-base lg:text-[18px] font-extrabold uppercase tracking-wider">{locale}</span>
       </button>
 
       {isOpen && (
-        <div className="absolute top-full mt-2 w-24 bg-white border border-border rounded-md shadow-lg overflow-hidden z-50 ltr:right-0 rtl:left-0">
+        <div className="absolute top-full mt-2 w-32 bg-white/95 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-xl overflow-hidden z-50 ltr:right-0 rtl:left-0 py-1.5">
           <button
             onClick={() => switchLanguage('tr')}
-            className={`w-full text-start px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${locale === 'tr' ? 'font-bold text-primary' : 'text-textPrimary'}`}
+            className={`w-full text-start px-4 py-2.5 text-base hover:bg-orange-50 transition-colors ${locale === 'tr' ? 'font-black text-primary bg-orange-50/50' : 'font-bold text-textPrimary'}`}
           >
             Türkçe
           </button>
           <button
             onClick={() => switchLanguage('ar')}
-            className={`w-full text-start px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${locale === 'ar' ? 'font-bold text-primary' : 'text-textPrimary'}`}
+            className={`w-full text-start px-4 py-2.5 text-base hover:bg-orange-50 transition-colors ${locale === 'ar' ? 'font-black text-primary bg-orange-50/50' : 'font-bold text-textPrimary'}`}
           >
             العربية
           </button>
           <button
             onClick={() => switchLanguage('en')}
-            className={`w-full text-start px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${locale === 'en' ? 'font-bold text-primary' : 'text-textPrimary'}`}
+            className={`w-full text-start px-4 py-2.5 text-base hover:bg-orange-50 transition-colors ${locale === 'en' ? 'font-black text-primary bg-orange-50/50' : 'font-bold text-textPrimary'}`}
           >
             English
           </button>

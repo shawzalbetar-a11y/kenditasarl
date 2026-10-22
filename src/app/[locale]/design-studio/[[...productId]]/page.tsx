@@ -264,11 +264,16 @@ export default function DesignStudioPage() {
       {/* Design Studio Layout Optimizations: Override Main Padding & Hide Footer */}
       <style>{`
         main {
-          padding-top: 80px !important;
+          padding-top: 86px !important;
         }
         @media (min-width: 768px) {
           main {
-            padding-top: 96px !important;
+            padding-top: 108px !important;
+          }
+        }
+        @media (min-width: 1024px) {
+          main {
+            padding-top: 118px !important;
           }
         }
         footer, .site-footer, #footer {
