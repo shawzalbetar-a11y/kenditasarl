@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html class="h-full" dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+  <title>كندي صمم | استوديو التصميم الذكي للجوال (Kenditasarl Mobile Studio)</title>
+  
+  <!-- Google Fonts: Cairo & IBM Plex Sans Arabic -->
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  
+  <!-- Font Awesome Icons 6.5.1 -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet"/>
+  
+  <!-- Tailwind CSS v3 -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"IBM Plex Sans Arabic"', 'Cairo', 'sans-serif'],
+            heading: ['Cairo', '"IBM Plex Sans Arabic"', 'sans-serif']
+          },
+          colors: {
+            brand: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              400: '#fb923c',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c'
+            },
+            charcoal: {
+              800: '#1e2229',
+              900: '#121418',
+              950: '#0a0b0d'
+            }
+          },
+          boxShadow: {
+            'glow': '0 0 25px -5px rgba(249, 115, 22, 0.4)',
+            'sheet': '0 -10px 30px -5px rgba(0, 0, 0, 0.15)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Mobile-first smooth app resets */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    input, textarea {
+      user-select: auto;
+      -webkit-user-select: auto;
+    }
+    
+    /* Custom Scrollbar for touch horizontal lists */
+    ::-webkit-scrollbar {
+      width: 0px;
+      height: 0px;
+      display: none;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Subtle Canvas Grid */
+    .mobile-canvas-grid {
+      background-color: #f8fafc;
+      background-image: radial-gradient(#cbd5e1 0.75px, transparent 0.75px);
+      background-size: 16px 16px;
+    }
+
+    /* Realistic T-Shirt Shadow */
+    .tshirt-realistic-shadow {
+      filter: drop-shadow(0 20px 30px rgba(15, 23, 42, 0.2)) drop-shadow(0 8px 12px rgba(15, 23, 42, 0.1));
+    }
+
+    /* Bottom Sheet Slide Up Animation */
+    .bottom-sheet {
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+      will-change: transform;
+    }
+    .bottom-sheet.closed {
+      transform: translateY(100%);
+      pointer-events: none;
+    }
+
+    /* Backdrop Fade */
+    .sheet-backdrop {
+      transition: opacity 0.28s ease, visibility 0.28s;
+    }
+    .sheet-backdrop.hidden-backdrop {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* Typewriter Cursor Pulse */
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    .typewriter-cursor {
+      animation: blink 0.9s infinite;
+    }
+
+    /* Device Simulator wrapper for desktop view */
+    @media (min-width: 640px) {
+      body.simulator-mode {
+        background: #0f172a;
+        background-image: radial-gradient(#334155 1px, transparent 1px);
+        background-size: 24px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 0;
+      }
+      .mobile-frame-container {
+        width: 412px;
+        height: 870px;
+        max-height: 94vh;
+        border-radius: 44px;
+        box-shadow: 0 25px 60px -15px rgba(0,0,0,0.7), 0 0 0 12px #1e293b, 0 0 0 14px #475569;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        background: #ffffff;
+      }
+      .mobile-notch {
+        display: flex !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased h-full w-full overflow-hidden simulator-mode">
+
+  <!-- Desktop Switcher bar (Only visible on wide screens to toggle simulator vs full view) -->
+  <div class="hidden sm:flex fixed top-4 right-4 z-50 items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-700 shadow-xl text-white text-xs">
+    <span class="text-slate-400">وضع العرض:</span>
+    <button id="toggleFrameBtn" class="px-2.5 py-1 rounded-lg bg-brand-500 text-white font-bold hover:bg-brand-600 transition flex items-center gap-1.5 cursor-pointer">
+      <i class="fa-solid fa-mobile-screen"></i>
+      <span id="frameModeText">إطار هاتف حقيقي</span>
+    </button>
+    <a href="stitch-studio-kenditasarl.html" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center gap-1.5" title="العودة لنسخة سطح المكتب">
+      <i class="fa-solid fa-desktop"></i>
+      <span>نسخة الكمبيوتر</span>
+    </a>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MOBILE APPLICATION WRAPPER (Device Screen Container) -->
+  <!-- ========================================================================= -->
+  <div id="mobileAppContainer" class="mobile-frame-container w-full h-full flex flex-col bg-white overflow-hidden relative select-none">
+
+    <!-- 0. Mobile Status Bar (Realistic Notch on Mobile Simulator) -->
+    <div class="mobile-notch hidden h-7 bg-white shrink-0 items-center justify-between px-6 text-[11px] font-bold text-slate-800 z-40">
+      <span>09:41</span>
+      <div class="w-20 h-4 bg-slate-900 rounded-full mx-auto -mt-1"></div>
+      <div class="flex items-center gap-1.5 text-xs text-slate-700">
+        <i class="fa-solid fa-signal text-[10px]"></i>
+        <i class="fa-solid fa-wifi text-[10px]"></i>
+        <i class="fa-solid fa-battery-full text-xs text-emerald-600"></i>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 1. MOBILE STUDIO HEADER -->
+    <!-- ========================================================================= -->
+    <header class="h-14 bg-white border-b border-slate-200/90 px-3.5 flex items-center justify-between shrink-0 z-30 shadow-xs">
+      <!-- Back & Brand -->
+      <div class="flex items-center gap-2.5">
+        <button class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 active:scale-95 transition" title="رجوع">
+          <i class="fa-solid fa-arrow-right text-xs"></i>
+        </button>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="font-heading font-extrabold text-sm text-slate-900 tracking-tight">كندي صمم</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-200">PRO Mobile</span>
+          </div>
+          <span class="text-[10px] text-slate-500 block truncate max-w-[170px]">تيشيرت أوفر سايز فاخر 240gsm</span>
+        </div>
+      </div>
+
+      <!-- Quick Header Actions -->
+      <div class="flex items-center gap-1.5">
+        <!-- Undo / Redo -->
+        <button class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 active:bg-slate-200 text-xs" title="تراجع">
+          <i class="fa-solid fa-rotate-right -scale-x-100"></i>
+        </button>
+        <button class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 active:bg-slate-200 text-xs" title="إعادة">
+          <i class="fa-solid fa-rotate-left -scale-x-100"></i>
+        </button>
+
+        <!-- 3D Preview Modal Button -->
+        <button id="open3DModalBtn" class="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center active:scale-95 text-xs shadow-xs" title="معاينة 3D">
+          <i class="fa-solid fa-cube"></i>
+        </button>
+
+        <!-- Clear / Reset -->
+        <button id="mobileResetBtn" class="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 active:bg-rose-50 active:text-rose-600 flex items-center justify-center text-xs" title="إعادة ضبط">
+          <i class="fa-regular fa-trash-can"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- ========================================================================= -->
+    <!-- 2. ANIMATED TYPEWRITER GUIDANCE BANNER -->
+    <!-- ========================================================================= -->
+    <div id="typewriterBanner" class="bg-gradient-to-r from-amber-500 via-orange-500 to-brand-500 text-white px-3 py-1.5 flex items-center justify-between shadow-xs shrink-0 z-20 text-[11px] font-medium">
+      <div class="flex items-center gap-2 overflow-hidden">
+        <span class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-amber-100"></i>
+        </span>
+        <div class="truncate">
+          <span id="typewriterText" class="font-semibold text-white"></span>
+          <span class="typewriter-cursor font-bold">|</span>
+        </div>
+      </div>
+      <button onclick="document.getElementById('typewriterBanner').classList.add('hidden')" class="text-white/80 hover:text-white p-1 text-xs shrink-0">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 3. MOBILE INTERACTIVE CANVAS STAGE -->
+    <!-- ========================================================================= -->
+    <div class="flex-1 mobile-canvas-grid relative overflow-hidden flex flex-col items-center justify-center p-2">
+
+      <!-- TOP FLOATING BAR: Face Switcher (الصدر الأمامي، الظهر، الأكمام) -->
+      <div class="absolute top-2.5 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-md p-1 rounded-2xl border border-slate-200 shadow-md">
+        <button id="faceBtnFront" class="face-pill px-3 py-1 rounded-xl bg-slate-900 text-white font-bold text-[11px] transition shadow-xs flex items-center gap-1 active:scale-95">
+          <i class="fa-regular fa-circle-dot text-[8px] text-emerald-400"></i>
+          <span>الصدر</span>
+        </button>
+        <button id="faceBtnBack" class="face-pill px-3 py-1 rounded-xl text-slate-600 hover:bg-slate-100 font-medium text-[11px] transition flex items-center gap-1 active:scale-95">
+          <span>الظهر</span>
+        </button>
+        <button id="faceBtnSleeveR" class="face-pill px-2.5 py-1 rounded-xl text-slate-600 hover:bg-slate-100 font-medium text-[11px] transition flex items-center gap-1 active:scale-95">
+          <span>كم يمين</span>
+        </button>
+        <button id="faceBtnSleeveL" class="face-pill px-2.5 py-1 rounded-xl text-slate-600 hover:bg-slate-100 font-medium text-[11px] transition flex items-center gap-1 active:scale-95">
+          <span>كم يسار</span>
+        </button>
+      </div>
+
+      <!-- ACTIVE PRINT PLACEMENT BADGE (Clickable to open Placement Guide) -->
+      <button id="openPlacementGuideChip" class="absolute top-12 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/90 text-white backdrop-blur-md shadow-sm border border-amber-300/40 text-[10px] font-bold active:scale-95 transition">
+        <i class="fa-solid fa-bullseye text-[9px]"></i>
+        <span id="activePlacementName">شعار الصدر الأيسر (10×10 cm)</span>
+        <i class="fa-solid fa-chevron-left text-[8px] mr-1 opacity-80"></i>
+      </button>
+
+      <!-- FLOATING CANVAS ZOOM CONTROLS -->
+      <div class="absolute right-2.5 bottom-16 z-20 flex flex-col gap-1.5 bg-white/90 backdrop-blur-md p-1 rounded-2xl border border-slate-200 shadow-md text-slate-700">
+        <button id="zoomInBtn" class="w-8 h-8 rounded-xl flex items-center justify-center active:bg-slate-100 text-xs font-bold" title="تكبير">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+        <button id="zoomOutBtn" class="w-8 h-8 rounded-xl flex items-center justify-center active:bg-slate-100 text-xs font-bold" title="تصغير">
+          <i class="fa-solid fa-minus"></i>
+        </button>
+        <button id="zoomResetBtn" class="w-8 h-8 rounded-xl flex items-center justify-center active:bg-slate-100 text-[10px]" title="إعادة ضبط الحجم">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+      </div>
+
+      <!-- THE T-SHIRT GARMENT & INTERACTIVE BOUNDS -->
+      <div id="canvasViewport" class="relative w-[320px] h-[370px] max-w-full flex items-center justify-center transition-transform duration-200">
+        
+        <!-- Realistic Garment SVG -->
+        <svg id="garmentMockupSvg" class="w-full h-full tshirt-realistic-shadow transition-all duration-300" viewBox="0 0 500 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- Fabric Shading Gradient -->
+            <radialGradient id="fabricShading" cx="50%" cy="40%" r="65%">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+              <stop offset="70%" stop-color="#000000" stop-opacity="0.1"/>
+              <stop offset="100%" stop-color="#000000" stop-opacity="0.35"/>
+            </radialGradient>
+            <!-- Creases & Folds Texture -->
+            <linearGradient id="creases" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="20%" stop-color="#ffffff" stop-opacity="0.08"/>
+              <stop offset="50%" stop-color="#000000" stop-opacity="0.12"/>
+              <stop offset="80%" stop-color="#ffffff" stop-opacity="0.05"/>
+            </linearGradient>
+          </defs>
+
+          <!-- T-Shirt Base Silhouette -->
+          <path id="garmentBodyPath" d="M165 42 C190 68 310 68 335 42 L475 110 L425 210 L370 185 L370 515 C370 525 360 535 348 535 L152 535 C140 535 130 525 130 515 L130 185 L75 210 L25 110 Z" fill="#121418" stroke="#334155" stroke-width="2" stroke-linejoin="round"/>
+
+          <!-- Fabric Shading Overlay -->
+          <path d="M165 42 C190 68 310 68 335 42 L475 110 L425 210 L370 185 L370 515 C370 525 360 535 348 535 L152 535 C140 535 130 525 130 515 L130 185 L75 210 L25 110 Z" fill="url(#fabricShading)" style="mix-blend-mode: multiply;"/>
+          <path d="M165 42 C190 68 310 68 335 42 L475 110 L425 210 L370 185 L370 515 C370 525 360 535 348 535 L152 535 C140 535 130 525 130 515 L130 185 L75 210 L25 110 Z" fill="url(#creases)" style="mix-blend-mode: overlay;"/>
+
+          <!-- Ribbed Collar Neckline -->
+          <path d="M165 42 C200 85 300 85 335 42 C305 66 195 66 165 42 Z" fill="#0a0b0d" stroke="#1e293b" stroke-width="2"/>
+
+          <!-- Realistic Seams / Stitches -->
+          <path d="M165 42 L130 185" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <path d="M335 42 L370 185" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <path d="M130 522 L370 522" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-dasharray="4 2"/>
+        </svg>
+
+        <!-- DTF Print Zone Bounding Box (Matches Selected Placement) -->
+        <div id="printAreaBox" class="absolute border-2 border-dashed border-amber-400 bg-amber-400/5 rounded-lg flex items-center justify-center transition-all duration-300" style="width: 140px; height: 140px; top: 110px; right: 85px;">
+          
+          <!-- Small Print Area Indicator Label -->
+          <span class="absolute -top-5 right-1 px-1.5 py-0.5 rounded bg-amber-500 text-white text-[9px] font-mono font-bold shadow-xs flex items-center gap-1">
+            <i class="fa-solid fa-vector-square text-[7px]"></i>
+            <span id="printZoneDimLabel">10 × 10 cm</span>
+          </span>
+
+          <!-- Interactive Active Design Sticker/Artwork -->
+          <div id="activeDesignElement" class="relative group cursor-move touch-none p-1 border-2 border-brand-500 rounded-lg shadow-lg bg-black/10 transition-transform" style="width: 105px; height: 105px;">
+            <!-- Sticker Graphic (Streetwear Cyber Character from Kenditasarl Library) -->
+            <img id="activeArtworkImg" src="https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300&auto=format&fit=crop&q=80" alt="Design Artwork" class="w-full h-full object-contain filter drop-shadow-md rounded pointer-events-none"/>
+            
+            <!-- Quick Floating Micro-Actions on Selected Object -->
+            <div class="absolute -top-3.5 -right-3.5 w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-md active:scale-90" title="حذف" onclick="toggleActiveArtworkVisibility()">
+              <i class="fa-solid fa-trash-can text-[10px]"></i>
+            </div>
+            <div class="absolute -top-3.5 -left-3.5 w-6 h-6 rounded-full bg-brand-500 text-white flex items-center justify-center shadow-md active:scale-90" title="تدوير">
+              <i class="fa-solid fa-rotate text-[10px]"></i>
+            </div>
+            <div class="absolute -bottom-3.5 -left-3.5 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-md active:scale-90" title="استنساخ">
+              <i class="fa-solid fa-copy text-[10px]"></i>
+            </div>
+            <div class="absolute -bottom-3.5 -right-3.5 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-md active:scale-90" title="تغيير الحجم">
+              <i class="fa-solid fa-up-right-and-down-left-from-center text-[9px]"></i>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- HORIZONTAL SMART COLOR SWATCH STRIP (Right below garment) -->
+      <div class="w-full max-w-sm mt-auto mb-1 px-2 z-20">
+        <div class="bg-white/95 backdrop-blur-md p-2 rounded-2xl border border-slate-200/90 shadow-md flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] font-bold text-slate-800">اللون:</span>
+            <span id="activeColorNameText" class="text-[11px] font-semibold text-brand-600">أسود ملكي</span>
+          </div>
+          <!-- Swatches Scroll Container -->
+          <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pl-1">
+            <!-- Black (Default) -->
+            <button class="color-swatch-btn w-6 h-6 rounded-full bg-[#121418] ring-2 ring-brand-500 ring-offset-2 transition active:scale-90 shrink-0" data-color="#121418" data-name="أسود ملكي"></button>
+            <!-- White -->
+            <button class="color-swatch-btn w-6 h-6 rounded-full bg-[#f8fafc] border border-slate-300 transition active:scale-90 shrink-0" data-color="#f8fafc" data-name="أبيض ناصع"></button>
+            <!-- Navy -->
+            <button class="color-swatch-btn w-6 h-6 rounded-full bg-[#1e293b] transition active:scale-90 shrink-0" data-color="#1e293b" data-name="كحلي غامق"></button>
+            <!-- Heather Grey -->
+            <button class="color-swatch-btn w-6 h-6 rounded-full bg-[#94a3b8] transition active:scale-90 shrink-0" data-color="#94a3b8" data-name="رمادي مضلع"></button>
+            <!-- Olive Green -->
+            <button class="color-swatch-btn w-6 h-6 rounded-full bg-[#3f4f3c] transition active:scale-90 shrink-0" data-color="#3f4f3c" data-name="زيتي عسكري"></button>
+            <!-- Burgundy -->
+            <button class="color-swatch-btn w-6 h-6 rounded-full bg-[#581c24] transition active:scale-90 shrink-0" data-color="#581c24" data-name="عودي كلاسيك"></button>
+            <!-- Sand Beige -->
+            <button class="color-swatch-btn w-6 h-6 rounded-full bg-[#d7c4a7] transition active:scale-90 shrink-0" data-color="#d7c4a7" data-name="بيج رملي"></button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 4. BOTTOM MOBILE DESIGN DOCK (الأدوات الرئيسية للتصميم) -->
+    <!-- ========================================================================= -->
+    <nav class="h-16 bg-white border-t border-slate-200 px-1.5 flex items-center justify-around shrink-0 z-30 shadow-md">
+      
+      <!-- 1. My Designs Drawer (تصاميمي) -->
+      <button id="dockBtnMyDesigns" class="flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl text-slate-600 hover:text-brand-600 active:scale-95 transition">
+        <div class="relative">
+          <i class="fa-solid fa-folder-heart text-base text-brand-500"></i>
+          <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500"></span>
+        </div>
+        <span class="text-[10px] font-bold">تصاميمي</span>
+      </button>
+
+      <!-- 2. Asset Gallery (الملصقات والرسوم) -->
+      <button id="dockBtnGallery" class="flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl text-slate-600 hover:text-brand-600 active:scale-95 transition">
+        <i class="fa-solid fa-shapes text-base text-amber-500"></i>
+        <span class="text-[10px] font-bold">ملصقات</span>
+      </button>
+
+      <!-- 3. Upload File (رفع صورة) -->
+      <button id="dockBtnUpload" class="flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl text-slate-600 hover:text-brand-600 active:scale-95 transition">
+        <i class="fa-solid fa-cloud-arrow-up text-base text-blue-500"></i>
+        <span class="text-[10px] font-bold">رفع تصميم</span>
+      </button>
+
+      <!-- 4. Text Tool (إضافة نصوص) -->
+      <button id="dockBtnText" class="flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl text-slate-600 hover:text-brand-600 active:scale-95 transition">
+        <i class="fa-solid fa-font text-base text-purple-500"></i>
+        <span class="text-[10px] font-bold">إضافة نص</span>
+      </button>
+
+      <!-- 5. Print Placement Guide (مواضع الطباعة + الوضع الحر) -->
+      <button id="dockBtnPlacement" class="flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl text-slate-600 hover:text-brand-600 active:scale-95 transition">
+        <i class="fa-solid fa-bullseye text-base text-emerald-500"></i>
+        <span class="text-[10px] font-bold">المواضع</span>
+      </button>
+
+      <!-- 6. Multi-Sizes & Quantities (تعدد المقاسات) -->
+      <button id="dockBtnMatrix" class="flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl text-slate-600 hover:text-brand-600 active:scale-95 transition relative">
+        <span id="matrixDockCountBadge" class="absolute -top-1 right-2 bg-brand-500 text-white font-mono text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">1</span>
+        <i class="fa-solid fa-layer-group text-base text-rose-500"></i>
+        <span class="text-[10px] font-bold">المقاسات</span>
+      </button>
+
+    </nav>
+
+    <!-- ========================================================================= -->
+    <!-- 5. STICKY MOBILE CHECKOUT / ORDER BAR -->
+    <!-- ========================================================================= -->
+    <div class="bg-slate-900 text-white px-3.5 py-2.5 flex items-center justify-between shrink-0 z-30 shadow-2xl border-t border-slate-800">
+      
+      <!-- Price & Selection Breakdown -->
+      <div class="flex flex-col cursor-pointer" onclick="openBottomSheet('matrixSheet')">
+        <div class="flex items-baseline gap-1">
+          <span class="text-[11px] text-slate-400">الإجمالي:</span>
+          <span id="bottomBarPrice" class="font-heading font-black text-amber-400 text-lg">₺ 632</span>
+        </div>
+        <div class="flex items-center gap-1.5 text-[10px] text-slate-300">
+          <span id="bottomBarQtyLabel" class="font-medium bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">1 قطعة</span>
+          <span>•</span>
+          <span id="bottomBarColorSizeLabel" class="text-slate-400">XL / أسود</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2">
+        <!-- Add to Cart CTA -->
+        <button id="mobileAddToCartBtn" class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-orange-500 hover:from-brand-700 hover:to-orange-600 text-white font-heading font-bold text-xs shadow-md shadow-brand-500/30 active:scale-95 transition">
+          <i class="fa-solid fa-bag-shopping"></i>
+          <span>أضف للسلة</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 6. BOTTOM SHEETS & MODALS (POP-UPS) -->
+    <!-- ========================================================================= -->
+
+    <!-- BACKDROP FOR ALL SHEETS -->
+    <div id="sheetsBackdrop" class="sheet-backdrop hidden-backdrop fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40" onclick="closeAllBottomSheets()"></div>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- SHEET A: تحديد مقاسات وكميات متعددة (Multi-Size & Quantity Matrix) -->
+    <!-- --------------------------------------------------------------------- -->
+    <div id="matrixSheet" class="bottom-sheet closed absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-sheet z-50 flex flex-col max-h-[88%] border-t border-slate-200">
+      
+      <!-- Drag Handle -->
+      <div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-2.5 shrink-0"></div>
+
+      <!-- Sheet Header -->
+      <div class="px-4 pb-3 border-b border-slate-100 flex items-start justify-between">
+        <div class="flex items-start gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-orange-100 text-brand-600 flex items-center justify-center text-base shrink-0 mt-0.5">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div>
+            <h3 class="font-heading font-bold text-slate-900 text-sm">تحديد مقاسات وكميات متعددة</h3>
+            <p class="text-[11px] text-slate-500 mt-0.5 leading-tight">اطلب من نفس تصميمك بمقاسات وألوان وكميات مختلفة بسهولة</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="resetMatrixQtyBtn" class="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg font-medium transition" title="تصفير العداد">
+            <i class="fa-solid fa-rotate-right text-[10px]"></i>
+            <span>تصفير</span>
+          </button>
+          <button onclick="closeBottomSheet('matrixSheet')" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center">
+            <i class="fa-solid fa-xmark text-xs"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Current Selected Color Indicator -->
+      <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-3.5 h-3.5 rounded-full bg-slate-900 ring-2 ring-slate-300"></span>
+          <span class="font-bold text-slate-800">اللون المحدد: <span id="matrixActiveColor">أسود</span></span>
+        </div>
+        <span id="matrixColorPiecesBadge" class="text-[11px] font-semibold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">1 قطع</span>
+      </div>
+
+      <!-- Sizes Steppers Grid (Matches Screenshot 1 Exactly) -->
+      <div class="p-4 overflow-y-auto space-y-3 flex-1">
+        
+        <!-- S Card -->
+        <div class="size-card flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition" data-size="S">
+          <div>
+            <span class="text-sm font-bold text-slate-900 font-mono">S</span>
+            <span class="text-[10px] text-emerald-600 font-bold block bg-emerald-50 px-2 py-0.5 rounded-full mt-1 border border-emerald-100">10 متوفر</span>
+          </div>
+          <!-- Stepper -->
+          <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <button class="qty-btn-minus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">-</button>
+            <span class="qty-val font-mono font-bold text-sm w-10 text-center text-slate-800">0</span>
+            <button class="qty-btn-plus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">+</button>
+          </div>
+        </div>
+
+        <!-- M Card -->
+        <div class="size-card flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition" data-size="M">
+          <div>
+            <span class="text-sm font-bold text-slate-900 font-mono">M</span>
+            <span class="text-[10px] text-emerald-600 font-bold block bg-emerald-50 px-2 py-0.5 rounded-full mt-1 border border-emerald-100">10 متوفر</span>
+          </div>
+          <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <button class="qty-btn-minus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">-</button>
+            <span class="qty-val font-mono font-bold text-sm w-10 text-center text-slate-800">0</span>
+            <button class="qty-btn-plus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">+</button>
+          </div>
+        </div>
+
+        <!-- L Card -->
+        <div class="size-card flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition" data-size="L">
+          <div>
+            <span class="text-sm font-bold text-slate-900 font-mono">L</span>
+            <span class="text-[10px] text-emerald-600 font-bold block bg-emerald-50 px-2 py-0.5 rounded-full mt-1 border border-emerald-100">10 متوفر</span>
+          </div>
+          <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <button class="qty-btn-minus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">-</button>
+            <span class="qty-val font-mono font-bold text-sm w-10 text-center text-slate-800">0</span>
+            <button class="qty-btn-plus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">+</button>
+          </div>
+        </div>
+
+        <!-- XL Card (Active as 1) -->
+        <div class="size-card flex items-center justify-between p-3 rounded-2xl border-2 border-brand-500 bg-brand-50/20 shadow-xs transition" data-size="XL">
+          <div>
+            <span class="text-sm font-bold text-slate-900 font-mono">XL</span>
+            <span class="text-[10px] text-emerald-600 font-bold block bg-emerald-50 px-2 py-0.5 rounded-full mt-1 border border-emerald-100">10 متوفر</span>
+          </div>
+          <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <button class="qty-btn-minus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">-</button>
+            <span class="qty-val font-mono font-bold text-sm w-10 text-center text-slate-900">1</span>
+            <button class="qty-btn-plus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">+</button>
+          </div>
+        </div>
+
+        <!-- 2XL Card -->
+        <div class="size-card flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition" data-size="2XL">
+          <div>
+            <span class="text-sm font-bold text-slate-900 font-mono">2XL</span>
+            <span class="text-[10px] text-emerald-600 font-bold block bg-emerald-50 px-2 py-0.5 rounded-full mt-1 border border-emerald-100">8 متوفر</span>
+          </div>
+          <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <button class="qty-btn-minus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">-</button>
+            <span class="qty-val font-mono font-bold text-sm w-10 text-center text-slate-800">0</span>
+            <button class="qty-btn-plus w-8 h-8 rounded-lg bg-white text-slate-700 flex items-center justify-center shadow-xs active:scale-90 font-bold text-sm">+</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Sheet Footer: Totals and CTAs -->
+      <div class="p-4 bg-slate-50 border-t border-slate-200 shrink-0 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500">إجمالي القطع:</span>
+            <span id="matrixTotalPiecesText" class="font-bold text-slate-900 text-sm font-mono">1 قطع</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500">المبلغ الإجمالي:</span>
+            <span id="matrixTotalPriceText" class="font-heading font-black text-brand-600 text-lg">₺ 632</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="closeBottomSheet('matrixSheet')" class="py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 font-heading font-bold text-xs hover:bg-slate-50 transition active:scale-95">
+            تطبيق التحديد
+          </button>
+          <button onclick="closeBottomSheet('matrixSheet'); alert('تمت إضافة جميع المقاسات والكميات المحددة إلى سلة الشراء بنجاح!');" class="py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-orange-500 text-white font-heading font-bold text-xs shadow-md shadow-brand-500/20 active:scale-95 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-cart-arrow-down"></i>
+            <span>إضافة الكل للسلة</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- SHEET B: نافذة تصاميمي (My Designs Mobile Sheet) -->
+    <!-- --------------------------------------------------------------------- -->
+    <div id="myDesignsSheet" class="bottom-sheet closed absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-sheet z-50 flex flex-col max-h-[82%] border-t border-slate-200">
+      
+      <!-- Drag Handle -->
+      <div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-2.5 shrink-0"></div>
+
+      <!-- Sheet Header (Matches Screenshot 4) -->
+      <div class="px-4 pb-3 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-folder-heart"></i>
+          </div>
+          <h3 class="font-heading font-bold text-slate-900 text-sm">تصاميمي المحفوظة</h3>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Eye Visibility Toggle -->
+          <button id="toggleArtworkEyeBtn" class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-slate-200 transition" title="إظهار / إخفاء التصميم من الكانفاس">
+            <i id="artworkEyeIcon" class="fa-regular fa-eye text-xs text-brand-600"></i>
+            <span id="artworkEyeText">مرئي</span>
+          </button>
+          <button onclick="closeBottomSheet('myDesignsSheet')" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center">
+            <i class="fa-solid fa-xmark text-xs"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Big Upload CTA Button -->
+      <div class="p-4 pb-2">
+        <button class="w-full py-2.5 px-4 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-heading font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition">
+          <i class="fa-solid fa-plus text-sm"></i>
+          <span>ارفع تصميمك الجديد</span>
+        </button>
+      </div>
+
+      <!-- Tabs: رفوعاتي (0) vs المكتبة (2) -->
+      <div class="px-4 pt-1 pb-3">
+        <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs font-medium">
+          <button class="py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-arrow-up-from-bracket text-[10px]"></i>
+            <span>رفوعاتي (0)</span>
+          </button>
+          <button class="py-1.5 rounded-lg bg-white text-slate-900 font-bold shadow-xs flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-brand-600"></i>
+            <span>المكتبة (2)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Designs Grid -->
+      <div class="p-4 pt-0 overflow-y-auto grid grid-cols-2 gap-3 flex-1">
+        
+        <!-- Artwork 1 -->
+        <div onclick="selectMobileArtwork('https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300&auto=format&fit=crop&q=80', 'شخصية السايبر بانك')" class="border-2 border-brand-500 rounded-2xl p-2 bg-slate-50 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition relative">
+          <span class="absolute top-2 right-2 w-4 h-4 rounded-full bg-brand-500 text-white flex items-center justify-center text-[9px]">
+            <i class="fa-solid fa-check"></i>
+          </span>
+          <img src="https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300&auto=format&fit=crop&q=80" class="h-28 object-contain rounded-lg"/>
+          <span class="text-[10px] font-bold text-slate-700 mt-2">شخصية السايبر بانك</span>
+        </div>
+
+        <!-- Artwork 2 -->
+        <div onclick="selectMobileArtwork('https://images.unsplash.com/photo-1518717758536-85ae29035b6d?w=300&auto=format&fit=crop&q=80', 'Make Me Happy Dogs')" class="border border-slate-200 rounded-2xl p-2 bg-slate-50 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition">
+          <img src="https://images.unsplash.com/photo-1518717758536-85ae29035b6d?w=300&auto=format&fit=crop&q=80" class="h-28 object-contain rounded-lg"/>
+          <span class="text-[10px] font-bold text-slate-700 mt-2">Make Me Happy</span>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- SHEET C: دليل مواضع الطباعة والتصميم (Print Placement Guide) -->
+    <!-- --------------------------------------------------------------------- -->
+    <div id="placementGuideSheet" class="bottom-sheet closed absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-sheet z-50 flex flex-col max-h-[88%] border-t border-slate-200">
+      
+      <!-- Drag Handle -->
+      <div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-2.5 shrink-0"></div>
+
+      <!-- Sheet Header (Matches Screenshot 3) -->
+      <div class="px-4 pb-3 border-b border-slate-100 flex items-start justify-between">
+        <div class="flex items-start gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shrink-0 mt-0.5">
+            <i class="fa-solid fa-shirt"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h3 class="font-heading font-bold text-slate-900 text-sm">دليل مواضع الطباعة والتصميم</h3>
+              <span class="text-[9px] font-extrabold bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-mono">DTF</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">المواضع القياسية المعتمدة أو وضع التصميم الحر</p>
+          </div>
+        </div>
+        <button onclick="closeBottomSheet('placementGuideSheet')" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+
+      <!-- Standard vs Free Mode Segmented Tabs -->
+      <div class="p-3 bg-slate-50 border-b border-slate-100">
+        <div class="grid grid-cols-2 p-1 bg-slate-200/80 rounded-2xl text-xs font-bold gap-1">
+          <button id="guideTabStandardBtn" class="py-2 rounded-xl bg-white text-slate-900 shadow-xs flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-shirt text-brand-600 text-xs"></i>
+            <span>المواضع المعتمدة عالمياً</span>
+          </button>
+          <button id="guideTabFreeBtn" class="py-2 rounded-xl text-amber-800 hover:bg-white/60 flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-bolt text-amber-500 text-xs"></i>
+            <span>الوضع الحر ⚡</span>
+          </button>
+        </div>
+
+        <!-- Color specific switch notice -->
+        <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-600 px-1">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-900 inline-block"></span>
+            <span>مواضع خاصة باللون الحالي: <b>أسود</b></span>
+          </div>
+          <button class="text-brand-600 font-bold hover:underline flex items-center gap-1">
+            <i class="fa-regular fa-copy text-[10px]"></i>
+            <span>نسخ للكل</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Category Chips -->
+      <div class="px-4 py-2 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs">
+        <button class="px-3 py-1 rounded-full bg-amber-500 text-white font-bold shrink-0">الكل (2)</button>
+        <button class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-medium shrink-0">الصدر (الأمام) (1)</button>
+        <button class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-medium shrink-0">الظهر (الخلف) (1)</button>
+        <button class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-medium shrink-0">الأكمام</button>
+      </div>
+
+      <!-- Placements Cards List -->
+      <div class="p-4 overflow-y-auto space-y-3 flex-1">
+        
+        <!-- Placement 1: Pocket Logo (Active) -->
+        <div onclick="selectPlacementPreset('شعار الصدر الأيسر (10×10 cm)', '10 × 10 cm', 140, 140, 110, 85)" class="placement-card relative p-3 rounded-2xl border-2 border-amber-500 bg-amber-50/20 flex items-center justify-between cursor-pointer active:scale-98 transition">
+          <div class="flex items-start gap-3">
+            <!-- Miniature Graphic -->
+            <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 relative overflow-hidden">
+              <div class="w-4 h-4 bg-amber-400/90 rounded-xs absolute top-2 right-2"></div>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-900 text-xs">شعار الصدر الأيسر</span>
+                <span class="font-mono text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold">10×10 cm</span>
+              </div>
+              <p class="text-[10px] text-blue-600 font-semibold mt-0.5 flex items-center gap-1">
+                <i class="fa-solid fa-tag text-[8px]"></i>
+                <span>نزولاً 8 سم من الياقة • الواجهة الأمامية</span>
+              </p>
+              <p class="text-[10px] text-slate-400 mt-0.5">يبدأ من 7 إلى 9 سم أسفل طوق الرقبة بمحاذاة فتحة العنق اليسرى</p>
+            </div>
+          </div>
+          <!-- Checkmark -->
+          <div class="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs shrink-0">
+            <i class="fa-solid fa-check"></i>
+          </div>
+        </div>
+
+        <!-- Placement 2: Center Chest -->
+        <div onclick="selectPlacementPreset('وسط الصدر (24×16 cm)', '24 × 16 cm', 200, 130, 120, 150)" class="placement-card relative p-3 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 flex items-center justify-between cursor-pointer active:scale-98 transition">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 relative overflow-hidden">
+              <div class="w-6 h-4 bg-blue-400/80 rounded-xs absolute top-3 mx-auto"></div>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-900 text-xs">وسط الصدر</span>
+                <span class="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-bold">24×16 cm</span>
+              </div>
+              <p class="text-[10px] text-blue-600 font-semibold mt-0.5 flex items-center gap-1">
+                <i class="fa-solid fa-tag text-[8px]"></i>
+                <span>نزولاً 8 سم من الياقة • الواجهة الأمامية</span>
+              </p>
+              <p class="text-[10px] text-slate-400 mt-0.5">شعار أو عبارة ممركزة في وسط الصدر أسفل الياقة بـ 8 سم</p>
+            </div>
+          </div>
+          <div class="w-5 h-5 rounded-full border border-slate-300 shrink-0"></div>
+        </div>
+
+        <!-- Placement 3: Full Front Chest -->
+        <div onclick="selectPlacementPreset('الصدر بالكامل (30×40 cm)', '30 × 40 cm', 230, 260, 100, 135)" class="placement-card relative p-3 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 flex items-center justify-between cursor-pointer active:scale-98 transition">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 relative overflow-hidden">
+              <div class="w-7 h-9 bg-blue-400/80 rounded-xs absolute top-2 mx-auto"></div>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-900 text-xs">الصدر بالكامل</span>
+                <span class="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-bold">30×40 cm</span>
+              </div>
+              <p class="text-[10px] text-blue-600 font-semibold mt-0.5 flex items-center gap-1">
+                <i class="fa-solid fa-tag text-[8px]"></i>
+                <span>نزولاً 6.5 سم من الياقة • الواجهة الأمامية</span>
+              </p>
+              <p class="text-[10px] text-slate-400 mt-0.5">تصميم عريض يغطي الصدر بالكامل ويبدأ 5 إلى 7.5 سم أسفل الياقة</p>
+            </div>
+          </div>
+          <div class="w-5 h-5 rounded-full border border-slate-300 shrink-0"></div>
+        </div>
+
+      </div>
+
+      <!-- Sheet Footer -->
+      <div class="p-4 bg-slate-50 border-t border-slate-200 shrink-0 flex items-center justify-between">
+        <span class="text-xs text-slate-600">تم اختيار <b class="text-slate-900">(2) مواضع</b></span>
+        <button onclick="closeBottomSheet('placementGuideSheet')" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-heading font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-check"></i>
+          <span>تأكيد المواضع</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- SHEET D: نافذة التحذير الخاصة بـ "الوضع الحر" (Free Placement Warning) -->
+    <!-- --------------------------------------------------------------------- -->
+    <div id="freeModeWarningModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs hidden">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+        
+        <!-- Warning Icon -->
+        <div class="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl mx-auto shadow-inner">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+
+        <!-- Warning Title & Body -->
+        <div class="text-center space-y-1.5">
+          <h4 class="font-heading font-black text-slate-900 text-base">تنبيه هام: نمط الموضع الحر ⚡</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            عند تفعيل <b>الوضع الحر</b>، يمكنك تحريك وتكبير وتدوير التصميم في أي مكان تريده على التيشيرت، ولكن يرجى الانتباه:
+          </p>
+        </div>
+
+        <!-- Warning Points -->
+        <div class="p-3 bg-amber-50/80 border border-amber-200 rounded-2xl text-[11px] text-amber-900 space-y-2">
+          <div class="flex items-start gap-2">
+            <i class="fa-solid fa-circle-exclamation text-amber-600 text-xs mt-0.5"></i>
+            <span>تجنب وضع التصميم فوق خياطة الرقبة أو الأكمام لضمان التصاق الطباعة الحرارية DTF.</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <i class="fa-solid fa-circle-exclamation text-amber-600 text-xs mt-0.5"></i>
+            <span>المواضع المعتمدة عالمياً تضمن لك الشكل الأكثر تناسقاً للملابس الفاخرة.</span>
+          </div>
+        </div>
+
+        <!-- Terms Agreement Checkbox -->
+        <label class="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer p-1">
+          <input type="checkbox" id="agreeFreeModeCheckbox" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300"/>
+          <span class="font-medium">أوافق على تخصيص الموضع بحرية وأتحمل النتيجة.</span>
+        </label>
+
+        <!-- CTAs -->
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button onclick="closeFreeModeWarning()" class="py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-50 transition active:scale-95">
+            إلغاء والعودة
+          </button>
+          <button onclick="confirmFreeModeActivation()" class="py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition active:scale-95">
+            تأكيد الوضع الحر
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- SHEET E: معرض التصاميم والملصقات (Asset Gallery Mobile Sheet) -->
+    <!-- --------------------------------------------------------------------- -->
+    <div id="gallerySheet" class="bottom-sheet closed absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-sheet z-50 flex flex-col max-h-[88%] border-t border-slate-200">
+      
+      <!-- Drag Handle -->
+      <div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-2.5 shrink-0"></div>
+
+      <!-- Sheet Header (Matches Screenshot 2) -->
+      <div class="px-4 pb-3 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-orange-100 text-brand-600 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-shapes"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h3 class="font-heading font-bold text-slate-900 text-sm">معرض التصاميم والملصقات</h3>
+              <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.2 rounded-full font-mono font-medium">22</span>
+            </div>
+            <p class="text-[10px] text-slate-500">اختر من تشكيلتنا المميزة وأضفها إلى مساحة التصميم بنقرة واحدة</p>
+          </div>
+        </div>
+        <button onclick="closeBottomSheet('gallerySheet')" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+
+      <!-- Search Input -->
+      <div class="p-3 border-b border-slate-100">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input class="w-full text-xs pr-9 pl-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition outline-none" placeholder="بحث في التصاميم والملصقات أو الأقسام..." type="text"/>
+        </div>
+      </div>
+
+      <!-- Category Filter Pills (Matches Screenshot 2 with Badges) -->
+      <div class="px-3 py-2 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs">
+        <button class="px-3 py-1 rounded-full bg-brand-500 text-white font-bold shrink-0 flex items-center gap-1.5">
+          <span>جميع الأقسام</span>
+          <span class="bg-white/30 text-white text-[10px] px-1.5 rounded-full font-mono">22</span>
+        </button>
+        <button class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium shrink-0 flex items-center gap-1.5">
+          <span>تصاميم عربية</span>
+          <span class="bg-slate-200 text-slate-700 text-[10px] px-1.5 rounded-full font-mono">5</span>
+        </button>
+        <button class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium shrink-0 flex items-center gap-1.5">
+          <span>خطوط وعبارات</span>
+          <span class="bg-slate-200 text-slate-700 text-[10px] px-1.5 rounded-full font-mono">3</span>
+        </button>
+        <button class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium shrink-0 flex items-center gap-1.5">
+          <span>رياضة</span>
+          <span class="bg-slate-200 text-slate-700 text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+        <button class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium shrink-0 flex items-center gap-1.5">
+          <span>حيوانات</span>
+          <span class="bg-slate-200 text-slate-700 text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+        <button class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium shrink-0 flex items-center gap-1.5">
+          <span>مضحك</span>
+          <span class="bg-slate-200 text-slate-700 text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+      </div>
+
+      <!-- Stickers Touch Grid (3 columns on mobile) -->
+      <div class="p-3 overflow-y-auto grid grid-cols-3 gap-2 flex-1">
+        
+        <!-- Sticker 1 -->
+        <div onclick="selectMobileArtwork('https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300&auto=format&fit=crop&q=80', 'سايبر بانك')" class="relative p-2 bg-slate-50 border border-slate-200 rounded-xl aspect-square flex items-center justify-center cursor-pointer active:scale-95 transition">
+          <span class="absolute top-1 left-1 bg-emerald-100 text-emerald-800 text-[8px] font-bold px-1 rounded">مجاني</span>
+          <img src="https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=200&auto=format&fit=crop&q=80" class="w-full h-full object-contain"/>
+        </div>
+
+        <!-- Sticker 2 -->
+        <div onclick="selectMobileArtwork('https://images.unsplash.com/photo-1518717758536-85ae29035b6d?w=300&auto=format&fit=crop&q=80', 'قلب Make Me Happy')" class="relative p-2 bg-slate-50 border border-slate-200 rounded-xl aspect-square flex items-center justify-center cursor-pointer active:scale-95 transition">
+          <span class="absolute top-1 left-1 bg-emerald-100 text-emerald-800 text-[8px] font-bold px-1 rounded">مجاني</span>
+          <span class="absolute top-1 right-1 bg-purple-100 text-purple-800 text-[8px] font-bold px-1 rounded font-mono">SVG</span>
+          <img src="https://images.unsplash.com/photo-1518717758536-85ae29035b6d?w=200&auto=format&fit=crop&q=80" class="w-full h-full object-contain"/>
+        </div>
+
+        <!-- Sticker 3 -->
+        <div onclick="selectMobileArtwork('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80', 'تجريدي ملون')" class="relative p-2 bg-slate-50 border border-slate-200 rounded-xl aspect-square flex items-center justify-center cursor-pointer active:scale-95 transition">
+          <span class="absolute top-1 left-1 bg-emerald-100 text-emerald-800 text-[8px] font-bold px-1 rounded">مجاني</span>
+          <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80" class="w-full h-full object-contain"/>
+        </div>
+
+        <!-- Sticker 4 -->
+        <div onclick="selectMobileArtwork('https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=300&auto=format&fit=crop&q=80', 'تصميم فن حديث')" class="relative p-2 bg-slate-50 border border-slate-200 rounded-xl aspect-square flex items-center justify-center cursor-pointer active:scale-95 transition">
+          <span class="absolute top-1 left-1 bg-emerald-100 text-emerald-800 text-[8px] font-bold px-1 rounded">مجاني</span>
+          <span class="absolute top-1 right-1 bg-purple-100 text-purple-800 text-[8px] font-bold px-1 rounded font-mono">SVG</span>
+          <img src="https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=200&auto=format&fit=crop&q=80" class="w-full h-full object-contain"/>
+        </div>
+
+        <!-- Sticker 5 -->
+        <div onclick="selectMobileArtwork('https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=300&auto=format&fit=crop&q=80', 'ألوان مائية')" class="relative p-2 bg-slate-50 border border-slate-200 rounded-xl aspect-square flex items-center justify-center cursor-pointer active:scale-95 transition">
+          <span class="absolute top-1 left-1 bg-emerald-100 text-emerald-800 text-[8px] font-bold px-1 rounded">مجاني</span>
+          <img src="https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=200&auto=format&fit=crop&q=80" class="w-full h-full object-contain"/>
+        </div>
+
+        <!-- Sticker 6 -->
+        <div onclick="selectMobileArtwork('https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=300&auto=format&fit=crop&q=80', 'نيون فوتوريست')" class="relative p-2 bg-slate-50 border border-slate-200 rounded-xl aspect-square flex items-center justify-center cursor-pointer active:scale-95 transition">
+          <span class="absolute top-1 left-1 bg-emerald-100 text-emerald-800 text-[8px] font-bold px-1 rounded">مجاني</span>
+          <img src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=200&auto=format&fit=crop&q=80" class="w-full h-full object-contain"/>
+        </div>
+
+      </div>
+
+      <!-- Sheet Footer -->
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+        <span class="text-slate-500 text-[11px]">انقر على أي عنصر لإدراجه فوراً</span>
+        <button onclick="closeBottomSheet('gallerySheet')" class="px-4 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold transition">
+          إغلاق
+        </button>
+      </div>
+
+    </div>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- MODAL F: معاينة ثلاثية الأبعاد 3D للموبايل (3D Preview Modal) -->
+    <!-- --------------------------------------------------------------------- -->
+    <div id="preview3DModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden">
+      <div class="bg-charcoal-900 rounded-3xl max-w-sm w-full p-5 text-white border border-slate-800 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+        
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-cube text-brand-500 text-base"></i>
+            <h4 class="font-heading font-bold text-sm">المعاينة الواقعية 3D (الجوال)</h4>
+          </div>
+          <button onclick="document.getElementById('preview3DModal').classList.add('hidden')" class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+            <i class="fa-solid fa-xmark text-xs"></i>
+          </button>
+        </div>
+
+        <!-- 3D Simulator Window -->
+        <div class="relative w-full h-64 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden">
+          <div class="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
+          
+          <img id="modal3DMockupImg" src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80" class="h-56 object-contain filter drop-shadow-2xl animate-pulse"/>
+
+          <!-- 360 Spin indicator -->
+          <div class="absolute bottom-3 inset-x-0 flex items-center justify-center">
+            <span class="bg-slate-900/90 border border-slate-700 px-3 py-1 rounded-full text-[10px] text-amber-400 font-semibold flex items-center gap-1.5">
+              <i class="fa-solid fa-arrows-spin text-xs"></i>
+              <span>اسحب للتدوير 360 درجة</span>
+            </span>
+          </div>
+        </div>
+
+        <button onclick="document.getElementById('preview3DModal').classList.add('hidden')" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-orange-500 text-white font-heading font-bold text-xs shadow-md">
+          العودة لاستكمال التصميم
+        </button>
+
+      </div>
+    </div>
+
+  </div>
+  <!-- END: MOBILE APPLICATION WRAPPER -->
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT LOGIC FOR MOBILE PROTOTYPE -->
+  <!-- ========================================================================= -->
+  <script>
+    // --- 1. Typewriter Animated Hint Logic ---
+    const typewriterPhrases = [
+      "⚡ إرشاد ذكي: انقر واسحب الشعار بحرية لتغيير موضعه على التيشيرت.",
+      "💡 فكرة: يمكنك تغيير لون القماش فوراً بالضغط على أي عينة لونية في الأسفل.",
+      "👕 مواصفات: تيشيرت أوفر سايز فاخر 100% قطن تركي ممشط 240gsm بطباعة DTF.",
+      "✨ خيارات: يمكنك طلب مقاسات وألوان متعددة لنفس تصميمك بنقرة واحدة."
+    ];
+    let phraseIndex = 0;
+    let charIndex = 0;
+    let isDeleting = false;
+    const typewriterElement = document.getElementById('typewriterText');
+
+    function runTypewriter() {
+      const currentPhrase = typewriterPhrases[phraseIndex];
+      if (isDeleting) {
+        typewriterElement.textContent = currentPhrase.substring(0, charIndex - 1);
+        charIndex--;
+      } else {
+        typewriterElement.textContent = currentPhrase.substring(0, charIndex + 1);
+        charIndex++;
+      }
+
+      let speed = isDeleting ? 30 : 60;
+      if (!isDeleting && charIndex === currentPhrase.length) {
+        speed = 2800; // Pause at end of sentence
+        isDeleting = true;
+      } else if (isDeleting && charIndex === 0) {
+        isDeleting = false;
+        phraseIndex = (phraseIndex + 1) % typewriterPhrases.length;
+        speed = 400;
+      }
+      setTimeout(runTypewriter, speed);
+    }
+    runTypewriter();
+
+    // --- 2. Bottom Sheets Management ---
+    function openBottomSheet(sheetId) {
+      closeAllBottomSheets();
+      const sheet = document.getElementById(sheetId);
+      const backdrop = document.getElementById('sheetsBackdrop');
+      if (sheet && backdrop) {
+        backdrop.classList.remove('hidden-backdrop');
+        sheet.classList.remove('closed');
+      }
+    }
+
+    function closeBottomSheet(sheetId) {
+      const sheet = document.getElementById(sheetId);
+      const backdrop = document.getElementById('sheetsBackdrop');
+      if (sheet) {
+        sheet.classList.add('closed');
+      }
+      // Check if any other sheet is open
+      const openSheets = document.querySelectorAll('.bottom-sheet:not(.closed)');
+      if (openSheets.length === 0 && backdrop) {
+        backdrop.classList.add('hidden-backdrop');
+      }
+    }
+
+    function closeAllBottomSheets() {
+      document.querySelectorAll('.bottom-sheet').forEach(sheet => {
+        sheet.classList.add('closed');
+      });
+      const backdrop = document.getElementById('sheetsBackdrop');
+      if (backdrop) backdrop.classList.add('hidden-backdrop');
+    }
+
+    // Connect Bottom Dock Buttons to Sheets
+    document.getElementById('dockBtnMatrix').addEventListener('click', () => openBottomSheet('matrixSheet'));
+    document.getElementById('dockBtnMyDesigns').addEventListener('click', () => openBottomSheet('myDesignsSheet'));
+    document.getElementById('dockBtnPlacement').addEventListener('click', () => openBottomSheet('placementGuideSheet'));
+    document.getElementById('dockBtnGallery').addEventListener('click', () => openBottomSheet('gallerySheet'));
+    document.getElementById('openPlacementGuideChip').addEventListener('click', () => openBottomSheet('placementGuideSheet'));
+    
+    // Quick Upload button in dock
+    document.getElementById('dockBtnUpload').addEventListener('click', () => {
+      openBottomSheet('myDesignsSheet');
+    });
+
+    // Text tool mock
+    document.getElementById('dockBtnText').addEventListener('click', () => {
+      const userText = prompt("أدخل النص الذي ترغب في طباعته على التيشيرت:", "KENDITASARL PRO");
+      if (userText) {
+        alert(`تم إدراج النص: "${userText}" بخط عربي فاخر في منتصف الكانفاس!`);
+      }
+    });
+
+    // 3D Preview Modal triggers
+    document.getElementById('open3DModalBtn').addEventListener('click', () => {
+      document.getElementById('preview3DModal').classList.remove('hidden');
+    });
+
+    // --- 3. Smart Color Switching ---
+    const swatches = document.querySelectorAll('.color-swatch-btn');
+    const garmentBodyPath = document.getElementById('garmentBodyPath');
+    const activeColorNameText = document.getElementById('activeColorNameText');
+    const matrixActiveColor = document.getElementById('matrixActiveColor');
+
+    swatches.forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Remove active ring from all
+        swatches.forEach(s => s.classList.remove('ring-2', 'ring-brand-500', 'ring-offset-2'));
+        // Add active ring
+        btn.classList.add('ring-2', 'ring-brand-500', 'ring-offset-2');
+        
+        const hexColor = btn.getAttribute('data-color');
+        const colorName = btn.getAttribute('data-name');
+        
+        // Update SVG T-shirt color smoothly
+        garmentBodyPath.setAttribute('fill', hexColor);
+        if (hexColor === '#f8fafc') {
+          garmentBodyPath.setAttribute('stroke', '#cbd5e1');
+        } else {
+          garmentBodyPath.setAttribute('stroke', '#334155');
+        }
+
+        // Update labels
+        activeColorNameText.textContent = colorName;
+        matrixActiveColor.textContent = colorName;
+        document.getElementById('bottomBarColorSizeLabel').textContent = `XL / ${colorName}`;
+      });
+    });
+
+    // --- 4. Face Switching (الصدر، الظهر، الأكمام) ---
+    const faceButtons = {
+      front: document.getElementById('faceBtnFront'),
+      back: document.getElementById('faceBtnBack'),
+      sleeveR: document.getElementById('faceBtnSleeveR'),
+      sleeveL: document.getElementById('faceBtnSleeveL')
+    };
+
+    function resetFaceButtons() {
+      Object.values(faceButtons).forEach(btn => {
+        btn.className = "face-pill px-2.5 py-1 rounded-xl text-slate-600 hover:bg-slate-100 font-medium text-[11px] transition flex items-center gap-1 active:scale-95";
+      });
+    }
+
+    faceButtons.front.addEventListener('click', () => {
+      resetFaceButtons();
+      faceButtons.front.className = "face-pill px-3 py-1 rounded-xl bg-slate-900 text-white font-bold text-[11px] transition shadow-xs flex items-center gap-1 active:scale-95";
+      document.getElementById('printAreaBox').style.width = '140px';
+      document.getElementById('printAreaBox').style.height = '140px';
+      document.getElementById('printAreaBox').style.top = '110px';
+      document.getElementById('printAreaBox').style.right = '85px';
+      document.getElementById('printAreaBox').style.left = 'auto';
+      document.getElementById('printZoneDimLabel').textContent = '10 × 10 cm';
+    });
+
+    faceButtons.back.addEventListener('click', () => {
+      resetFaceButtons();
+      faceButtons.back.className = "face-pill px-3 py-1 rounded-xl bg-slate-900 text-white font-bold text-[11px] transition shadow-xs flex items-center gap-1 active:scale-95";
+      document.getElementById('printAreaBox').style.width = '170px';
+      document.getElementById('printAreaBox').style.height = '230px';
+      document.getElementById('printAreaBox').style.top = '90px';
+      document.getElementById('printAreaBox').style.right = 'auto';
+      document.getElementById('printAreaBox').style.left = '75px';
+      document.getElementById('printZoneDimLabel').textContent = '30 × 40 cm (A3)';
+    });
+
+    faceButtons.sleeveR.addEventListener('click', () => {
+      resetFaceButtons();
+      faceButtons.sleeveR.className = "face-pill px-2.5 py-1 rounded-xl bg-slate-900 text-white font-bold text-[11px] transition shadow-xs flex items-center gap-1 active:scale-95";
+      document.getElementById('printAreaBox').style.width = '65px';
+      document.getElementById('printAreaBox').style.height = '65px';
+      document.getElementById('printAreaBox').style.top = '115px';
+      document.getElementById('printAreaBox').style.right = '25px';
+      document.getElementById('printAreaBox').style.left = 'auto';
+      document.getElementById('printZoneDimLabel').textContent = '8 × 8 cm (الكم)';
+    });
+
+    faceButtons.sleeveL.addEventListener('click', () => {
+      resetFaceButtons();
+      faceButtons.sleeveL.className = "face-pill px-2.5 py-1 rounded-xl bg-slate-900 text-white font-bold text-[11px] transition shadow-xs flex items-center gap-1 active:scale-95";
+      document.getElementById('printAreaBox').style.width = '65px';
+      document.getElementById('printAreaBox').style.height = '65px';
+      document.getElementById('printAreaBox').style.top = '115px';
+      document.getElementById('printAreaBox').style.left = '25px';
+      document.getElementById('printAreaBox').style.right = 'auto';
+      document.getElementById('printZoneDimLabel').textContent = '8 × 8 cm (الكم)';
+    });
+
+    // --- 5. Multi-Size & Quantity Matrix Logic ---
+    const sizeCards = document.querySelectorAll('.size-card');
+    const basePricePerItem = 632;
+
+    function recalculateMatrix() {
+      let totalQty = 0;
+      sizeCards.forEach(card => {
+        const qtyVal = parseInt(card.querySelector('.qty-val').textContent, 10);
+        totalQty += qtyVal;
+        
+        // Highlight active size cards
+        if (qtyVal > 0) {
+          card.classList.add('border-2', 'border-brand-500', 'bg-brand-50/20');
+          card.classList.remove('border-slate-200', 'bg-white');
+        } else {
+          card.classList.remove('border-2', 'border-brand-500', 'bg-brand-50/20');
+          card.classList.add('border', 'border-slate-200', 'bg-white');
+        }
+      });
+
+      // Avoid zero items fallback
+      const effectiveQty = totalQty === 0 ? 0 : totalQty;
+      const totalPrice = effectiveQty * basePricePerItem;
+
+      // Update Matrix UI
+      document.getElementById('matrixTotalPiecesText').textContent = `${effectiveQty} قطع`;
+      document.getElementById('matrixTotalPriceText').textContent = `₺ ${totalPrice.toLocaleString()}`;
+      document.getElementById('matrixColorPiecesBadge').textContent = `${effectiveQty} قطع`;
+      document.getElementById('matrixDockCountBadge').textContent = effectiveQty;
+
+      // Update Sticky Bottom Bar
+      document.getElementById('bottomBarPrice').textContent = `₺ ${totalPrice.toLocaleString()}`;
+      document.getElementById('bottomBarQtyLabel').textContent = `${effectiveQty} قطعة`;
+    }
+
+    sizeCards.forEach(card => {
+      const plusBtn = card.querySelector('.qty-btn-plus');
+      const minusBtn = card.querySelector('.qty-btn-minus');
+      const qtyText = card.querySelector('.qty-val');
+
+      plusBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        let current = parseInt(qtyText.textContent, 10);
+        qtyText.textContent = current + 1;
+        recalculateMatrix();
+      });
+
+      minusBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        let current = parseInt(qtyText.textContent, 10);
+        if (current > 0) {
+          qtyText.textContent = current - 1;
+          recalculateMatrix();
+        }
+      });
+    });
+
+    document.getElementById('resetMatrixQtyBtn').addEventListener('click', () => {
+      sizeCards.forEach(card => {
+        card.querySelector('.qty-val').textContent = '0';
+      });
+      recalculateMatrix();
+    });
+
+    // --- 6. "تصاميمي" Eye Visibility Toggle ---
+    let isArtworkVisible = true;
+    const activeArtworkImg = document.getElementById('activeArtworkImg');
+    const artworkEyeIcon = document.getElementById('artworkEyeIcon');
+    const artworkEyeText = document.getElementById('artworkEyeText');
+
+    function toggleActiveArtworkVisibility() {
+      isArtworkVisible = !isArtworkVisible;
+      if (isArtworkVisible) {
+        activeArtworkImg.style.display = 'block';
+        artworkEyeIcon.className = "fa-regular fa-eye text-xs text-brand-600";
+        artworkEyeText.textContent = "مرئي";
+      } else {
+        activeArtworkImg.style.display = 'none';
+        artworkEyeIcon.className = "fa-regular fa-eye-slash text-xs text-slate-400";
+        artworkEyeText.textContent = "مخفي";
+      }
+    }
+    document.getElementById('toggleArtworkEyeBtn').addEventListener('click', toggleActiveArtworkVisibility);
+
+    function selectMobileArtwork(url, name) {
+      activeArtworkImg.src = url;
+      activeArtworkImg.style.display = 'block';
+      isArtworkVisible = true;
+      artworkEyeIcon.className = "fa-regular fa-eye text-xs text-brand-600";
+      artworkEyeText.textContent = "مرئي";
+      closeAllBottomSheets();
+      alert(`تم إدراج التصميم: "${name}" بنجاح في مساحة العمل!`);
+    }
+
+    // --- 7. Print Placement Selection & Free Mode Warning ---
+    function selectPlacementPreset(name, dim, w, h, top, right) {
+      document.getElementById('activePlacementName').textContent = name;
+      const box = document.getElementById('printAreaBox');
+      box.style.width = w + 'px';
+      box.style.height = h + 'px';
+      box.style.top = top + 'px';
+      box.style.right = right + 'px';
+      box.style.left = 'auto';
+      document.getElementById('printZoneDimLabel').textContent = dim;
+      closeAllBottomSheets();
+    }
+
+    // Free Mode Trigger
+    const guideTabFreeBtn = document.getElementById('guideTabFreeBtn');
+    const freeModeWarningModal = document.getElementById('freeModeWarningModal');
+
+    guideTabFreeBtn.addEventListener('click', () => {
+      freeModeWarningModal.classList.remove('hidden');
+    });
+
+    function closeFreeModeWarning() {
+      freeModeWarningModal.classList.add('hidden');
+    }
+
+    function confirmFreeModeActivation() {
+      const checkbox = document.getElementById('agreeFreeModeCheckbox');
+      if (!checkbox.checked) {
+        alert("يرجى وضع علامة بالموافقة على الشروط قبل تفعيل نمط الموضع الحر.");
+        return;
+      }
+      freeModeWarningModal.classList.add('hidden');
+      closeAllBottomSheets();
+      document.getElementById('activePlacementName').textContent = 'الوضع الحر ⚡ (تحكم يدوي كامل)';
+      document.getElementById('printZoneDimLabel').textContent = 'حر (Free DTF)';
+      alert("⚡ تم تفعيل نمط الموضع الحر بنجاح! يمكنك الآن سحب وتعديل مكان وحجم التصميم بدون قيود.");
+    }
+
+    // --- 8. Canvas Zoom Controls ---
+    let currentZoom = 1;
+    const canvasViewport = document.getElementById('canvasViewport');
+
+    document.getElementById('zoomInBtn').addEventListener('click', () => {
+      if (currentZoom < 1.4) {
+        currentZoom += 0.1;
+        canvasViewport.style.transform = `scale(${currentZoom})`;
+      }
+    });
+
+    document.getElementById('zoomOutBtn').addEventListener('click', () => {
+      if (currentZoom > 0.8) {
+        currentZoom -= 0.1;
+        canvasViewport.style.transform = `scale(${currentZoom})`;
+      }
+    });
+
+    document.getElementById('zoomResetBtn').addEventListener('click', () => {
+      currentZoom = 1;
+      canvasViewport.style.transform = `scale(1)`;
+    });
+
+    // Reset button in header
+    document.getElementById('mobileResetBtn').addEventListener('click', () => {
+      if (confirm("هل ترغب في إعادة ضبط الواجهة بالكامل؟")) {
+        currentZoom = 1;
+        canvasViewport.style.transform = `scale(1)`;
+        activeArtworkImg.style.display = 'block';
+        alert("تمت إعادة ضبط مساحة العمل بنجاح.");
+      }
+    });
+
+    // Add to cart CTA
+    document.getElementById('mobileAddToCartBtn').addEventListener('click', () => {
+      alert("🛒 رائع! تمت إضافة التيشيرت المخصص بالمقاس واللون المحدد إلى سلة المشتريات!");
+    });
+
+    // --- 9. Toggle Device Simulator Mode (For Desktop Testing) ---
+    const toggleFrameBtn = document.getElementById('toggleFrameBtn');
+    const mobileAppContainer = document.getElementById('mobileAppContainer');
+    const frameModeText = document.getElementById('frameModeText');
+    let isSimulator = true;
+
+    toggleFrameBtn.addEventListener('click', () => {
+      isSimulator = !isSimulator;
+      if (isSimulator) {
+        document.body.classList.add('simulator-mode');
+        mobileAppContainer.className = "mobile-frame-container w-full h-full flex flex-col bg-white overflow-hidden relative select-none";
+        frameModeText.textContent = "إطار هاتف حقيقي";
+      } else {
+        document.body.classList.remove('simulator-mode');
+        mobileAppContainer.className = "w-full h-full min-h-screen flex flex-col bg-white overflow-hidden relative select-none";
+        frameModeText.textContent = "شاشة كاملة عريضة";
+      }
+    });
+  </script>
+
+</body>
+</html>
