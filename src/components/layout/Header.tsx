@@ -141,50 +141,50 @@ export default function Header() {
         )}
 
         <div className="px-5 sm:px-8">
-          <div className="flex justify-between items-center h-16 md:h-18">
+          <div className="relative flex justify-between items-center h-16 md:h-18">
             
             {/* Logo */}
-            <div className="flex-shrink-0 flex items-center">
+            <div className="flex-shrink-0 flex items-center z-10">
               <Link href="/" className="flex items-center">
                 <img src="/images/logo.png" alt="Kenditasarl Logo" className={`w-auto object-contain transition-all duration-500 ${isScrolled ? 'h-8 md:h-10' : 'h-10 md:h-12'}`} />
               </Link>
             </div>
 
-          {/* Desktop Navigation - 4 Names enlarged and sharp */}
-          <nav className="hidden md:flex items-center space-x-6 lg:space-x-8 rtl:space-x-reverse">
-            <Link href="/tshirts" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide">
-              {t('tshirts')}
-            </Link>
-            <Link href="/hats" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide">
-              {t('hats')}
-            </Link>
-            <Link href="/mugs" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide">
-              {t('mugs')}
-            </Link>
-            <Link href="/design-studio" className="bg-orange-50 hover:bg-orange-100 text-primary border border-orange-200 px-3.5 py-1.5 rounded-full transition-all font-black text-[15px] lg:text-[17px] tracking-wide hover:scale-105 active:scale-95 shadow-2xs inline-flex items-center gap-1.5">
-              <span>✨</span>
-              <span>{t('designYourself')}</span>
-            </Link>
-          </nav>
+            {/* Desktop Navigation - Mathematically Centered in Rectangle (Auto-centers regardless of items added) */}
+            <nav className="hidden md:flex items-center justify-center absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 space-x-5 lg:space-x-8 rtl:space-x-reverse pointer-events-auto z-10">
+              <Link href="/tshirts" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide whitespace-nowrap">
+                {t('tshirts')}
+              </Link>
+              <Link href="/hats" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide whitespace-nowrap">
+                {t('hats')}
+              </Link>
+              <Link href="/mugs" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide whitespace-nowrap">
+                {t('mugs')}
+              </Link>
+              <Link href="/design-studio" className="bg-orange-50 hover:bg-orange-100 text-primary border border-orange-200 px-3.5 py-1.5 rounded-full transition-all font-black text-[15px] lg:text-[17px] tracking-wide hover:scale-105 active:scale-95 shadow-2xs inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span>✨</span>
+                <span>{t('designYourself')}</span>
+              </Link>
+            </nav>
 
-          {/* Icons / Actions - 4 Icons enlarged and sharp */}
-          <div className="hidden md:flex items-center space-x-5 lg:space-x-6 rtl:space-x-reverse">
-            <button className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('search')}>
-              <Search className="w-6 h-6 stroke-[2.2]" />
-            </button>
-            <LanguageSwitcher />
-            <button onClick={handleAccountClick} className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('account')}>
-              <User className="w-6 h-6 stroke-[2.2]" />
-            </button>
-            <Link href="/cart" className="text-gray-700 hover:text-primary transition-colors relative p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('cart')}>
-              <ShoppingCart className="w-6 h-6 stroke-[2.2]" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-offer text-white text-[10px] min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center font-bold shadow-xs">
-                  {cartCount > 99 ? '99+' : cartCount}
-                </span>
-              )}
-            </Link>
-          </div>
+            {/* Icons / Actions - 4 Icons enlarged and sharp */}
+            <div className="hidden md:flex items-center space-x-5 lg:space-x-6 rtl:space-x-reverse z-10">
+              <button className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('search')}>
+                <Search className="w-6 h-6 stroke-[2.2]" />
+              </button>
+              <LanguageSwitcher />
+              <button onClick={handleAccountClick} className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('account')}>
+                <User className="w-6 h-6 stroke-[2.2]" />
+              </button>
+              <Link href="/cart" className="text-gray-700 hover:text-primary transition-colors relative p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('cart')}>
+                <ShoppingCart className="w-6 h-6 stroke-[2.2]" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-offer text-white text-[10px] min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center font-bold shadow-xs">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
+              </Link>
+            </div>
 
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden gap-3 sm:gap-4">
