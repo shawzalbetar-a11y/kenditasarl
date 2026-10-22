@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { Filter, ArrowUpDown, Check, Sparkles, RotateCcw } from 'lucide-react';
+import { Filter, ArrowUpDown, Check, Sparkles, RotateCcw, Rows, Columns, LayoutGrid, Grid3x3 } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import ProductGrid from '@/components/ui/ProductGrid';
 
@@ -37,6 +37,19 @@ export default function CategoryClient({ initialProducts, categoryTitle, categor
   const [priceRange, setPriceRange] = useState<number>(2300);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>('newest');
+  const [cols, setCols] = useState<number | null>(null);
+
+  useEffect(() => {
+    const savedCols = localStorage.getItem('product_grid_cols');
+    if (savedCols) {
+      setCols(Number(savedCols));
+    }
+  }, []);
+
+  const handleSetCols = (num: number) => {
+    setCols(num);
+    localStorage.setItem('product_grid_cols', num.toString());
+  };
 
   // Format products to match ProductGrid requirements and add defaults for filtering
   const formattedProducts: Product[] = useMemo(() => {
@@ -101,8 +114,8 @@ export default function CategoryClient({ initialProducts, categoryTitle, categor
   return (
     <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       
-      {/* Category Header Banner with Typography Hierarchy */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 sm:mb-10 pb-6 border-b border-gray-200/80">
+      {/* Category Header Banner with Typography Hierarchy & Action Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-6 sm:mb-8 pb-6 border-b border-gray-200/80">
         <div>
           <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200/80 text-primary px-3.5 py-1 rounded-full text-xs font-black tracking-wide mb-2.5 shadow-2xs">
             <span>✨</span>
@@ -118,24 +131,68 @@ export default function CategoryClient({ initialProducts, categoryTitle, categor
           )}
         </div>
 
-        {/* Modern Sort selector */}
-        <div className="flex items-center gap-2.5 bg-white border border-gray-200/90 shadow-2xs rounded-2xl px-4 py-2.5 self-start md:self-auto shrink-0">
-          <ArrowUpDown className="w-4 h-4 text-primary shrink-0" />
-          <span className="text-xs sm:text-sm font-bold text-gray-600 whitespace-nowrap">{t('sort')}:</span>
-          <select 
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="bg-transparent text-sm lg:text-base font-extrabold text-gray-900 focus:outline-none cursor-pointer pr-2"
-          >
-            <option value="newest">{t('newest')}</option>
-            <option value="priceAsc">{t('priceAsc')}</option>
-            <option value="priceDesc">{t('priceDesc')}</option>
-            <option value="bestSelling">{t('bestSelling')}</option>
-          </select>
+        {/* Action Controls Cluster: View Toggler & Sort Selector Side by Side */}
+        <div className="flex flex-wrap items-center gap-3 self-start lg:self-end">
+          
+          {/* View Toggler (عرض كـ: 1, 2, 3, 4 أعمدة) */}
+          <div className="flex items-center gap-2.5 bg-white border border-gray-200/90 shadow-2xs rounded-2xl px-3.5 py-2">
+            <span className="text-xs sm:text-sm font-bold text-gray-600 whitespace-nowrap">{t('viewAs')}</span>
+            <div className="flex items-center gap-1.5">
+              <button 
+                onClick={() => handleSetCols(1)}
+                className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer ${cols === 1 ? "bg-primary text-white border-primary shadow-xs" : "bg-white border-gray-200/80 hover:bg-gray-50 text-gray-700"}`}
+                title={t('oneColumn')}
+                aria-label={t('oneColumn')}
+              >
+                <Rows size={16} />
+              </button>
+              <button 
+                onClick={() => handleSetCols(2)}
+                className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer ${cols === 2 ? "bg-primary text-white border-primary shadow-xs" : "bg-white border-gray-200/80 hover:bg-gray-50 text-gray-700"}`}
+                title={t('twoColumns')}
+                aria-label={t('twoColumns')}
+              >
+                <Columns size={16} />
+              </button>
+              <button 
+                onClick={() => handleSetCols(3)}
+                className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer hidden md:flex items-center justify-center ${cols === 3 ? "bg-primary text-white border-primary shadow-xs" : "bg-white border-gray-200/80 hover:bg-gray-50 text-gray-700"}`}
+                title={t('threeColumns')}
+                aria-label={t('threeColumns')}
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button 
+                onClick={() => handleSetCols(4)}
+                className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer hidden xl:flex items-center justify-center ${cols === 4 ? "bg-primary text-white border-primary shadow-xs" : "bg-white border-gray-200/80 hover:bg-gray-50 text-gray-700"}`}
+                title={t('fourColumns', { fallback: '4 Columns' })}
+                aria-label={t('fourColumns', { fallback: '4 Columns' })}
+              >
+                <Grid3x3 size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Modern Sort selector */}
+          <div className="flex items-center gap-2 bg-white border border-gray-200/90 shadow-2xs rounded-2xl px-3.5 py-2 shrink-0">
+            <ArrowUpDown className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-xs sm:text-sm font-bold text-gray-600 whitespace-nowrap">{t('sort')}:</span>
+            <select 
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-transparent text-sm lg:text-base font-extrabold text-gray-900 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="newest">{t('newest')}</option>
+              <option value="priceAsc">{t('priceAsc')}</option>
+              <option value="priceDesc">{t('priceDesc')}</option>
+              <option value="bestSelling">{t('bestSelling')}</option>
+            </select>
+          </div>
+
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
+      <div className="flex flex-col md:flex-row gap-6 lg:gap-8 items-start">
         
         {/* Sidebar Filters */}
         <div className="w-full md:w-80 shrink-0">
@@ -213,10 +270,13 @@ export default function CategoryClient({ initialProducts, categoryTitle, categor
           </div>
         </div>
 
-        {/* Product Grid */}
+        {/* Product Grid (Directly aligned with divider line, zero extra gap) */}
         <div className="flex-1 min-w-0">
           <ProductGrid 
             products={filteredProducts}
+            hideHeader={true}
+            cols={cols}
+            onColsChange={handleSetCols}
             emptyMessage={
               <div className="py-16 px-6 bg-white/70 backdrop-blur-sm border border-dashed border-gray-300 rounded-3xl flex flex-col items-center justify-center text-center shadow-xs">
                 <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-200/80 flex items-center justify-center text-primary mb-4 shadow-xs">

@@ -19,10 +19,21 @@ interface ProductGridProps {
   emptyMessage?: React.ReactNode;
   title?: React.ReactNode;
   description?: React.ReactNode;
+  hideHeader?: boolean;
+  cols?: number | null;
+  onColsChange?: (cols: number) => void;
 }
 
-export default function ProductGrid({ products, emptyMessage, title, description }: ProductGridProps) {
-  const [cols, setCols] = useState<number | null>(null);
+export default function ProductGrid({ 
+  products, 
+  emptyMessage, 
+  title, 
+  description,
+  hideHeader = false,
+  cols: propCols,
+  onColsChange
+}: ProductGridProps) {
+  const [internalCols, setInternalCols] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const t = useTranslations('Categories');
 
@@ -30,12 +41,17 @@ export default function ProductGrid({ products, emptyMessage, title, description
     setIsMounted(true);
     const savedCols = localStorage.getItem('product_grid_cols');
     if (savedCols) {
-      setCols(Number(savedCols));
+      setInternalCols(Number(savedCols));
     }
   }, []);
 
+  const cols = propCols !== undefined ? propCols : internalCols;
+
   const handleSetCols = (num: number) => {
-    setCols(num);
+    if (onColsChange) {
+      onColsChange(num);
+    }
+    setInternalCols(num);
     localStorage.setItem('product_grid_cols', num.toString());
   };
 
@@ -51,12 +67,11 @@ export default function ProductGrid({ products, emptyMessage, title, description
     }
   }
 
-  // Determine active highlight. If not mounted or no selection, default highlight would technically match 2 columns on mobile, etc.
-  // We'll highlight the active specific choice, or nothing if responsive fallback is running.
   return (
     <div className="w-full">
-      {/* Header & View Toggler Row */}
-      <div className={cn("flex flex-col md:flex-row md:items-end mb-6 gap-4 border-b border-gray-100 pb-4", (title || description) ? "justify-between" : "justify-end")}>
+      {/* Header & View Toggler Row (Conditionally rendered) */}
+      {!hideHeader && (
+        <div className={cn("flex flex-col md:flex-row md:items-end mb-6 gap-4 border-b border-gray-100 pb-4", (title || description) ? "justify-between" : "justify-end")}>
         
         {/* Left Side: Title & Description */}
         {(title || description) && (
@@ -99,6 +114,7 @@ export default function ProductGrid({ products, emptyMessage, title, description
           </button>
         </div>
       </div>
+      )}
 
       <div className={cn("grid gap-4 md:gap-6", gridClass)}>
         {products.map(product => (
