@@ -16,6 +16,7 @@ interface GarmentPlacementGuideProps {
   garmentType?: string;
   allowedPlacements?: string[];
   activeFace: string;
+  availableFaces?: string[];
   selectedColor?: string;
   selectedPlacementIds: string[];
   syncPlacementsAcrossColors?: boolean;
@@ -49,6 +50,11 @@ function GarmentMiniature({
   const isHoodie = garmentType === 'hoodie';
   const box = placement.canvasBox;
 
+  // Precise sleeve detection
+  const isLeftSleeve = placement.id === 'left_sleeve' || placement.targetFace === 'left' || placement.targetFace === 'left_shoulder';
+  const isRightSleeve = placement.id === 'right_sleeve' || placement.targetFace === 'right' || placement.targetFace === 'right_shoulder';
+  const isSleeve = isLeftSleeve || isRightSleeve;
+
   return (
     <div className={`relative w-12 h-12 rounded-xl flex items-center justify-center p-1 transition-all shrink-0 ${
       isActive
@@ -70,6 +76,10 @@ function GarmentMiniature({
               strokeWidth="2"
               strokeLinejoin="round"
             />
+            {/* Shoulder Seams */}
+            <line x1="30" y1="25" x2="28" y2="44" className="stroke-slate-400" strokeWidth="1" strokeDasharray="1.5 1.5" />
+            <line x1="70" y1="25" x2="72" y2="44" className="stroke-slate-400" strokeWidth="1" strokeDasharray="1.5 1.5" />
+
             {!isBack ? (
               <path
                 d="M38 18 C44 26 56 26 62 18 C58 10 42 10 38 18 Z"
@@ -90,6 +100,59 @@ function GarmentMiniature({
                 strokeWidth="1.2"
               />
             )}
+
+            {/* Sleeve specific highlights & boxes for Hoodie */}
+            {isRightSleeve && (
+              <g>
+                <path d="M30 25 L10 42 L18 52 L28 44 Z" className={isActive ? "fill-amber-400/25" : "fill-blue-500/20"} />
+                <line x1="12" y1="44" x2="17" y2="50" className="stroke-slate-400" strokeWidth="1" strokeDasharray="1 1" />
+                <rect
+                  x="13"
+                  y="34"
+                  width="13"
+                  height="13"
+                  rx="1.5"
+                  transform="rotate(-30 19.5 40.5)"
+                  className={isActive ? "fill-amber-400 stroke-amber-500 animate-pulse" : "fill-blue-500/80 stroke-blue-600"}
+                  strokeWidth="1.2"
+                />
+                <line
+                  x1="30"
+                  y1="25"
+                  x2="22"
+                  y2="35"
+                  stroke={isActive ? "#F59E0B" : "#3B82F6"}
+                  strokeWidth="1"
+                  strokeDasharray="1.5 1.5"
+                />
+              </g>
+            )}
+
+            {isLeftSleeve && (
+              <g>
+                <path d="M70 25 L90 42 L82 52 L72 44 Z" className={isActive ? "fill-amber-400/25" : "fill-blue-500/20"} />
+                <line x1="88" y1="44" x2="83" y2="50" className="stroke-slate-400" strokeWidth="1" strokeDasharray="1 1" />
+                <rect
+                  x="74"
+                  y="34"
+                  width="13"
+                  height="13"
+                  rx="1.5"
+                  transform="rotate(30 80.5 40.5)"
+                  className={isActive ? "fill-amber-400 stroke-amber-500 animate-pulse" : "fill-blue-500/80 stroke-blue-600"}
+                  strokeWidth="1.2"
+                />
+                <line
+                  x1="70"
+                  y1="25"
+                  x2="78"
+                  y2="35"
+                  stroke={isActive ? "#F59E0B" : "#3B82F6"}
+                  strokeWidth="1"
+                  strokeDasharray="1.5 1.5"
+                />
+              </g>
+            )}
           </g>
         ) : (
           /* Classic T-Shirt Vector Path */
@@ -100,40 +163,101 @@ function GarmentMiniature({
               strokeWidth="2"
               strokeLinejoin="round"
             />
+            {/* Shoulder Seams */}
+            <line x1="32" y1="20" x2="29" y2="38" className="stroke-slate-400" strokeWidth="1" strokeDasharray="1.5 1.5" />
+            <line x1="68" y1="20" x2="71" y2="38" className="stroke-slate-400" strokeWidth="1" strokeDasharray="1.5 1.5" />
+
             <path
               d={isBack ? "M36 19 C42 23 58 23 64 19" : "M34 20 C42 28 58 28 66 20"}
               className="stroke-slate-500"
               strokeWidth="1.5"
               fill="none"
             />
+
+            {/* Sleeve specific highlights & boxes for T-Shirt */}
+            {isRightSleeve && (
+              <g>
+                <path d="M32 20 L12 36 L20 46 L29 38 Z" className={isActive ? "fill-amber-400/25" : "fill-blue-500/20"} />
+                <line x1="14" y1="38" x2="20" y2="44" className="stroke-slate-400" strokeWidth="1" strokeDasharray="1.5 1.5" />
+                <rect
+                  x="14"
+                  y="28"
+                  width="13"
+                  height="13"
+                  rx="1.5"
+                  transform="rotate(-28 20.5 34.5)"
+                  className={isActive ? "fill-amber-400 stroke-amber-500 animate-pulse" : "fill-blue-500/80 stroke-blue-600"}
+                  strokeWidth="1.2"
+                />
+                <line
+                  x1="32"
+                  y1="20"
+                  x2="23"
+                  y2="29"
+                  stroke={isActive ? "#F59E0B" : "#3B82F6"}
+                  strokeWidth="1"
+                  strokeDasharray="1.5 1.5"
+                />
+              </g>
+            )}
+
+            {isLeftSleeve && (
+              <g>
+                <path d="M68 20 L88 36 L80 46 L71 38 Z" className={isActive ? "fill-amber-400/25" : "fill-blue-500/20"} />
+                <line x1="86" y1="38" x2="80" y2="44" className="stroke-slate-400" strokeWidth="1" strokeDasharray="1.5 1.5" />
+                <rect
+                  x="73"
+                  y="28"
+                  width="13"
+                  height="13"
+                  rx="1.5"
+                  transform="rotate(28 79.5 34.5)"
+                  className={isActive ? "fill-amber-400 stroke-amber-500 animate-pulse" : "fill-blue-500/80 stroke-blue-600"}
+                  strokeWidth="1.2"
+                />
+                <line
+                  x1="68"
+                  y1="20"
+                  x2="77"
+                  y2="29"
+                  stroke={isActive ? "#F59E0B" : "#3B82F6"}
+                  strokeWidth="1"
+                  strokeDasharray="1.5 1.5"
+                />
+              </g>
+            )}
           </g>
         )}
 
-        {/* Highlighted Official Print Area Box */}
-        <rect
-          x={box.leftPercent}
-          y={box.topPercent}
-          width={box.maxWidthPercent}
-          height={box.maxHeightPercent}
-          rx="1.5"
-          className={
-            isActive
-              ? "fill-amber-400 stroke-amber-500 animate-pulse"
-              : "fill-blue-500/70 stroke-blue-600"
-          }
-          strokeWidth="1.2"
-        />
+        {/* Highlighted Official Print Area Box for Front/Back (Non-sleeve) Placements */}
+        {!isSleeve && (
+          <>
+            <rect
+              x={box.leftPercent}
+              y={box.topPercent}
+              width={box.maxWidthPercent}
+              height={box.maxHeightPercent}
+              rx="1.5"
+              className={
+                isActive
+                  ? "fill-amber-400 stroke-amber-500 animate-pulse"
+                  : "fill-blue-500/70 stroke-blue-600"
+              }
+              strokeWidth="1.2"
+            />
 
-        {/* Distance from collar indicator line */}
-        <line
-          x1={box.leftPercent + box.maxWidthPercent / 2}
-          y1={21}
-          x2={box.leftPercent + box.maxWidthPercent / 2}
-          y2={box.topPercent}
-          stroke={isActive ? "#F59E0B" : "#3B82F6"}
-          strokeWidth="1"
-          strokeDasharray="1.5 1.5"
-        />
+            {/* Distance from collar indicator line */}
+            <line
+              x1={box.leftPercent + box.maxWidthPercent / 2}
+              y1={21}
+              x2={box.leftPercent + box.maxWidthPercent / 2}
+              y2={box.topPercent}
+              stroke={isActive ? "#F59E0B" : "#3B82F6"}
+              strokeWidth="1"
+              strokeDasharray="1.5 1.5"
+            />
+          </>
+        )}
       </svg>
     </div>
   );
@@ -284,6 +408,7 @@ export default function GarmentPlacementGuide({
   garmentType = 'tshirt',
   allowedPlacements,
   activeFace,
+  availableFaces = [],
   selectedColor = 'black',
   selectedPlacementIds = [],
   syncPlacementsAcrossColors = false,
@@ -854,8 +979,27 @@ export default function GarmentPlacementGuide({
                   type="button"
                   onClick={() => {
                     setActiveTab('sleeves');
-                    if (onSelectFace && activeFace !== 'left' && activeFace !== 'right' && activeFace !== 'left_shoulder' && activeFace !== 'right_shoulder') {
-                      onSelectFace('left');
+                    if (onSelectFace) {
+                      // If already on a sleeve face, keep it
+                      if (
+                        isFaceMatching(activeFace, 'right') ||
+                        isFaceMatching(activeFace, 'left')
+                      ) {
+                        return;
+                      }
+
+                      // Check if user already has a selected sleeve placement to switch to its face
+                      const selectedSleeve = selectedSpecs.find(p => isFaceMatching(p.targetFace, 'right') || isFaceMatching(p.targetFace, 'left'));
+                      const preferredTarget = selectedSleeve?.targetFace;
+
+                      // Find an available sleeve face from availableFaces
+                      const availableSleeveFace = (availableFaces || []).find(af => 
+                        (preferredTarget && isFaceMatching(af, preferredTarget)) ||
+                        isFaceMatching(af, 'right') ||
+                        isFaceMatching(af, 'left')
+                      );
+
+                      onSelectFace(availableSleeveFace || preferredTarget || 'right_shoulder');
                     }
                   }}
                   className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
@@ -885,8 +1029,20 @@ export default function GarmentPlacementGuide({
                     type="button"
                     onClick={() => {
                       onTogglePlacement(placement);
-                      if (onSelectFace && !isFaceMatching(placement.targetFace, activeFace)) {
-                        onSelectFace(placement.targetFace);
+                      if (onSelectFace) {
+                        let targetFace = placement.targetFace;
+                        if (availableFaces && availableFaces.length > 0) {
+                          const matched = availableFaces.find(af => isFaceMatching(af, targetFace));
+                          if (matched) {
+                            targetFace = matched as any;
+                          } else if (isFaceMatching(targetFace, 'right') || isFaceMatching(targetFace, 'left')) {
+                            const anySleeve = availableFaces.find(af => isFaceMatching(af, 'right') || isFaceMatching(af, 'left'));
+                            if (anySleeve) targetFace = anySleeve as any;
+                          }
+                        }
+                        if (!isFaceMatching(targetFace, activeFace)) {
+                          onSelectFace(targetFace);
+                        }
                       }
                     }}
                     className={`w-full p-3 rounded-2xl border transition-all flex items-center gap-3 text-right cursor-pointer select-none active:scale-[0.99] ${

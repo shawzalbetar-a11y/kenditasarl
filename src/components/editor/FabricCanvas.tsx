@@ -1121,14 +1121,14 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       const matchingBlank = rawImages.find((img: any) => 
         (img && typeof img === 'object') &&
         (img.type === 'blank' || !img.type) &&
-        (img.face === targetFace || (targetFace === 'left_shoulder' && img.face === 'left') || (targetFace === 'right_shoulder' && img.face === 'right')) &&
+        isFaceMatching(img.face, targetFace) &&
         (isColorEqual(img.colorHex, color) || isColorEqual(img.color, color) || isColorEqual(img.colorName, color) || isColorEqual(img.colorName_ar, color) || isColorEqual(img.colorName_tr, color) || isColorEqual(img.colorName_en, color))
       );
       if (matchingBlank?.url) return matchingBlank.url;
 
       const matchingReady = rawImages.find((img: any) => 
         (img && typeof img === 'object') &&
-        (img.face === targetFace || (targetFace === 'left_shoulder' && img.face === 'left') || (targetFace === 'right_shoulder' && img.face === 'right')) &&
+        isFaceMatching(img.face, targetFace) &&
         (isColorEqual(img.colorHex, color) || isColorEqual(img.color, color) || isColorEqual(img.colorName, color) || isColorEqual(img.colorName_ar, color) || isColorEqual(img.colorName_tr, color) || isColorEqual(img.colorName_en, color))
       );
       if (matchingReady?.url) return matchingReady.url;
@@ -1146,11 +1146,17 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       );
 
       if (matchingVariant) {
-        if (matchingVariant.base_images && matchingVariant.base_images[targetFace]) {
-          return matchingVariant.base_images[targetFace];
+        if (matchingVariant.base_images) {
+          if (matchingVariant.base_images[targetFace]) return matchingVariant.base_images[targetFace];
+          for (const [k, v] of Object.entries(matchingVariant.base_images)) {
+            if (isFaceMatching(k, targetFace) && v) return v as string;
+          }
         }
-        if (matchingVariant.images && matchingVariant.images[targetFace]) {
-          return matchingVariant.images[targetFace];
+        if (matchingVariant.images) {
+          if (matchingVariant.images[targetFace]) return matchingVariant.images[targetFace];
+          for (const [k, v] of Object.entries(matchingVariant.images)) {
+            if (isFaceMatching(k, targetFace) && v) return v as string;
+          }
         }
         if (targetFace === 'front' && (matchingVariant.image_front || matchingVariant.mockup_front || matchingVariant.image || matchingVariant.url)) {
           return matchingVariant.image_front || matchingVariant.mockup_front || matchingVariant.image || matchingVariant.url;
@@ -1162,7 +1168,19 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     }
 
     // 3. Fallback to productFaces prop
-    return productFaces[face as keyof typeof productFaces] || productFaces['front'] || '';
+    if (productFaces[face as keyof typeof productFaces]) {
+      return productFaces[face as keyof typeof productFaces];
+    }
+    for (const [k, v] of Object.entries(productFaces)) {
+      if (isFaceMatching(k, face) && v) return v as string;
+    }
+    // If face is sleeve, check for any sleeve mockup before front
+    if (isFaceMatching(face, 'right') || isFaceMatching(face, 'left')) {
+      for (const [k, v] of Object.entries(productFaces)) {
+        if ((isFaceMatching(k, 'right') || isFaceMatching(k, 'left')) && v) return v as string;
+      }
+    }
+    return productFaces['front'] || '';
   }, [productData, productFaces]);
 
   const currentFaceMockupUrl = getFaceMockupForColor(activeFace, selectedColor);
@@ -2273,8 +2291,20 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
+  const resolveTargetFace = useCallback((face: string): string => {
+    if (availableFaces.includes(face)) return face;
+    const match = availableFaces.find(af => isFaceMatching(af, face));
+    if (match) return match;
+    if (isFaceMatching(face, 'right') || isFaceMatching(face, 'left') || face === 'sleeve' || face === 'sleeves') {
+      const anySleeve = availableFaces.find(af => isFaceMatching(af, 'right') || isFaceMatching(af, 'left'));
+      if (anySleeve) return anySleeve;
+    }
+    return face;
+  }, [availableFaces]);
+
   const switchFace = useCallback((face: string) => {
-    if (face === activeFace) return;
+    const resolvedFace = resolveTargetFace(face);
+    if (resolvedFace === activeFace) return;
     if (canvas && !isRestoring.current) {
       try {
         const json = JSON.stringify(canvas.toJSON(SERIALIZE_PROPERTIES));
@@ -2282,8 +2312,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         facesData.current[currentKey] = json;
       } catch (e) {}
     }
-    setActiveFace(face);
-  }, [canvas, activeFace, selectedColor, getFaceStateKey]);
+    setActiveFace(resolvedFace);
+  }, [canvas, activeFace, selectedColor, getFaceStateKey, resolveTargetFace]);
 
   const handleTogglePlacement = useCallback((placement: PlacementSpec) => {
     const targetFace = placement.targetFace;
@@ -4348,6 +4378,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                 garmentType={productData?.config?.garmentType || productData?.category || 'tshirt'}
                 allowedPlacements={productData?.config?.allowedPlacements}
                 activeFace={activeFace}
+                availableFaces={availableFaces}
                 selectedColor={selectedColor}
                 selectedPlacementIds={currentSelectedPlacementIds}
                 syncPlacementsAcrossColors={syncPlacementsAcrossColors}

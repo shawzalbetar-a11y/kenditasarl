@@ -621,8 +621,14 @@ export function isFaceMatching(targetFace?: string, currentFace?: string): boole
   const tf = targetFace.trim().toLowerCase();
   const cf = currentFace.trim().toLowerCase();
   if (tf === cf) return true;
-  if ((tf === 'left' || tf === 'left_shoulder') && (cf === 'left' || cf === 'left_shoulder')) return true;
-  if ((tf === 'right' || tf === 'right_shoulder') && (cf === 'right' || cf === 'right_shoulder')) return true;
+  if (
+    (tf === 'left' || tf === 'left_shoulder' || tf === 'left_sleeve') &&
+    (cf === 'left' || cf === 'left_shoulder' || cf === 'left_sleeve')
+  ) return true;
+  if (
+    (tf === 'right' || tf === 'right_shoulder' || tf === 'right_sleeve') &&
+    (cf === 'right' || cf === 'right_shoulder' || cf === 'right_sleeve')
+  ) return true;
   return false;
 }
 
