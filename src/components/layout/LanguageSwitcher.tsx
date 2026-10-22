@@ -44,11 +44,11 @@ export default function LanguageSwitcher() {
     <div className="relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 p-1.5 md:p-2 rounded-full hover:bg-gray-100/80 hover:text-primary transition-colors focus:outline-none cursor-pointer"
+        className="flex items-center gap-1.5 p-1.5 rounded-full hover:bg-gray-100/80 hover:text-primary transition-colors focus:outline-none cursor-pointer"
         aria-label="Change Language"
       >
-        <Globe className="w-7 h-7 stroke-[2.2]" />
-        <span className="text-base lg:text-[18px] font-extrabold uppercase tracking-wider">{locale}</span>
+        <Globe className="w-6 h-6 stroke-[2.2]" />
+        <span className="text-[15px] lg:text-[16px] font-extrabold uppercase tracking-wider">{locale}</span>
       </button>
 
       {isOpen && (

@@ -133,53 +133,53 @@ export default function Header() {
       >
         {/* Announcement Bar (Collapsed completely on Design Studio) */}
         {!isDesignStudio && (
-          <div className={`transition-all duration-500 text-center py-2 md:py-2.5 text-xs md:text-sm font-bold px-4 flex items-center justify-center rounded-t-[2rem] tracking-wide ${
+          <div className={`transition-all duration-500 text-center py-2 text-xs font-bold px-4 flex items-center justify-center rounded-t-[2rem] tracking-wide ${
             (isScrolled || isHovering) ? 'bg-primary/90 text-white shadow-xs' : 'bg-primary text-white'
           }`}>
             {t('announcement')}
           </div>
         )}
 
-        <div className="px-5 sm:px-8 lg:px-10">
-          <div className="flex justify-between items-center h-18 md:h-22 lg:h-24">
+        <div className="px-5 sm:px-8">
+          <div className="flex justify-between items-center h-16 md:h-18">
             
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center">
               <Link href="/" className="flex items-center">
-                <img src="/images/logo.png" alt="Kenditasarl Logo" className={`w-auto object-contain transition-all duration-500 ${isScrolled ? 'h-9 md:h-11' : 'h-11 md:h-14 lg:h-15'}`} />
+                <img src="/images/logo.png" alt="Kenditasarl Logo" className={`w-auto object-contain transition-all duration-500 ${isScrolled ? 'h-8 md:h-10' : 'h-10 md:h-12'}`} />
               </Link>
             </div>
 
-          {/* Desktop Navigation (+40% larger text and robust contrast) */}
-          <nav className="hidden md:flex items-center space-x-5 lg:space-x-8 xl:space-x-10 rtl:space-x-reverse">
-            <Link href="/tshirts" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-base lg:text-[19px] xl:text-[20px] tracking-wide">
+          {/* Desktop Navigation - 4 Names enlarged and sharp */}
+          <nav className="hidden md:flex items-center space-x-6 lg:space-x-8 rtl:space-x-reverse">
+            <Link href="/tshirts" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide">
               {t('tshirts')}
             </Link>
-            <Link href="/hats" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-base lg:text-[19px] xl:text-[20px] tracking-wide">
+            <Link href="/hats" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide">
               {t('hats')}
             </Link>
-            <Link href="/mugs" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-base lg:text-[19px] xl:text-[20px] tracking-wide">
+            <Link href="/mugs" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide">
               {t('mugs')}
             </Link>
-            <Link href="/design-studio" className="bg-orange-50 hover:bg-orange-100 text-primary border-2 border-orange-200 px-4 py-2 lg:px-6 lg:py-2.5 rounded-full transition-all font-black text-base lg:text-[18px] xl:text-[19px] tracking-wide hover:scale-105 active:scale-95 shadow-sm inline-flex items-center gap-1.5">
+            <Link href="/design-studio" className="bg-orange-50 hover:bg-orange-100 text-primary border border-orange-200 px-3.5 py-1.5 rounded-full transition-all font-black text-[15px] lg:text-[17px] tracking-wide hover:scale-105 active:scale-95 shadow-2xs inline-flex items-center gap-1.5">
               <span>✨</span>
               <span>{t('designYourself')}</span>
             </Link>
           </nav>
 
-          {/* Icons / Actions (+40% larger icons: w-5 h-5 [20px] -> w-7 h-7 [28px]) */}
-          <div className="hidden md:flex items-center space-x-4 lg:space-x-6 xl:space-x-7 rtl:space-x-reverse">
-            <button className="text-gray-700 hover:text-primary transition-colors p-2 lg:p-2.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('search')}>
-              <Search className="w-7 h-7 stroke-[2.2]" />
+          {/* Icons / Actions - 4 Icons enlarged and sharp */}
+          <div className="hidden md:flex items-center space-x-5 lg:space-x-6 rtl:space-x-reverse">
+            <button className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('search')}>
+              <Search className="w-6 h-6 stroke-[2.2]" />
             </button>
             <LanguageSwitcher />
-            <button onClick={handleAccountClick} className="text-gray-700 hover:text-primary transition-colors p-2 lg:p-2.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('account')}>
-              <User className="w-7 h-7 stroke-[2.2]" />
+            <button onClick={handleAccountClick} className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('account')}>
+              <User className="w-6 h-6 stroke-[2.2]" />
             </button>
-            <Link href="/cart" className="text-gray-700 hover:text-primary transition-colors relative p-2 lg:p-2.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('cart')}>
-              <ShoppingCart className="w-7 h-7 stroke-[2.2]" />
+            <Link href="/cart" className="text-gray-700 hover:text-primary transition-colors relative p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('cart')}>
+              <ShoppingCart className="w-6 h-6 stroke-[2.2]" />
               {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-offer text-white text-xs min-w-[22px] h-[22px] px-1 rounded-full flex items-center justify-center font-black shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 bg-offer text-white text-[10px] min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center font-bold shadow-xs">
                   {cartCount > 99 ? '99+' : cartCount}
                 </span>
               )}
@@ -190,9 +190,9 @@ export default function Header() {
           <div className="flex items-center md:hidden gap-3 sm:gap-4">
             <LanguageSwitcher />
             <Link href="/cart" className="text-textPrimary relative p-1.5" aria-label={t('cart')}>
-              <ShoppingCart className="w-7 h-7 stroke-[2.2]" />
+              <ShoppingCart className="w-6 h-6 stroke-[2.2]" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-offer text-white text-[11px] min-w-5 h-5 px-1 rounded-full flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -right-1 bg-offer text-white text-[10px] min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center font-bold">
                   {cartCount > 99 ? '99+' : cartCount}
                 </span>
               )}
@@ -202,7 +202,7 @@ export default function Header() {
               className="text-textPrimary hover:text-primary p-1.5 cursor-pointer"
               aria-label="Toggle Menu"
             >
-              {isMobileMenuOpen ? <X className="w-8 h-8 stroke-[2.2]" /> : <Menu className="w-8 h-8 stroke-[2.2]" />}
+              {isMobileMenuOpen ? <X className="w-7 h-7 stroke-[2.2]" /> : <Menu className="w-7 h-7 stroke-[2.2]" />}
             </button>
           </div>
           </div>
