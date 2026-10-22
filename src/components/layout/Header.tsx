@@ -123,25 +123,25 @@ export default function Header() {
 
   return (
     <>
-      <header className={`fixed top-1 md:top-4 left-0 right-0 z-50 w-full px-2 sm:px-6 lg:px-8 transition-all duration-500 flex flex-col items-center pointer-events-none ${shouldHide ? '-translate-y-[150%] opacity-0' : 'translate-y-0 opacity-100'}`}>
+      <header className={`fixed top-1 md:top-3 left-0 right-0 z-50 w-full px-2 sm:px-4 lg:px-8 transition-all duration-500 flex flex-col items-center pointer-events-none ${shouldHide ? '-translate-y-[150%] opacity-0' : 'translate-y-0 opacity-100'}`}>
         <div 
-          className={`pointer-events-auto w-full max-w-6xl flex flex-col rounded-[2rem] border transition-all duration-500 shadow-lg ${
+          className={`pointer-events-auto w-full max-w-[1720px] flex flex-col rounded-[2rem] border transition-all duration-500 shadow-xl ${
           isScrolled || isHovering
-            ? 'bg-white/40 backdrop-blur-xl border-white/20' 
-            : 'bg-white/90 backdrop-blur-md border-white/50'
+            ? 'bg-white/70 backdrop-blur-2xl border-white/40 shadow-black/5' 
+            : 'bg-white/95 backdrop-blur-xl border-white/60 shadow-black/8'
         }`}
       >
         {/* Announcement Bar (Collapsed completely on Design Studio) */}
         {!isDesignStudio && (
-          <div className={`transition-all duration-500 text-center py-2 text-xs font-medium px-4 flex items-center justify-center rounded-t-[2rem] ${
-            (isScrolled || isHovering) ? 'bg-primary/50 text-white/90' : 'bg-primary text-white'
+          <div className={`transition-all duration-500 text-center py-2 text-xs font-bold px-4 flex items-center justify-center rounded-t-[2rem] tracking-wide ${
+            (isScrolled || isHovering) ? 'bg-primary/90 text-white shadow-xs' : 'bg-primary text-white'
           }`}>
             {t('announcement')}
           </div>
         )}
 
-        <div className="px-6 sm:px-8">
-          <div className="flex justify-between items-center h-16">
+        <div className="px-5 sm:px-8">
+          <div className="flex justify-between items-center h-16 md:h-18">
             
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center">
@@ -151,32 +151,32 @@ export default function Header() {
             </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-8 rtl:space-x-reverse">
-            <Link href="/tshirts" className="text-textPrimary hover:text-primary transition-colors font-medium">
+          <nav className="hidden md:flex items-center space-x-8 rtl:space-x-reverse">
+            <Link href="/tshirts" className="text-gray-800 hover:text-primary transition-colors font-bold text-sm tracking-wide">
               {t('tshirts')}
             </Link>
-            <Link href="/hats" className="text-textPrimary hover:text-primary transition-colors font-medium">
+            <Link href="/hats" className="text-gray-800 hover:text-primary transition-colors font-bold text-sm tracking-wide">
               {t('hats')}
             </Link>
-            <Link href="/mugs" className="text-textPrimary hover:text-primary transition-colors font-medium">
+            <Link href="/mugs" className="text-gray-800 hover:text-primary transition-colors font-bold text-sm tracking-wide">
               {t('mugs')}
             </Link>
-            <Link href="/design-studio" className="text-accent hover:text-primary transition-colors font-bold">
-              {t('designYourself')}
+            <Link href="/design-studio" className="bg-orange-50 hover:bg-orange-100 text-primary border border-orange-200 px-3.5 py-1.5 rounded-full transition-all font-black text-sm tracking-wide hover:scale-105 active:scale-95 shadow-2xs">
+              ✨ {t('designYourself')}
             </Link>
           </nav>
 
           {/* Icons / Actions */}
           <div className="hidden md:flex items-center space-x-6 rtl:space-x-reverse">
-            <button className="text-textPrimary hover:text-primary transition-colors" aria-label={t('search')}>
-              <Search className="w-5 h-5" />
+            <button className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('search')}>
+              <Search className="w-5 h-5 stroke-[2.2]" />
             </button>
             <LanguageSwitcher />
-            <button onClick={handleAccountClick} className="text-textPrimary hover:text-primary transition-colors" aria-label={t('account')}>
-              <User className="w-5 h-5" />
+            <button onClick={handleAccountClick} className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('account')}>
+              <User className="w-5 h-5 stroke-[2.2]" />
             </button>
-            <Link href="/cart" className="text-textPrimary hover:text-primary transition-colors relative" aria-label={t('cart')}>
-              <ShoppingCart className="w-5 h-5" />
+            <Link href="/cart" className="text-gray-700 hover:text-primary transition-colors relative p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('cart')}>
+              <ShoppingCart className="w-5 h-5 stroke-[2.2]" />
               {cartCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-offer text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
                   {cartCount > 99 ? '99+' : cartCount}

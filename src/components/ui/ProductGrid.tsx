@@ -39,8 +39,8 @@ export default function ProductGrid({ products, emptyMessage, title, description
     localStorage.setItem('product_grid_cols', num.toString());
   };
 
-  // Default responsive grid: 2 cols on mobile, 3 on md, 4 on lg
-  let gridClass = "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+  // Default responsive grid: 2 cols on mobile, 3 on md, 4 on lg/xl, 5 on 2xl
+  let gridClass = "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5";
   
   if (isMounted && cols) {
     switch (cols) {

@@ -37,7 +37,7 @@ export default async function HomePage({ params: { locale } }: { params: { local
   return (
     <div className="flex flex-col min-h-screen">
       {/* Featured Products */}
-      <section className="pt-8 pb-16 px-4 max-w-[100rem] mx-auto w-full">
+      <section className="pt-8 pb-16 px-4 sm:px-6 lg:px-8 max-w-[1720px] mx-auto w-full">
         <ProductGrid 
           title={t('featuredProducts')}
           products={featuredProducts.map((p: any) => ({

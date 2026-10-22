@@ -3993,7 +3993,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           className={cn(
-            "w-full h-[60vh] md:h-[65vh] lg:h-[75vh] relative flex items-center justify-center p-2 lg:p-4 overflow-hidden select-none",
+            "w-full h-[64vh] md:h-[70vh] lg:h-[78vh] xl:h-[82vh] min-h-[580px] max-h-[920px] relative flex items-center justify-center p-2 lg:p-4 overflow-hidden select-none",
             isPanMode ? "cursor-grab active:cursor-grabbing" : ""
           )}
         >
@@ -4369,15 +4369,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         </div>
 
         {/* Action CTA Buttons (Buy Now & Add to Cart) - Positioned directly below product preview frame */}
-        <div className="w-full px-3 py-3 flex flex-row items-center gap-2.5 md:gap-3 z-20 border-t border-gray-100/80 bg-white/70 backdrop-blur-xs rounded-b-2xl md:rounded-b-3xl">
+        <div className="w-full px-3.5 py-3.5 flex flex-row items-center gap-3 z-20 border-t border-gray-200/80 bg-white/80 backdrop-blur-md rounded-b-2xl md:rounded-b-3xl shadow-xs">
           {/* 1. Buy Now Button */}
           <button
             type="button"
             onClick={() => handleAction('buy_now')}
             disabled={isSaving}
-            className="flex-1 py-3 px-3 md:px-5 bg-gray-900 hover:bg-black text-white font-bold text-xs md:text-sm rounded-xl md:rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="flex-1 py-3.5 px-4 md:px-6 bg-gray-900 hover:bg-black text-white font-black text-xs md:text-sm tracking-wide rounded-2xl shadow-md hover:shadow-xl transition-all active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Zap size={16} className="text-amber-400 fill-amber-400 shrink-0" />
+            <Zap size={17} className="text-amber-400 fill-amber-400 shrink-0 drop-shadow-xs" />
             <span className="truncate">{isSaving ? t('processing') : t('buyNow')}</span>
           </button>
 
@@ -4386,16 +4386,16 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             type="button"
             onClick={() => handleAction('cart')}
             disabled={isSaving || isPreviewLoading}
-            className="flex-1 py-3 px-3 md:px-5 bg-[var(--color-primary)] hover:opacity-90 text-white font-bold text-xs md:text-sm rounded-xl md:rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+            className="flex-1 py-3.5 px-4 md:px-6 bg-[var(--color-primary)] hover:bg-[#e04826] text-white font-black text-xs md:text-sm tracking-wide rounded-2xl shadow-md hover:shadow-xl transition-all active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
             {isPreviewLoading && pendingAction === 'cart' ? (
               <>
-                <Loader2 size={16} className="animate-spin shrink-0" />
+                <Loader2 size={17} className="animate-spin shrink-0" />
                 <span className="truncate">{locale === 'tr' ? 'Önizleme...' : locale === 'en' ? 'Preparing...' : 'جاري تجهيز المعاينة...'}</span>
               </>
             ) : (
               <>
-                <ShoppingCart size={16} className="shrink-0" />
+                <ShoppingCart size={17} className="shrink-0" />
                 <span className="truncate">{isSaving ? t('processing') : t('addToCart')}</span>
               </>
             )}
@@ -4413,7 +4413,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
       {/* Sidebar Toolbar (Desktop sticky sidebar with independent scroll, Mobile Bottom Sheet) */}
       <div className={cn(
-        "w-full lg:w-96 flex flex-col gap-3 pb-20 lg:pb-4",
+        "w-full lg:w-[380px] xl:w-[420px] 2xl:w-[450px] shrink-0 flex flex-col gap-3.5 pb-20 lg:pb-4",
         "fixed lg:sticky inset-x-0 bottom-0 lg:top-28 bg-white/95 backdrop-blur-md lg:bg-transparent z-50 lg:z-auto",
         "rounded-t-3xl lg:rounded-none shadow-[0_-10px_40px_rgba(0,0,0,0.15)] lg:shadow-none p-4 lg:p-0",
         "transition-transform duration-300 max-h-[45vh] lg:max-h-none lg:h-[calc(100vh-130px)] overflow-hidden lg:overflow-y-auto",
@@ -4568,13 +4568,21 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               <h4 className="font-bold text-[var(--color-secondary)] hidden md:block">{t('addElements', { fallback: 'إضافة عناصر' })}</h4>
               
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={addText} className="flex flex-col items-center justify-center gap-2 p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors text-[var(--color-secondary)] border border-transparent hover:border-gray-200">
-                  <Type size={24} className="text-[var(--color-primary)]" />
-                  <span className="text-sm font-bold">{t('addText', { fallback: 'إضافة نص' })}</span>
+                <button 
+                  type="button"
+                  onClick={addText} 
+                  className="flex flex-col items-center justify-center gap-2.5 p-4 bg-white hover:bg-orange-50/40 rounded-2xl border-2 border-gray-200 hover:border-[var(--color-primary)] shadow-xs hover:shadow-md transition-all active:scale-95 text-gray-900 group cursor-pointer"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-orange-50 group-hover:bg-orange-100 flex items-center justify-center transition-colors">
+                    <Type size={24} className="text-[var(--color-primary)]" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-black tracking-wide text-gray-800 group-hover:text-black">{t('addText', { fallback: 'إضافة نص' })}</span>
                 </button>
-                <label className="flex flex-col items-center justify-center gap-2 p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors cursor-pointer text-center text-[var(--color-secondary)] border border-transparent hover:border-gray-200">
-                  <Upload size={24} className="text-[var(--color-primary)]" />
-                  <span className="text-sm font-bold">{isUploading ? '...' : t('addImage', { fallback: 'رفع صورة' })}</span>
+                <label className="flex flex-col items-center justify-center gap-2.5 p-4 bg-white hover:bg-orange-50/40 rounded-2xl border-2 border-gray-200 hover:border-[var(--color-primary)] shadow-xs hover:shadow-md transition-all active:scale-95 text-gray-900 group cursor-pointer text-center">
+                  <div className="w-11 h-11 rounded-xl bg-orange-50 group-hover:bg-orange-100 flex items-center justify-center transition-colors">
+                    <Upload size={24} className="text-[var(--color-primary)]" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-black tracking-wide text-gray-800 group-hover:text-black">{isUploading ? '...' : t('addImage', { fallback: 'رفع صورة' })}</span>
                   <input type="file" accept="image/*" className="hidden" onChange={handleUploadImage} disabled={isUploading} />
                 </label>
               </div>

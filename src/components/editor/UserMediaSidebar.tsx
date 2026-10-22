@@ -128,12 +128,14 @@ export default function UserMediaSidebar({
 
   // Render Expanded 2-Column Grid Drawer Panel
   return (
-    <div className="absolute top-14 left-3 z-30 w-60 sm:w-68 max-w-[calc(100vw-24px)] max-h-[calc(100%-195px)] bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200/80 flex flex-col transition-all duration-300 animate-in fade-in slide-in-from-left-3 select-none">
+    <div className="absolute top-14 left-3 z-30 w-64 sm:w-72 xl:w-80 max-w-[calc(100vw-24px)] max-h-[calc(100%-195px)] bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/90 flex flex-col transition-all duration-300 animate-in fade-in slide-in-from-left-3 select-none">
       {/* Panel Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <FolderHeart size={16} className="text-blue-600 shrink-0" />
-          <h3 className="font-bold text-xs text-gray-900 truncate">
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+            <FolderHeart size={16} />
+          </div>
+          <h3 className="font-black text-xs sm:text-sm text-gray-900 tracking-wide truncate">
             {t('myDesigns')}
           </h3>
         </div>
@@ -143,10 +145,10 @@ export default function UserMediaSidebar({
           <button
             type="button"
             onClick={() => toggleCollapse(true)}
-            className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
             title={t('hidePanel')}
           >
-            <EyeOff size={14} />
+            <EyeOff size={15} />
           </button>
         </div>
       </div>
@@ -161,21 +163,21 @@ export default function UserMediaSidebar({
       />
 
       {/* Quick Upload Action Button */}
-      <div className="p-2 border-b border-gray-100">
+      <div className="p-2.5 border-b border-gray-100">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
-          className="w-full py-2 px-2.5 bg-blue-50 hover:bg-blue-100/90 text-blue-700 active:scale-98 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border border-blue-200/70 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+          className="w-full py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-800 active:scale-98 rounded-xl font-black text-xs flex items-center justify-center gap-2 border border-blue-200 shadow-xs transition-all cursor-pointer disabled:opacity-50"
         >
           {isUploading ? (
             <>
-              <Loader2 size={13} className="animate-spin text-blue-600 shrink-0" />
+              <Loader2 size={15} className="animate-spin text-blue-600 shrink-0" />
               <span className="truncate">{t('uploadingDesign')}</span>
             </>
           ) : (
             <>
-              <Plus size={14} className="text-blue-600 shrink-0" />
+              <Plus size={16} className="text-blue-600 shrink-0 stroke-[2.5]" />
               <span className="truncate">{t('uploadDesign')}</span>
             </>
           )}

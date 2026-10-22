@@ -276,13 +276,13 @@ export default function DesignStudioPage() {
         }
       `}</style>
 
-      <div className="max-w-[95rem] mx-auto flex flex-col gap-1.5 md:gap-4">
+      <div className="w-full max-w-[1920px] mx-auto px-2 sm:px-4 lg:px-6 xl:px-8 flex flex-col gap-2 md:gap-3.5">
         
         {/* Top Quick Actions Bar (Upload Design, Change Product, and Choose from Gallery - 3 Equal Columns in One Row) */}
-        <div className="grid grid-cols-3 items-center gap-2 sm:gap-3 w-full px-1 sm:px-2 md:px-4 mt-0 mb-1">
+        <div className="grid grid-cols-3 items-center gap-2.5 sm:gap-3.5 w-full mt-0 mb-1">
           {/* 1. Upload Design Button */}
-          <label className="flex items-center justify-center gap-1.5 sm:gap-2 bg-[var(--color-primary)] text-white shadow-sm rounded-xl py-2.5 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm transition-all active:scale-95 hover:opacity-90 cursor-pointer text-center truncate">
-            <Upload size={17} className="shrink-0" />
+          <label className="flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:bg-[#e04826] text-white shadow-sm hover:shadow-md rounded-2xl py-2.5 sm:py-3 px-3 sm:px-5 font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-98 cursor-pointer text-center truncate border border-transparent">
+            <Upload size={18} className="shrink-0 drop-shadow-xs" />
             <span className="truncate">{tStudio('uploadDesign')}</span>
             <input 
               type="file" 
@@ -299,9 +299,9 @@ export default function DesignStudioPage() {
               setActiveProductId('');
               setProductData(null);
             }}
-            className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 shadow-sm rounded-xl py-2.5 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm transition-all active:scale-95 hover:bg-gray-50 text-center cursor-pointer truncate"
+            className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-400 text-gray-800 shadow-sm hover:shadow-md rounded-2xl py-2.5 sm:py-3 px-3 sm:px-5 font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-98 text-center cursor-pointer truncate"
           >
-            <RefreshCw size={16} className="shrink-0 text-gray-600" />
+            <RefreshCw size={17} className="shrink-0 text-gray-700" />
             <span className="truncate">{t('changeProduct', { fallback: 'تغيير المنتج' })}</span>
           </button>
 
@@ -313,7 +313,7 @@ export default function DesignStudioPage() {
                 window.dispatchEvent(new CustomEvent('STUDIO_OPEN_GALLERY_MODAL'));
               }
             }}
-            className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white border border-[var(--color-primary)] text-[var(--color-primary)] shadow-sm rounded-xl py-2.5 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm transition-all active:scale-95 hover:bg-orange-50 text-center cursor-pointer truncate"
+            className="flex items-center justify-center gap-2 bg-white hover:bg-orange-50/80 border-2 border-[var(--color-primary)] text-[var(--color-primary)] shadow-sm hover:shadow-md rounded-2xl py-2.5 sm:py-3 px-3 sm:px-5 font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-98 text-center cursor-pointer truncate"
           >
             <img src="/images/logo.png" alt="Logo" className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" />
             <span className="truncate">{tStudio('chooseFromGallery')}</span>

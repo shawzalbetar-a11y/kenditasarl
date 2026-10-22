@@ -92,7 +92,7 @@ export default function CategoryClient({ initialProducts, categoryTitle }: Categ
   };
 
   return (
-    <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       
       <div className="flex justify-between items-end mb-8 border-b border-border pb-4">
         <h1 className="text-3xl font-bold text-secondary">{categoryTitle}</h1>
