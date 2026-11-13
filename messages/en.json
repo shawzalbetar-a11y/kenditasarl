@@ -550,7 +550,13 @@
     "panoramaOppositeHint": "Opposite Handle",
     "expand3d": "Expand 3D",
     "hideLive3d": "Hide 3D",
-    "showLive3d": "Show 3D"
+    "showLive3d": "Show 3D",
+    "singleFaceConflictTitle": "Notice: Single Face Print Selected",
+    "singleFaceConflictDesc": "You designed on multiple sides of the mug, but your current selection is Single Face print (included in base price). You can upgrade to two-sided printing or choose one side to keep.",
+    "upgradeToTwoSidedBtn": "Upgrade to Two-Sided (+35 ₺)",
+    "orKeepSingleFace": "Or choose one face to keep and print:",
+    "keepFaceBtn": "Keep This Face Only",
+    "cancelConflictBtn": "Back to Design"
   },
   "ProductDetails": {
     "designItYourself": "Design it Yourself ✨"

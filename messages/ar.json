@@ -550,7 +550,13 @@
     "panoramaOppositeHint": "مقابل المقبض",
     "expand3d": "تكبير 3D",
     "hideLive3d": "إخفاء المعاينة الحيّة",
-    "showLive3d": "إظهار المعاينة الحيّة"
+    "showLive3d": "إظهار المعاينة الحيّة",
+    "singleFaceConflictTitle": "تنبيه: اخترت طباعة وجه واحد فقط",
+    "singleFaceConflictDesc": "لقد قمت بإضافة تصاميم على أكثر من واجهة للكوب، لكنك حددت طباعة وجه واحد فقط (مشمول في السعر الأساسي). يمكنك إما الترقية لطباعة وجهين، أو اختيار واجهة واحدة للاحتفاظ بها.",
+    "upgradeToTwoSidedBtn": "ترقية إلى وجهان (+35 ₺)",
+    "orKeepSingleFace": "أو اختر واجهة واحدة فقط للاحتفاظ بها وطباعتها:",
+    "keepFaceBtn": "الاحتفاظ بهذه الواجهة فقط",
+    "cancelConflictBtn": "العودة للتصميم"
   },
   "ProductDetails": {
     "designItYourself": "صمم بنفسك ✨"

@@ -550,7 +550,13 @@
     "panoramaOppositeHint": "Kulp Karşısı",
     "expand3d": "3D Büyüt",
     "hideLive3d": "3D Gizle",
-    "showLive3d": "3D Göster"
+    "showLive3d": "3D Göster",
+    "singleFaceConflictTitle": "Uyarı: Yalnızca Tek Yüz Baskı Seçildi",
+    "singleFaceConflictDesc": "Kupanın birden fazla yüzüne tasarım eklediniz, ancak mevcut seçiminiz Tek Yüz baskıdır (taban fiyata dahildir). İki yüzlü baskıya yükseltebilir veya saklamak istediğiniz tek yüzü seçebilirsiniz.",
+    "upgradeToTwoSidedBtn": "İki Yüzlü Baskıya Yükselt (+35 ₺)",
+    "orKeepSingleFace": "Veya yalnızca basılmasını istediğiniz tek yüzü seçin:",
+    "keepFaceBtn": "Yalnızca Bu Yüzü Koru",
+    "cancelConflictBtn": "Tasarıma Dön"
   },
   "ProductDetails": {
     "designItYourself": "Kendin Tasarla ✨"

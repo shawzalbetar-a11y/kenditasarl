@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { fabric } from 'fabric';
-import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw, RotateCw, Bookmark, Box, Shirt, ChevronDown, ArrowUp, ArrowDown, EyeOff, ChevronLeft, ChevronRight, Loader2, Search, Wand2, Target, Truck, ShieldCheck, Check, Crosshair, Copy, ArrowUpDown, FolderOpen, Lock, Unlock, AlertCircle, ArrowLeft, ArrowRight, Cloud } from 'lucide-react';
+import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw, RotateCw, Bookmark, Box, Shirt, ChevronDown, ArrowUp, ArrowDown, EyeOff, ChevronLeft, ChevronRight, Loader2, Search, Wand2, Target, Truck, ShieldCheck, Check, Crosshair, Copy, ArrowUpDown, FolderOpen, Lock, Unlock, AlertCircle, ArrowLeft, ArrowRight, Cloud, Coffee } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import AuthModal from '@/components/auth/AuthModal';
 import { auth, db } from '@/lib/firebase';
@@ -9698,6 +9698,106 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           onSafeMode={handleSafeMode}
           onFreeMode={handleFreeMode}
         />
+      )}
+
+      {/* Mug Single-Face Conflict Modal */}
+      {isMugSingleFaceConflictOpen && (
+        <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-5 sm:p-6 bg-gradient-to-b from-amber-50/80 to-white border-b border-amber-100 flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-600">
+                <Coffee size={24} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug">
+                  {tMug('singleFaceConflictTitle')}
+                </h3>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  {tMug('singleFaceConflictDesc')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMugSingleFaceConflictOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 space-y-4">
+              {/* Option 1: Upgrade to Two-Sided */}
+              <button
+                type="button"
+                onClick={handleUpgradeToTwoSidedFromConflict}
+                className="w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-blue-50 border-2 border-blue-500 hover:bg-blue-100/80 text-blue-900 transition font-bold group cursor-pointer shadow-xs active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Layers size={18} />
+                  </div>
+                  <div className="text-start">
+                    <div className="text-sm font-extrabold text-blue-950">
+                      {tMug('upgradeToTwoSidedBtn')}
+                    </div>
+                    <div className="text-[11px] text-blue-700 font-medium">
+                      {locale === 'tr' ? 'Ön Yüz ve Arka Yüz birlikte basılır' : locale === 'en' ? 'Prints both Front & Opposite sides' : 'تتم طباعة الواجهة الأمامية والخلفية معاً'}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-xs font-black bg-blue-600 text-white px-2.5 py-1 rounded-lg shrink-0">
+                  +35 ₺
+                </span>
+              </button>
+
+              {/* Option 2: Choose 1 face to keep */}
+              <div className="pt-2">
+                <div className="text-xs font-bold text-slate-700 mb-2.5">
+                  {tMug('orKeepSingleFace')}
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {mugConflictFaces.map((face) => {
+                    const f = (face || '').trim().toLowerCase();
+                    const label = f === 'front' ? (locale === 'tr' ? 'Ön Yüz' : locale === 'en' ? 'Front' : 'الواجهة الأمامية') :
+                                  f === 'back' ? (locale === 'tr' ? 'Arka Yüz' : locale === 'en' ? 'Back' : 'الجهة الخلفية') :
+                                  f === 'other' ? tMug('faceOtherLabel') :
+                                  t(face, { fallback: face });
+
+                    return (
+                      <button
+                        key={face}
+                        type="button"
+                        onClick={() => handleKeepSingleFaceFromConflict(face)}
+                        className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-400 hover:bg-slate-100/80 transition cursor-pointer active:scale-[0.98]"
+                      >
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{label}</span>
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-500">
+                          {tMug('keepFaceBtn')}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsMugSingleFaceConflictOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition cursor-pointer"
+              >
+                {tMug('cancelConflictBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Fullscreen Realistic Preview Modal with GPU-Accelerated Pinch-to-Zoom & Pan */}
