@@ -8,6 +8,7 @@ import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc } 
 import { onAuthStateChanged } from 'firebase/auth';
 import { Trash2, Minus, Plus, ShoppingBag, Loader2, PenTool } from 'lucide-react';
 import { getProductFrontImage } from '@/lib/products';
+import { isColorMatch, normalizeSize, getStockAndKeyForSize, getLocalizedColorName } from '@/lib/colorTranslations';
 import Image from 'next/image';
 import AddressSelectionModal from '@/components/checkout/AddressSelectionModal';
 import DeliveryMethodModal from '@/components/checkout/DeliveryMethodModal';
@@ -21,7 +22,7 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const router = useRouter();
-  
+
   const { setCheckoutData } = useCheckoutStore();
   const [addresses, setAddresses] = useState<any[]>([]);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -47,66 +48,89 @@ export default function CartPage() {
     try {
       const q = query(collection(db, 'cart_items'), where('user_id', '==', uid));
       const snap = await getDocs(q);
-      
+
       const itemPromises = snap.docs.map(async (cartDoc) => {
         const data = cartDoc.data();
-        
+
         // Fetch product details
         let title = '';
         let maxStock = 0;
-        let imageUrl = '';
+        let imageUrl = data.preview_image_url || '';
         let colorName = '';
-        
+        const isBlankItem = data.design_type === 'blank';
+        const isReadyItem = data.design_type === 'ready';
+
         try {
           const prodSnap = await getDoc(doc(db, 'products', data.product_id));
           if (prodSnap.exists()) {
             const prodData = prodSnap.data();
             title = prodData[`name_${locale}`] || prodData.name_en;
-            
+
             if (data.variant_id) {
-              const [color, size] = data.variant_id.split('_');
+              const lastUnder = data.variant_id.lastIndexOf('_');
+              const color = data.color || (lastUnder !== -1 ? data.variant_id.slice(0, lastUnder) : data.variant_id);
+              const size = data.size || (lastUnder !== -1 ? data.variant_id.slice(lastUnder + 1) : '');
               const allVarsSnap = await getDocs(collection(db, 'products', data.product_id, 'variants'));
-              
+
               for (const vDoc of allVarsSnap.docs) {
                 const vData = vDoc.data();
-                const vColor = vData.hex || vData.colorName_en || vData.color;
-                
-                if (vColor === color) {
-                  // Extract localized color name
-                  colorName = vData[`colorName_${locale}`] || vData.colorName_en || color;
+                if (isColorMatch(color, vData) || vDoc.id === data.variant_id) {
+                  colorName = vData[`colorName_${locale}`] || vData.colorName_en || vData.colorName_ar || color;
 
-                  // Check stock based on schema
                   if (vData.sizes) {
-                    maxStock = vData.sizes[size] || 0;
-                  } else if (vData.size === size) {
-                    maxStock = vData.stock || 0;
+                    const sizeInfo = getStockAndKeyForSize(vData.sizes, size);
+                    maxStock = sizeInfo ? sizeInfo.stock : (Number(vData.sizes[size]) || 0);
+                  } else if (vData.size && normalizeSize(vData.size) === normalizeSize(size)) {
+                    maxStock = Number(vData.stock) || 0;
                   }
-                  
-                  // Get image
-                  if (vData.image_front) {
+
+                  if (!imageUrl) {
+                    if (isBlankItem) {
+                      imageUrl = vData.blank_image_front || vData.mockup_front || '';
+                    } else if (vData.image_front) {
+                      imageUrl = vData.image_front;
+                    }
+                  }
+
+                  break;
+                }
+              }
+
+              // Fallback to single variant if only 1 exists
+              if (!colorName && allVarsSnap.docs.length === 1) {
+                const vDoc = allVarsSnap.docs[0];
+                const vData = vDoc.data();
+                colorName = vData[`colorName_${locale}`] || vData.colorName_en || vData.colorName_ar || color;
+                if (vData.sizes) {
+                  const sizeInfo = getStockAndKeyForSize(vData.sizes, size);
+                  maxStock = sizeInfo ? sizeInfo.stock : (Number(vData.sizes[size]) || 0);
+                }
+                if (!imageUrl) {
+                  if (isBlankItem) {
+                    imageUrl = vData.blank_image_front || vData.mockup_front || '';
+                  } else if (vData.image_front) {
                     imageUrl = vData.image_front;
                   }
-                  
-                  break; // Found matching color
                 }
               }
             }
           }
-          
-          if (data.design_id) {
+
+          if (!imageUrl && !isBlankItem && data.design_id) {
             const designSnap = await getDoc(doc(db, 'designs', data.design_id));
             if (designSnap.exists()) {
-               imageUrl = designSnap.data().preview_image_url;
+              imageUrl = designSnap.data().preview_image_url || imageUrl;
             }
           }
-          
+
           if (!imageUrl) {
-             imageUrl = await getProductFrontImage(data.product_id);
+            const prefType: 'blank' | 'ready' = isBlankItem ? 'blank' : 'ready';
+            imageUrl = await getProductFrontImage(data.product_id, prefType, data.color);
           }
         } catch (e) {
           console.error(e);
         }
-        
+
         return {
           id: cartDoc.id,
           ...data,
@@ -116,11 +140,11 @@ export default function CartPage() {
           imageUrl: imageUrl || 'https://via.placeholder.com/200'
         };
       });
-      
+
       const resolvedItems = await Promise.all(itemPromises);
       // Sort by created_at desc
       resolvedItems.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-      
+
       setItems(resolvedItems);
     } catch (err) {
       console.error(err);
@@ -132,10 +156,10 @@ export default function CartPage() {
   const updateQuantity = async (id: string, currentQty: number, maxStock: number, change: number) => {
     const newQty = currentQty + change;
     if (newQty < 1 || newQty > maxStock) return;
-    
+
     // Optimistic update
     setItems(prev => prev.map(item => item.id === id ? { ...item, quantity: newQty } : item));
-    
+
     try {
       await updateDoc(doc(db, 'cart_items', id), { quantity: newQty });
     } catch (err) {
@@ -189,7 +213,7 @@ export default function CartPage() {
         router.push('/account/addresses?returnTo=/cart');
         return;
       }
-      setAddresses(snap.docs.map(d => ({id: d.id, ...d.data()})));
+      setAddresses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setIsAddressModalOpen(true);
     } catch (e) {
       console.error(e);
@@ -236,7 +260,7 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-[var(--color-background)] pt-24 sm:pt-28 pb-16 px-3 sm:px-4 md:px-8">
       <div className="max-w-[95rem] mx-auto">
-        
+
         {/* Cart Header: Title and Clear Cart Button */}
         <div className="flex items-center justify-between gap-3 mb-6 pb-2 border-b border-border/40">
           <div className="flex items-baseline gap-2 sm:gap-3">
@@ -259,30 +283,30 @@ export default function CartPage() {
             <span>{t('clearCart')}</span>
           </button>
         </div>
-        
+
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-10">
-          
+
           {/* Cart Items List */}
           <div className="flex-1 flex flex-col gap-4 sm:gap-6">
             {items.map(item => {
               const [color, size] = item.variant_id ? item.variant_id.split('_') : ['', ''];
-              
+
               return (
-                <div 
-                  key={item.id} 
+                <div
+                  key={item.id}
                   className="bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-border/60 hover:border-gray-300 transition-all flex flex-row gap-3 sm:gap-5 relative group"
                 >
                   {/* Product Image Thumbnail */}
-                  <Link 
-                    href={`/products/${item.product_id}`} 
+                  <Link
+                    href={`/products/${item.product_id}`}
                     className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-gray-50 shrink-0 relative block border border-gray-100 self-center sm:self-start"
                   >
-                    <Image 
-                      src={item.imageUrl} 
-                      alt={item.title} 
-                      fill 
+                    <Image
+                      src={item.imageUrl}
+                      alt={item.title}
+                      fill
                       sizes="(max-width: 640px) 96px, 128px"
-                      className="object-cover" 
+                      className="object-cover"
                     />
                   </Link>
 
@@ -291,15 +315,15 @@ export default function CartPage() {
                     <div>
                       {/* Top Row: Title + Delete Button */}
                       <div className="flex items-start justify-between gap-2">
-                        <Link 
-                          href={`/products/${item.product_id}`} 
+                        <Link
+                          href={`/products/${item.product_id}`}
                           className="font-bold text-sm sm:text-base md:text-lg text-[var(--color-text)] hover:text-[var(--color-primary)] transition-colors line-clamp-2 leading-snug"
                         >
                           {item.title}
                         </Link>
 
                         {/* Individual Remove Button (Always clearly visible & accessible on mobile) */}
-                        <button 
+                        <button
                           type="button"
                           onClick={() => removeItem(item.id)}
                           className="p-1.5 sm:p-2 text-red-500 sm:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shrink-0 active:scale-95 cursor-pointer -mt-1 -mr-1 rtl:-mr-0 rtl:-ml-1"
@@ -314,10 +338,10 @@ export default function CartPage() {
                       <div className="flex flex-wrap items-center gap-2 mt-1 sm:mt-2 text-xs text-gray-500 font-medium">
                         {color && (
                           <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
-                            <span 
-                              className="w-3.5 h-3.5 rounded-full border border-gray-300 shadow-xs shrink-0" 
-                              style={{ backgroundColor: color === 'navy' ? '#000080' : color }} 
-                              title={item.colorName || color} 
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-gray-300 shadow-xs shrink-0"
+                              style={{ backgroundColor: color === 'navy' ? '#000080' : color }}
+                              title={item.colorName || color}
                             />
                             <span className="capitalize">{item.colorName || color}</span>
                           </div>
@@ -331,7 +355,7 @@ export default function CartPage() {
                           <div className="w-full flex items-center justify-between gap-1.5 bg-amber-500/10 text-amber-900 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-amber-300 mt-1">
                             <span className="flex items-center gap-1">
                               <span>⚡</span>
-                              <span>{locale === 'tr' ? 'Serbest Konumlandırma Modu' : locale === 'en' ? 'Free Placement Mode' : 'الوضع الحر (تصميم حر بكامل الواجهة)'}</span>
+                              <span>{locale === 'tr' ? 'Serbest Yerleşim Modu' : locale === 'en' ? 'Free Placement Mode' : 'الوضع الحر (تصميم حر بكامل الواجهة)'}</span>
                             </span>
                             <span className="text-[10px] text-amber-800 font-semibold bg-amber-100/90 border border-amber-200 px-2 py-0.5 rounded-md">
                               {locale === 'tr' ? 'Sorumluluk Reddi Onaylı ✓' : locale === 'en' ? 'Disclaimer Acknowledged ✓' : 'إخلاء المسؤولية مقبول ✓'}
@@ -345,18 +369,18 @@ export default function CartPage() {
                         ) : null}
                       </div>
                     </div>
-                    
+
                     {/* Bottom Row: Price & Quantity Controls */}
                     <div className="flex items-center justify-between gap-2 mt-3 sm:mt-4 pt-2 border-t border-gray-50 sm:border-0 sm:pt-0">
                       {/* Unit Price */}
                       <span className="font-black text-base sm:text-xl text-[var(--color-primary)] whitespace-nowrap">
                         {item.unit_price} ₺
                       </span>
-                      
+
                       {/* Quantity Controls */}
                       <div className="flex flex-col items-end gap-1">
                         <div className="flex items-center h-8 sm:h-9 bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
-                          <button 
+                          <button
                             type="button"
                             onClick={() => updateQuantity(item.id, item.quantity, item.maxStock, -1)}
                             disabled={item.quantity <= 1}
@@ -368,7 +392,7 @@ export default function CartPage() {
                           <span className="w-8 sm:w-9 text-center font-bold text-xs sm:text-sm text-gray-800">
                             {item.quantity}
                           </span>
-                          <button 
+                          <button
                             type="button"
                             onClick={() => updateQuantity(item.id, item.quantity, item.maxStock, 1)}
                             disabled={item.quantity >= item.maxStock}
@@ -393,15 +417,15 @@ export default function CartPage() {
           <div className="w-full lg:w-96 flex-shrink-0">
             <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-border/50 sticky top-28">
               <h2 className="text-xl font-bold mb-6 text-[var(--color-text)]">{t('title')}</h2>
-              
+
               <div className="flex justify-between items-center mb-6">
                 <span className="text-gray-500 font-medium">{t('subtotal')}</span>
                 <span className="text-2xl font-black text-[var(--color-primary)]">{subtotal} ₺</span>
               </div>
-              
+
               <div className="h-px w-full bg-border/60 my-6"></div>
-              
-              <button 
+
+              <button
                 onClick={handleCheckoutClick}
                 disabled={isCheckingOut}
                 className="w-full py-4 rounded-xl font-bold text-lg bg-[var(--color-action)] text-white hover:opacity-90 shadow-sm flex items-center justify-center gap-2"
@@ -411,23 +435,23 @@ export default function CartPage() {
               </button>
             </div>
           </div>
-          
+
         </div>
       </div>
 
-      <AddressSelectionModal 
-        isOpen={isAddressModalOpen} 
-        onClose={() => setIsAddressModalOpen(false)} 
-        addresses={addresses} 
-        onSelect={handleAddressSelect} 
+      <AddressSelectionModal
+        isOpen={isAddressModalOpen}
+        onClose={() => setIsAddressModalOpen(false)}
+        addresses={addresses}
+        onSelect={handleAddressSelect}
       />
 
-      <DeliveryMethodModal 
-        isOpen={isDeliveryModalOpen} 
-        onClose={() => setIsDeliveryModalOpen(false)} 
-        address={selectedAddressForDelivery} 
+      <DeliveryMethodModal
+        isOpen={isDeliveryModalOpen}
+        onClose={() => setIsDeliveryModalOpen(false)}
+        address={selectedAddressForDelivery}
         subtotal={subtotal}
-        onConfirm={handleDeliveryConfirm} 
+        onConfirm={handleDeliveryConfirm}
       />
     </div>
   );

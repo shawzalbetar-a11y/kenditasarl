@@ -15,8 +15,23 @@ const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata = {
-  title: 'Kenditasarl',
-  description: 'Design your own custom products.',
+  title: {
+    default: 'Kendin Tasarla | صمم منتجك بنفسك',
+    template: '%s | Kendin Tasarla'
+  },
+  description: 'صمم بنفسك أروع التيشيرتات والأكواب والقبعات بجودة طباعة عالمية DTF.',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/images/logo-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/images/logo.png', type: 'image/png', sizes: '500x500' }
+    ],
+    apple: [
+      { url: '/images/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
+    ],
+    shortcut: '/favicon.svg'
+  }
 };
 
 export const viewport: Viewport = {
@@ -42,10 +57,10 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} dir={dir}>
-      <body className={`${ibmPlexSansArabic.className} bg-background text-textPrimary flex flex-col min-h-screen`}>
+      <body className={`${ibmPlexSansArabic.className} bg-background text-textPrimary flex flex-col min-h-screen overflow-x-hidden w-full max-w-full`}>
         <NextIntlClientProvider messages={messages}>
           <Header />
-          <main className="flex-grow pt-24 md:pt-28">
+          <main className="flex-grow pt-24 md:pt-28 w-full max-w-full overflow-x-hidden">
             {children}
           </main>
           <Footer />

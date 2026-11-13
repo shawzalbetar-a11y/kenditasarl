@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  X, 
-  Search, 
-  Sparkles, 
-  Layers, 
-  Tag, 
+import {
+  X,
+  Search,
+  Sparkles,
+  Layers,
+  Tag,
   Image as ImageIcon,
   Check,
   FolderOpen
@@ -49,7 +49,7 @@ export default function AssetGalleryModal({
 }: AssetGalleryModalProps) {
   const t = useTranslations('Editor');
   const locale = useLocale();
-  
+
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [justSelectedId, setJustSelectedId] = useState<string | null>(null);
@@ -81,11 +81,11 @@ export default function AssetGalleryModal({
       const localizedCat = getCategoryLocalizedName(categoryName, locale);
       const matchCategory = selectedCategory === 'all' || categoryName === selectedCategory;
       const q = searchQuery.toLowerCase().trim();
-      const matchSearch = !q || 
+      const matchSearch = !q ||
         asset.name.toLowerCase().includes(q) ||
         categoryName.toLowerCase().includes(q) ||
         localizedCat.toLowerCase().includes(q);
-      
+
       return matchCategory && matchSearch;
     });
   }, [assets, selectedCategory, searchQuery, locale]);
@@ -115,14 +115,14 @@ export default function AssetGalleryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-5 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
       {/* Modal Container */}
-      <div 
-        className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden animate-in zoom-in-95 duration-200"
+      <div
+        className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-4xl h-[82dvh] max-h-[82dvh] sm:h-auto sm:max-h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
-        <div className="px-5 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50/80 to-white">
+        <div className="px-5 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50/80 to-white shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-orange-100 text-[var(--color-primary)] flex items-center justify-center shadow-xs">
               <Sparkles size={20} />
@@ -142,15 +142,15 @@ export default function AssetGalleryModal({
 
           <button
             onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-            title={t('close')}
+            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-900 flex items-center justify-center transition-all cursor-pointer shrink-0"
+            aria-label="Close"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Search & Categories Bar */}
-        <div className="px-5 sm:px-6 py-3 bg-white border-b border-gray-100 space-y-3">
+        <div className="px-5 sm:px-6 py-3 bg-white border-b border-gray-100 space-y-3 shrink-0">
           {/* Search Input */}
           <div className="relative">
             <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -162,7 +162,7 @@ export default function AssetGalleryModal({
               className="w-full pl-4 pr-10 py-2.5 bg-gray-50 hover:bg-gray-100/70 focus:bg-white border border-gray-200 focus:border-[var(--color-primary)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 transition-all"
             />
             {searchQuery && (
-              <button 
+              <button
                 onClick={() => setSearchQuery('')}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 text-xs font-medium cursor-pointer"
               >
@@ -223,13 +223,13 @@ export default function AssetGalleryModal({
         </div>
 
         {/* Assets Grid Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scrollbar bg-gray-50/40">
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 custom-scrollbar bg-gray-50/40">
           {filteredAssets.length === 0 ? (
             <div className="h-64 flex flex-col items-center justify-center text-center p-6 bg-white rounded-2xl border-2 border-dashed border-gray-200">
               <FolderOpen size={40} className="text-gray-300 mb-2" />
               <h4 className="text-sm font-bold text-gray-700">{t('noDesignsMatching')}</h4>
               <p className="text-xs text-gray-400 mt-1">
-                {searchQuery 
+                {searchQuery
                   ? `${t('noDesignsFoundFor')} "${searchQuery}"`
                   : t('noStickersInCategoryDesc')}
               </p>
@@ -253,8 +253,8 @@ export default function AssetGalleryModal({
                     onClick={() => handleAssetClick(asset)}
                     className={cn(
                       "group bg-white rounded-2xl p-2.5 sm:p-3 border transition-all flex flex-col items-center justify-between gap-2 relative cursor-pointer text-right hover:shadow-md active:scale-95",
-                      isSelected 
-                        ? "ring-2 ring-emerald-500 border-transparent bg-emerald-50/40" 
+                      isSelected
+                        ? "ring-2 ring-emerald-500 border-transparent bg-emerald-50/40"
                         : "border-gray-200/80 hover:border-[var(--color-primary)]"
                     )}
                   >
@@ -302,7 +302,7 @@ export default function AssetGalleryModal({
         </div>
 
         {/* Footer info & Cancel */}
-        <div className="px-5 sm:px-6 py-3 border-t border-gray-100 bg-white flex items-center justify-between text-xs text-gray-500">
+        <div className="px-5 sm:px-6 py-3 border-t border-gray-100 bg-white flex items-center justify-between text-xs text-gray-500 shrink-0">
           <span>{t('clickToInsertHint')}</span>
           <button
             onClick={onClose}

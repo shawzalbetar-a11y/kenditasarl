@@ -7,9 +7,11 @@ interface LayerPanelProps {
   canvas: fabric.Canvas | null;
   activeObject: fabric.Object | null;
   onSaveHistory: () => void;
+  locale?: string;
+  onLockToggleToast?: (locked: boolean) => void;
 }
 
-export default function LayerPanel({ canvas, activeObject, onSaveHistory }: LayerPanelProps) {
+export default function LayerPanel({ canvas, activeObject, onSaveHistory, locale, onLockToggleToast }: LayerPanelProps) {
   const t = useTranslations('Editor');
   const [layers, setLayers] = useState<fabric.Object[]>([]);
 
@@ -41,11 +43,23 @@ export default function LayerPanel({ canvas, activeObject, onSaveHistory }: Laye
 
   const toggleLock = (obj: fabric.Object, e: React.MouseEvent) => {
     e.stopPropagation();
-    const isLocked = obj.selectable === false;
-    obj.set({ selectable: isLocked, evented: isLocked });
+    const isCurrentlyLocked = (obj as any).isLocked === true || obj.selectable === false || (obj as any).lockMovementX === true;
+    const nextLocked = !isCurrentlyLocked;
+    obj.set({
+      selectable: true,
+      evented: true,
+      lockMovementX: nextLocked,
+      lockMovementY: nextLocked,
+      lockRotation: nextLocked,
+      lockScalingX: nextLocked,
+      lockScalingY: nextLocked,
+      hasControls: !nextLocked,
+    });
+    (obj as any).isLocked = nextLocked;
     canvas?.renderAll();
     onSaveHistory();
     updateLayers();
+    onLockToggleToast?.(nextLocked);
   };
 
   const moveUp = (obj: fabric.Object, e: React.MouseEvent) => {

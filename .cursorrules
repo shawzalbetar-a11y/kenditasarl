@@ -1,11 +1,34 @@
-# STRICT i18n RULE - MUST FOLLOW FOR EVERY UI CHANGE
+# STRICT i18n & LOCALIZATION RULES - MUST FOLLOW FOR EVERY UI CHANGE
 
-You are assisting a highly professional Next.js e-commerce platform. Multi-language support is mandatory, not optional.
+You are assisting a high-end Next.js e-commerce and Print-on-Demand (POD) platform. Multi-language support and native-level localization are mandatory.
 
+## 1. Multi-Language (i18n) Mandate
 1. **Three Languages Mandate:** Every new feature, component, button, notification, or UI text MUST support three languages simultaneously: Arabic (ar), English (en), and Turkish (tr).
-2. **Zero Hardcoding:** You are STRICTLY FORBIDDEN from hardcoding any text into `.tsx` or `.ts` files. 
-3. **Translation Flow:** When asked to add a new UI element, you must:
-   - Create a key for it (e.g., `Button.saveDesign`).
-   - Provide the translations for `ar` (Arabic), `en` (English), and `tr` (Turkish) to be added to the dictionary JSON files.
-   - Implement it in the component using the project's translation hook.
-4. **Consistency:** If you output code that contains user-facing text without providing the corresponding updates for the AR, EN, and TR JSON files, you have failed. Always output the required JSON updates alongside the component code.
+2. **Zero Hardcoding:** Strictly forbidden from hardcoding raw text in `.tsx` or `.ts` files. Always use translation dictionaries or pass localized props according to `locale`.
+3. **Translation Flow:** When adding a new UI element:
+   - Use an existing key or create a new key.
+   - Maintain 100% key parity across `/messages/ar.json`, `/messages/tr.json`, and `/messages/en.json`.
+   - Never modify key names or delete existing keys.
+   - Never alter dynamic variables like `{count}`, `{name}`, `{{price}}`.
+
+## 2. Permanent Turkish UX Copywriting & POD Standards
+Act as a native Turkish Principal UX Copywriter specialized in Turkish fashion e-commerce and POD platforms:
+- **Brand Identity:** Always use `"KENDİN TASARLA"` / `"Kendin Tasarla"` (NEVER `"KENDİ TASARLA"`).
+- **Print Placement Terminology:**
+  - **STRICT BAN ON "Konum" for print areas** ("Konum" is strictly GPS/map location).
+  - Use `"Baskı Alanı"` or `"Baskı Yeri"` for titles, alerts, guides (`"Baskı Alanı Rehberi"`, `"Onaylı Baskı Alanları"`, `"Henüz baskı alanı seçilmedi"`).
+  - Use `"Yerleşim"` for short buttons and nav tabs (bottom nav tab `"Yerleşim"`, `"Serbest Yerleşim Modu"`).
+  - Garment faces & placements: `"Ön Yüz"`, `"Arka Yüz"`, `"Sağ Kol"`, `"Sol Kol"` (NEVER `"Sağ/Sol Omuz"` for sleeves), `"Sol Göğüs"`, `"Sağ Göğüs"`, `"Orta Göğüs"`, `"Ense Altı"`.
+- **Fashion & Shop Terms:**
+  - Navigation: `"Koleksiyonlar"`, `"Yeni Gelenler"`, `"Çok Satanlar"`, `"Kendin Tasarla"`, `"Tüm Ürünler"`.
+  - Specs: `"Beden Tablosu"` / `"Beden Rehberi"`, `"%100 Pamuk"`, `"Oversize Kalıp"`, `"Standart Kalıp"`, `"Yıkama Talimatları"`.
+  - Stock: `"Stokta Var"` (not "Mevcut"), `"Tükendi"` (not "Stokta Yok").
+- **Cart & Orders:**
+  - `"Sepetim"`, `"Sepete Ekle"`, `"Sipariş Özeti"`, `"Ara Toplam"`, `"Ücretsiz Kargo"`, `"İndirim Kodu"`, `"Ödemeye Geç"`, `"Teslimat Adresi"`, `"Ödeme Yöntemi"`.
+  - Order status lifecycle: `"Siparişiniz Alındı"`, `"Hazırlanıyor"`, `"Baskıda / Üretimde"`, `"Kargoya Verildi"`, `"Teslim Edildi"`, `"Kargo Takibi"`.
+- **Account & Validation:**
+  - `"Giriş Yap"`, `"Kayıt Ol"`, `"Hesabım"`, `"Siparişlerim"`, `"Adreslerim"`, `"Doğrulama Kodu"`. Polite, natural Turkish validation messages.
+- **Mobile Constraints:**
+  - Keep buttons and tab labels short to preserve layout on mobile screens without clipping.
+
+See `AGENTS.md` for full detailed reference.

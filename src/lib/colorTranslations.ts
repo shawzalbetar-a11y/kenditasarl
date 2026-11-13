@@ -61,3 +61,31 @@ export function getLocalizedColorName(color: string, locale: string = 'ar'): str
   }
   return color;
 }
+
+export function normalizeSize(size: string): string {
+  if (!size) return '';
+  return size.toString().trim().toUpperCase();
+}
+
+export function isColorMatch(targetColor: string, variantData: any): boolean {
+  if (!targetColor || !variantData) return false;
+  const target = targetColor.trim().toLowerCase();
+  const hex = (variantData.hex || '').trim().toLowerCase();
+  const nameEn = (variantData.colorName_en || '').trim().toLowerCase();
+  const nameAr = (variantData.colorName_ar || '').trim().toLowerCase();
+  const nameTr = (variantData.colorName_tr || '').trim().toLowerCase();
+  const color = (variantData.color || '').trim().toLowerCase();
+  return target === hex || target === nameEn || target === nameAr || target === nameTr || target === color;
+}
+
+export function getStockAndKeyForSize(sizes: Record<string, any> | undefined, size: string): { stock: number; key: string } | null {
+  if (!sizes || typeof sizes !== 'object' || !size) return null;
+  const target = normalizeSize(size);
+  for (const [k, v] of Object.entries(sizes)) {
+    if (normalizeSize(k) === target) {
+      return { stock: Number(v) || 0, key: k };
+    }
+  }
+  return null;
+}
+

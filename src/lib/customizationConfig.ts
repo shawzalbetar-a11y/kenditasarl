@@ -33,7 +33,7 @@ export interface PrintArea {
   shape?: 'rectangle' | 'circle';
   clipPath?: string;
   bleed?: number; // Bleed in millimeters (default 0)
-  
+
   // High-Resolution Native Calibration coordinates (Unscaled Image Space)
   nativeWidth?: number;
   nativeHeight?: number;
@@ -46,7 +46,7 @@ export interface PrintArea {
     left: number;
     shape?: 'rect' | 'circle';
   };
-  
+
   // Production / Manufacturing Settings
   physicalWidthCm?: number;   // Physical print width in centimeters (e.g. 30 cm)
   physicalHeightCm?: number;  // Physical print height in centimeters (e.g. 40 cm)
@@ -85,20 +85,28 @@ export interface FaceConfig {
   printArea: PrintArea;
 }
 
+export type PrintStrategy = 'dtf_only' | 'sublimation_only' | 'customer_choice';
+export type PrintMethodType = 'DTF' | 'Sublimation';
+
 export interface CustomizationConfig {
   enabled: boolean;
   version?: number;
-  
+
   allowCustomerUpload?: boolean;
   allowText?: boolean;
   allowStickers?: boolean;
   allowFreeMode?: boolean;
 
-  productType?: string; // The normalized product category (e.g. 't-shirt', 'mug', 'hat')
-  garmentType?: 'tshirt' | 'hoodie' | 'sweatshirt' | 'generic';
+  // Print technology strategy
+  printStrategy?: PrintStrategy;
+  defaultPrintMethod?: PrintMethodType;
+  allowedPrintMethods?: PrintMethodType[];
+
+  productType?: string; // The normalized product category (e.g. 't-shirt', 'mug', 'hat', 'phone_case')
+  garmentType?: 'tshirt' | 'hoodie' | 'sweatshirt' | 'mug' | 'hat' | 'phone_case' | 'generic';
   allowedPlacements?: string[]; // IDs of approved placements allowed for this product
   defaultPlacementId?: string;
-  
+
   // Custom calibrated placement coordinates per product (mapped by placementId)
   calibratedPlacements?: {
     [placementId: string]: CalibratedPlacementRect;
@@ -130,9 +138,9 @@ export interface CustomizationConfig {
 export interface ProductionSnapshot {
   snapshotVersion: number;
   editorVersion: number;
-  
+
   customization_config: CustomizationConfig;
-  
+
   // Flattened for easy access by Production Renderer
   printAreas: {
     [faceId: string]: PrintArea;
@@ -235,6 +243,9 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
     enabled: true,
     productType: 't-shirt',
     garmentType: 'tshirt',
+    printStrategy: 'dtf_only',
+    defaultPrintMethod: 'DTF',
+    allowedPrintMethods: ['DTF'],
     allowCustomerUpload: true,
     allowText: true,
     allowStickers: true,
@@ -308,6 +319,9 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
     enabled: true,
     productType: 'hoodie',
     garmentType: 'hoodie',
+    printStrategy: 'dtf_only',
+    defaultPrintMethod: 'DTF',
+    allowedPrintMethods: ['DTF'],
     allowCustomerUpload: true,
     allowText: true,
     allowStickers: true,
@@ -380,9 +394,16 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
   'mugs': {
     enabled: true,
     productType: 'mug',
+    garmentType: 'mug',
+    printStrategy: 'sublimation_only',
+    defaultPrintMethod: 'Sublimation',
+    allowedPrintMethods: ['Sublimation'],
     allowCustomerUpload: true,
     allowText: true,
     allowStickers: true,
+    allowFreeMode: true,
+    allowedPlacements: ['mug_full_wrap', 'mug_front', 'mug_back'],
+    defaultPlacementId: 'mug_full_wrap',
     faces: {
       front: {
         name: 'Wrap Around',
@@ -395,7 +416,7 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
           top: 180,
           left: 60,
           bleed: 3,
-          physicalWidthCm: 20,
+          physicalWidthCm: 23,
           physicalHeightCm: 9.5,
           targetDPI: 300,
           printMethod: 'Sublimation'
@@ -406,9 +427,16 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
   'hats': {
     enabled: true,
     productType: 'hat',
-    allowCustomerUpload: false,
+    garmentType: 'hat',
+    printStrategy: 'dtf_only',
+    defaultPrintMethod: 'DTF',
+    allowedPrintMethods: ['DTF'],
+    allowCustomerUpload: true,
     allowText: true,
     allowStickers: true,
+    allowFreeMode: true,
+    allowedPlacements: ['hat_front_crown', 'hat_left_side', 'hat_right_side', 'hat_back_arch'],
+    defaultPlacementId: 'hat_front_crown',
     faces: {
       front: {
         name: 'Front Patch',
@@ -421,10 +449,43 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
           top: 180,
           left: 130,
           bleed: 2,
-          physicalWidthCm: 12,
-          physicalHeightCm: 6,
+          physicalWidthCm: 11,
+          physicalHeightCm: 5.5,
           targetDPI: 300,
-          printMethod: 'Embroidery'
+          printMethod: 'DTF'
+        }
+      }
+    }
+  },
+  'phone_cases': {
+    enabled: true,
+    productType: 'phone_case',
+    garmentType: 'phone_case',
+    printStrategy: 'sublimation_only',
+    defaultPrintMethod: 'Sublimation',
+    allowedPrintMethods: ['Sublimation', 'DTF'],
+    allowCustomerUpload: true,
+    allowText: true,
+    allowStickers: true,
+    allowFreeMode: true,
+    allowedPlacements: ['phone_full_back', 'phone_lower_badge'],
+    defaultPlacementId: 'phone_full_back',
+    faces: {
+      front: {
+        name: 'Full Back Case',
+        enabled: true,
+        printArea: {
+          id: 'front',
+          name: 'Phone Case Back',
+          width: 240,
+          height: 480,
+          top: 60,
+          left: 80,
+          bleed: 3,
+          physicalWidthCm: 7.5,
+          physicalHeightCm: 15.5,
+          targetDPI: 300,
+          printMethod: 'Sublimation'
         }
       }
     }
@@ -432,9 +493,16 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
   'generic': {
     enabled: true,
     productType: 'generic',
+    garmentType: 'generic',
+    printStrategy: 'dtf_only',
+    defaultPrintMethod: 'DTF',
+    allowedPrintMethods: ['DTF'],
     allowCustomerUpload: true,
     allowText: true,
     allowStickers: true,
+    allowFreeMode: true,
+    allowedPlacements: ['generic_center'],
+    defaultPlacementId: 'generic_center',
     faces: {
       front: {
         name: 'Front',
@@ -462,19 +530,29 @@ export const CATEGORY_CUSTOMIZATION_DEFAULTS: Record<string, CustomizationConfig
  */
 export function getCustomizationConfig(categoryId?: string): CustomizationConfig {
   const normalizedKey = (categoryId || '').toLowerCase();
-  
+
   if (normalizedKey.includes('tshirt') || normalizedKey.includes('t-shirt') || normalizedKey.includes('tee')) {
     return JSON.parse(JSON.stringify(CATEGORY_CUSTOMIZATION_DEFAULTS.tshirts));
   }
   if (normalizedKey.includes('hoodie') || normalizedKey.includes('sweatshirt')) {
     return JSON.parse(JSON.stringify(CATEGORY_CUSTOMIZATION_DEFAULTS.hoodies));
   }
-  if (normalizedKey.includes('mug') || normalizedKey.includes('cup')) {
+  if (normalizedKey.includes('mug') || normalizedKey.includes('cup') || normalizedKey.includes('kupa') || normalizedKey.includes('كوب')) {
     return JSON.parse(JSON.stringify(CATEGORY_CUSTOMIZATION_DEFAULTS.mugs));
   }
-  if (normalizedKey.includes('hat') || normalizedKey.includes('cap')) {
+  if (normalizedKey.includes('hat') || normalizedKey.includes('cap') || normalizedKey.includes('şapka') || normalizedKey.includes('قبعة')) {
     return JSON.parse(JSON.stringify(CATEGORY_CUSTOMIZATION_DEFAULTS.hats));
   }
-  
+  if (
+    normalizedKey.includes('phone') ||
+    normalizedKey.includes('case') ||
+    normalizedKey.includes('kılıf') ||
+    normalizedKey.includes('kilif') ||
+    normalizedKey.includes('telefon') ||
+    normalizedKey.includes('غلاف')
+  ) {
+    return JSON.parse(JSON.stringify(CATEGORY_CUSTOMIZATION_DEFAULTS.phone_cases));
+  }
+
   return JSON.parse(JSON.stringify(CATEGORY_CUSTOMIZATION_DEFAULTS.generic));
 }

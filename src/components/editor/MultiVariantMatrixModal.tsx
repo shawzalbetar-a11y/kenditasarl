@@ -27,6 +27,7 @@ interface MultiVariantMatrixModalProps {
   onAddToCartDirect?: (breakdown: VariantMatrixItem[], totalQuantity: number) => void;
   syncAllColors?: boolean;
   onToggleSyncAllColors?: (sync: boolean) => void;
+  hasApparelSizes?: boolean;
 }
 
 const COLOR_MAP: Record<string, string> = {
@@ -43,7 +44,7 @@ const isColorEqual = (c1?: string | null, c2?: string | null): boolean => {
   const s1 = c1.trim().toLowerCase();
   const s2 = c2.trim().toLowerCase();
   if (s1 === s2) return true;
-  
+
   const hex1 = COLOR_MAP[s1]?.toLowerCase() || s1;
   const hex2 = COLOR_MAP[s2]?.toLowerCase() || s2;
   if (hex1 === hex2) return true;
@@ -80,6 +81,7 @@ export default function MultiVariantMatrixModal({
   onAddToCartDirect,
   syncAllColors,
   onToggleSyncAllColors,
+  hasApparelSizes = true,
 }: MultiVariantMatrixModalProps) {
   const t = useTranslations('Editor');
   const locale = useLocale();
@@ -127,7 +129,7 @@ export default function MultiVariantMatrixModal({
 
   // Active matrix colors rows
   const [activeColors, setActiveColors] = useState<string[]>(() => buildInitialState().colors);
-  
+
   // Matrix quantities mapped by canonical key
   const [quantities, setQuantities] = useState<Record<string, number>>(() => buildInitialState().map);
 
@@ -246,8 +248,8 @@ export default function MultiVariantMatrixModal({
     const defaultColor = resolveColor(selectedColor);
     const defaultSize = resolveSize(selectedSize);
     const defaultQty = Math.max(1, totalOrderQuantity || 1);
-    const items = breakdown.length > 0 
-      ? breakdown 
+    const items = breakdown.length > 0
+      ? breakdown
       : [{ color: defaultColor, size: defaultSize, quantity: defaultQty }];
     const count = totalPieces > 0 ? totalPieces : defaultQty;
     if (onAddToCartDirect) {
@@ -259,21 +261,25 @@ export default function MultiVariantMatrixModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100 w-full max-w-2xl h-[82dvh] max-h-[82dvh] sm:h-auto sm:max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
+
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/70">
+        <div className="p-4 sm:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/70 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-2xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] flex items-center justify-center font-bold shrink-0">
               <Layers size={20} />
             </div>
             <div>
               <h3 className="font-bold text-base sm:text-lg text-gray-900">
-                {locale === 'tr' ? 'Çoklu Beden ve Adet Seçimi' : locale === 'en' ? 'Multi-Size & Quantity Selection' : 'تحديد مقاسات وكميات متعددة'}
+                {!hasApparelSizes
+                  ? (locale === 'tr' ? 'Çoklu Renk ve Adet Seçimi' : locale === 'en' ? 'Multi-Color & Quantity Selection' : 'تحديد الألوان والكميات المتعددة')
+                  : t('multiSizeSelectionTitle', { fallback: locale === 'tr' ? 'Çoklu Beden ve Adet Seçimi' : locale === 'en' ? 'Multi-Size & Quantity Selection' : 'تحديد مقاسات وكميات متعددة' })}
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                {locale === 'tr' ? 'Aynı tasarımdan farklı beden ve renklerde dilediğiniz adetlerde sipariş verin' : locale === 'en' ? 'Order multiple sizes & colors for this design in bulk' : 'اطلب من نفس تصميمك بمقاسات وألوان وكميات مختلفة بسهولة'}
+                {!hasApparelSizes
+                  ? (locale === 'tr' ? 'Aynı tasarım için dilediğiniz renk ve adetlerde sipariş oluşturun' : locale === 'en' ? 'Order multiple colors and quantities for this design' : 'اطلب من نفس تصميمك بألوان وكميات متعددة بسهولة')
+                  : t('multiSizeSelectionDesc', { fallback: locale === 'tr' ? 'Aynı tasarımdan farklı beden ve renklerde dilediğiniz adetlerde sipariş verin' : locale === 'en' ? 'Order multiple sizes & colors for this design in bulk' : 'اطلب من نفس تصميمك بمقاسات وألوان وكميات مختلفة بسهولة' })}
               </p>
             </div>
           </div>
@@ -281,42 +287,45 @@ export default function MultiVariantMatrixModal({
             <button
               type="button"
               onClick={handleResetMatrix}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 hover:border-red-300 bg-white hover:bg-red-50 text-gray-500 hover:text-red-600 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-              title={locale === 'tr' ? 'Varsayılana Sıfırla' : locale === 'en' ? 'Reset to Default' : 'تصفير وإعادة تعيين'}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 hover:border-red-300 bg-white hover:bg-red-50 text-gray-600 hover:text-red-600 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              title={t('resetCounter', { fallback: locale === 'tr' ? 'Varsayılana Sıfırla' : locale === 'en' ? 'Reset to Default' : 'تصفير وإعادة تعيين' })}
             >
               <RotateCcw size={13} />
-              <span>{locale === 'tr' ? 'Sıfırla' : locale === 'en' ? 'Reset' : 'تصفير'}</span>
+              <span>{t('resetCounter', { fallback: locale === 'tr' ? 'Sıfırla' : locale === 'en' ? 'Reset' : 'تصفير' })}</span>
             </button>
-            <button 
+            <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-900 flex items-center justify-center transition-all cursor-pointer shrink-0"
+              aria-label="Close"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
 
         {/* Matrix Body (Scrollable) */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 space-y-6">
           {activeColors.map((color) => {
             const colorName = getLocalizedColorName(color, locale);
             const bgColor = color === 'white' ? '#ffffff' : color === 'black' ? '#000000' : color === 'navy' ? '#1E3A8A' : color;
-            
+
             // Subtotal for this color
             const colorSubtotal = availableSizes.reduce((sum, size) => sum + (quantities[getMatrixKey(color, size)] || 0), 0);
 
             return (
               <div key={color} className="bg-gray-50/80 border border-gray-200/80 rounded-2xl p-4 sm:p-5 space-y-3.5">
-                {/* Color Row Header */}
+                {/* Color Row Header (Matching Screenshot 1) */}
                 <div className="flex justify-between items-center border-b border-gray-200/60 pb-2.5">
                   <div className="flex items-center gap-2.5">
-                    <div 
-                      className="w-5 h-5 rounded-full border border-gray-300 shadow-xs shrink-0"
+                    <div
+                      className="w-5 h-5 rounded-full border border-gray-300 shadow-xs shrink-0 ring-2 ring-slate-200"
                       style={{ backgroundColor: bgColor }}
                     />
-                    <span className="font-bold text-sm text-gray-900">{colorName}</span>
-                    <span className="text-xs text-gray-500">
+                    <span className="font-black text-sm text-gray-900">
+                      {colorName}
+                    </span>
+                    <span className="text-xs font-semibold text-gray-500 bg-white px-2 py-0.5 rounded-md border border-gray-200">
                       ({colorSubtotal} {locale === 'tr' ? 'Adet' : locale === 'en' ? 'Pieces' : 'قطع'})
                     </span>
                   </div>
@@ -333,54 +342,56 @@ export default function MultiVariantMatrixModal({
                   )}
                 </div>
 
-                {/* Size Quantity Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                {/* Size Quantity Grid (Matching Screenshot 1 Cards with Stock Badge + Stepper) */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                   {availableSizes.map((size) => {
                     const key = getMatrixKey(color, size);
                     const maxStock = getMaxStock(color, size);
                     const isOutOfStock = maxStock <= 0;
                     const qty = isOutOfStock ? 0 : (quantities[key] || 0);
                     const hasQty = qty > 0;
+                    const stockDisplay = maxStock < 900 ? maxStock : 10;
 
                     return (
-                      <div 
+                      <div
                         key={size}
                         className={cn(
-                          "flex flex-col items-center justify-between p-2.5 rounded-2xl border transition-all bg-white relative",
-                          isOutOfStock 
-                            ? "border-dashed border-gray-200 bg-gray-50/60 opacity-60" 
-                            : hasQty 
-                              ? "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/10 shadow-xs" 
-                              : "border-gray-200 hover:border-gray-300"
+                          "flex flex-col items-center justify-between p-3 rounded-2xl transition-all relative",
+                          isOutOfStock
+                            ? "border-dashed border-gray-200 bg-gray-50/60 opacity-60"
+                            : hasQty
+                              ? "border-2 border-[var(--color-primary)] ring-4 ring-[var(--color-primary)]/10 bg-orange-50/30 shadow-sm"
+                              : "border border-gray-200 hover:border-gray-300 bg-white"
                         )}
                       >
-                        <div className="flex items-center justify-between w-full mb-1.5 px-0.5">
-                          <span className={cn("font-black text-xs uppercase", isOutOfStock ? "text-gray-400 line-through" : "text-gray-800")}>
-                            {size}
+                        {/* Size Card Top Row: Stock Badge + Size Name */}
+                        <div className="flex items-center justify-between w-full mb-2">
+                          <span className={cn("font-mono font-black text-sm", isOutOfStock ? "text-gray-400 line-through" : "text-gray-900")}>
+                            {size === 'Standard' ? (locale === 'tr' ? 'Standart' : locale === 'en' ? 'Standard' : 'قياسي') : size}
                           </span>
-                          
+
                           {isOutOfStock ? (
-                            <span className="text-[9px] text-red-500 font-bold bg-red-50 px-1 py-0.2 rounded">
+                            <span className="text-[9px] text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded-full border border-red-100">
                               {locale === 'tr' ? 'Tükendi' : locale === 'en' ? 'Out' : 'نفذ'}
                             </span>
-                          ) : maxStock < 50 ? (
-                            <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1 py-0.2 rounded">
-                              {maxStock} {locale === 'tr' ? 'stok' : locale === 'en' ? 'left' : 'متوفر'}
+                          ) : (
+                            <span className="text-[9.5px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 font-mono">
+                              {stockDisplay} {t('availableStock', { fallback: locale === 'tr' ? 'stokta' : locale === 'en' ? 'in stock' : 'متوفر' })}
                             </span>
-                          ) : null}
+                          )}
                         </div>
-                        
-                        {/* Stepper */}
-                        <div className={cn("flex items-center gap-1 w-full justify-between rounded-xl p-1", isOutOfStock ? "bg-gray-100 opacity-50" : "bg-gray-100")}>
+
+                        {/* Stepper (Matching Screenshot 1 Steppers) */}
+                        <div className={cn("flex items-center gap-1 w-full justify-between rounded-xl p-1", isOutOfStock ? "bg-gray-100 opacity-50" : "bg-gray-100/90 border border-gray-200/60")}>
                           <button
                             type="button"
                             onClick={() => handleQtyChange(color, size, -1)}
                             disabled={isOutOfStock || qty <= 0}
-                            className="w-6 h-6 rounded-lg bg-white shadow-xs flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            className="w-7 h-7 rounded-lg bg-white shadow-xs flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-90 font-bold text-sm disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-transform"
                           >
-                            <Minus size={12} />
+                            <Minus size={13} />
                           </button>
-                          
+
                           <input
                             type="text"
                             inputMode="numeric"
@@ -389,16 +400,16 @@ export default function MultiVariantMatrixModal({
                             disabled={isOutOfStock}
                             value={qty}
                             onChange={(e) => handleSetDirectQty(color, size, e.target.value)}
-                            className={cn("w-8 text-center font-mono font-black text-xs bg-transparent outline-none", isOutOfStock ? "text-gray-400 cursor-not-allowed" : "text-gray-900")}
+                            className={cn("w-8 text-center font-mono font-black text-sm bg-transparent outline-none", isOutOfStock ? "text-gray-400 cursor-not-allowed" : "text-gray-900")}
                           />
 
                           <button
                             type="button"
                             onClick={() => handleQtyChange(color, size, 1)}
                             disabled={isOutOfStock || qty >= maxStock}
-                            className="w-6 h-6 rounded-lg bg-white shadow-xs flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            className="w-7 h-7 rounded-lg bg-white shadow-xs flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-90 font-bold text-sm disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-transform"
                           >
-                            <Plus size={12} />
+                            <Plus size={13} />
                           </button>
                         </div>
                       </div>
@@ -472,7 +483,7 @@ export default function MultiVariantMatrixModal({
           )}
         </div>
 
-        {/* Footer with Live Summary & CTA */}
+        {/* Footer with Live Summary & CTA (Matching Screenshot 1) */}
         <div className="p-4 sm:p-5 border-t border-gray-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
             <div className="flex flex-col">
@@ -500,15 +511,15 @@ export default function MultiVariantMatrixModal({
             <button
               type="button"
               onClick={handleConfirm}
-              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold text-xs transition-all cursor-pointer"
+              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold text-xs transition-all cursor-pointer active:scale-95"
             >
-              {locale === 'tr' ? 'Uygula ve Kapat' : locale === 'en' ? 'Apply Matrix' : 'تطبيق التحديد'}
+              {locale === 'tr' ? 'Seçimi Uygula' : locale === 'en' ? 'Apply Selection' : 'تطبيق التحديد'}
             </button>
-            
+
             <button
               type="button"
               onClick={handleDirectAdd}
-              className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:opacity-90 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-[var(--color-primary)] to-orange-500 hover:opacity-95 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
             >
               <ShoppingBag size={15} />
               <span>{locale === 'tr' ? 'Tümünü Sepete Ekle' : locale === 'en' ? 'Add All to Cart' : 'إضافة الكل للسلة'}</span>

@@ -1,18 +1,20 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import {
   PlacementSpec,
+  NormalizedProductType,
   PRINT_CONFIG,
   normalizeGarmentType,
   isFaceMatching,
 } from '@/lib/printPlacementConfig';
-import { Ruler, Check, ChevronDown, ChevronUp, Shirt, Sparkles, X, Copy, AlertTriangle, ShieldAlert, CheckCircle2, Zap } from 'lucide-react';
+import { resolveProductStudioProfile } from '@/lib/productStudioProfile';
+import { Ruler, Check, Shirt, Coffee, Smartphone, ShoppingBag, X, ShieldAlert, CheckCircle2, Zap } from 'lucide-react';
 import { getLocalizedColorName } from '@/lib/colorTranslations';
-import { cn } from '@/lib/utils';
 
 interface GarmentPlacementGuideProps {
+  isOpen?: boolean;
+  onClose?: () => void;
   garmentType?: string;
   allowedPlacements?: string[];
   activeFace: string;
@@ -21,7 +23,6 @@ interface GarmentPlacementGuideProps {
   selectedPlacementIds: string[];
   syncPlacementsAcrossColors?: boolean;
   onToggleSyncPlacements?: () => void;
-  onApplyToAllColors?: () => void;
   onTogglePlacement: (placement: PlacementSpec) => void;
   onSelectFace?: (face: string) => void;
   onClearAll?: () => void;
@@ -30,8 +31,12 @@ interface GarmentPlacementGuideProps {
   isFreeMode?: boolean;
   onToggleFreeMode?: (enabled: boolean) => void;
   allowFreeMode?: boolean;
-  focusedPlacementId?: string | null;
-  onFocusPlacement?: (placementId: string) => void;
+  getPlacementPrice?: (spec: PlacementSpec) => number;
+  printMethod?: string;
+  allowPrintMethodChoice?: boolean;
+  selectedPrintMethod?: 'DTF' | 'Sublimation';
+  onSelectPrintMethod?: (method: 'DTF' | 'Sublimation') => void;
+  isCurrentColorDark?: boolean;
 }
 
 /**
@@ -42,32 +47,181 @@ function GarmentMiniature({
   placement,
   isActive,
 }: {
-  garmentType: 'tshirt' | 'hoodie' | 'sweatshirt' | 'generic';
+  garmentType: NormalizedProductType;
   placement: PlacementSpec;
   isActive: boolean;
 }) {
   const isBack = placement.targetFace === 'back';
   const isHoodie = garmentType === 'hoodie';
+  const isMug = garmentType === 'mug';
+  const isHat = garmentType === 'hat';
+  const isPhoneCase = garmentType === 'phone_case';
+  const isGeneric = garmentType === 'generic';
   const box = placement.canvasBox;
 
-  // Precise sleeve detection
+  // Precise sleeve / side panel detection
   const isLeftSleeve = placement.id === 'left_sleeve' || placement.targetFace === 'left' || placement.targetFace === 'left_shoulder';
   const isRightSleeve = placement.id === 'right_sleeve' || placement.targetFace === 'right' || placement.targetFace === 'right_shoulder';
   const isSleeve = isLeftSleeve || isRightSleeve;
 
   return (
-    <div className={`relative w-12 h-12 rounded-xl flex items-center justify-center p-1 transition-all shrink-0 ${
-      isActive
+    <div className={`relative w-12 h-12 rounded-xl flex items-center justify-center p-1 transition-all shrink-0 ${isActive
         ? 'bg-amber-500/15 border-2 border-amber-500 shadow-xs ring-2 ring-amber-400/30'
         : 'bg-slate-100 hover:bg-slate-200 border border-slate-300'
-    }`}>
+      }`}>
       <svg
         viewBox="0 0 100 100"
         className="w-full h-full drop-shadow-2xs"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {isHoodie ? (
+        {isMug ? (
+          /* Mug Silhouette with D-Handle & Panoramic / Side Zones */
+          <g>
+            <path
+              d="M72 32 H82 C89 32 89 68 82 68 H72"
+              className={isActive ? "stroke-slate-800" : "stroke-slate-400"}
+              strokeWidth="5"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <rect
+              x="16"
+              y="22"
+              width="56"
+              height="60"
+              rx="5"
+              className={isActive ? "fill-slate-800 stroke-slate-900" : "fill-slate-300 stroke-slate-400"}
+              strokeWidth="2"
+            />
+            <ellipse
+              cx="44"
+              cy="22"
+              rx="28"
+              ry="4.5"
+              className={isActive ? "fill-slate-700 stroke-slate-900" : "fill-slate-200 stroke-slate-400"}
+              strokeWidth="1.5"
+            />
+            {placement.isWrapAround ? (
+              <rect
+                x="20"
+                y="32"
+                width="48"
+                height="40"
+                rx="2"
+                className={isActive ? "fill-amber-400/45 stroke-amber-400 animate-pulse" : "fill-blue-500/25 stroke-blue-500"}
+                strokeWidth="1.6"
+                strokeDasharray={isActive ? "none" : "2.5 2"}
+              />
+            ) : (
+              <rect
+                x={isBack ? "44" : "24"}
+                y="33"
+                width="26"
+                height="38"
+                rx="2"
+                className={isActive ? "fill-amber-400/45 stroke-amber-400 animate-pulse" : "fill-blue-500/25 stroke-blue-500"}
+                strokeWidth="1.6"
+                strokeDasharray={isActive ? "none" : "2 2"}
+              />
+            )}
+          </g>
+        ) : isHat ? (
+          /* Structured Cap Silhouette with Crown & Visor */
+          <g>
+            <path
+              d="M22 60 C22 30 34 20 50 20 C66 20 78 30 78 60 Z"
+              className={isActive ? "fill-slate-800 stroke-slate-900" : "fill-slate-300 stroke-slate-400"}
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            <line x1="50" y1="20" x2="50" y2="56" className="stroke-slate-500/50" strokeWidth="1.2" strokeDasharray="1.5 1.5" />
+            <circle cx="50" cy="19" r="2.2" className="fill-slate-500" />
+            {!isBack ? (
+              <path
+                d="M14 60 Q50 50 86 60 Q50 72 14 60 Z"
+                className={isActive ? "fill-slate-700 stroke-slate-900" : "fill-slate-200 stroke-slate-400"}
+                strokeWidth="1.8"
+              />
+            ) : (
+              <path
+                d="M36 60 A14 12 0 0 1 64 60 Z"
+                className="fill-white/80 stroke-slate-400"
+                strokeWidth="1.3"
+              />
+            )}
+            {isRightSleeve ? (
+              <rect x="25" y="37" width="14" height="14" rx="2" className={isActive ? "fill-amber-400 stroke-amber-300 animate-pulse" : "fill-blue-500/60 stroke-blue-600"} strokeWidth="1.5" />
+            ) : isLeftSleeve ? (
+              <rect x="61" y="37" width="14" height="14" rx="2" className={isActive ? "fill-amber-400 stroke-amber-300 animate-pulse" : "fill-blue-500/60 stroke-blue-600"} strokeWidth="1.5" />
+            ) : isBack ? (
+              <rect x="34" y="32" width="32" height="14" rx="2" className={isActive ? "fill-amber-400 stroke-amber-300 animate-pulse" : "fill-blue-500/40 stroke-blue-500"} strokeWidth="1.5" />
+            ) : (
+              <rect x="32" y="31" width="36" height="21" rx="2" className={isActive ? "fill-amber-400 stroke-amber-300 animate-pulse" : "fill-blue-500/40 stroke-blue-500"} strokeWidth="1.5" />
+            )}
+          </g>
+        ) : isPhoneCase ? (
+          /* Phone Case Silhouette with Top-Left Camera Cutout */
+          <g>
+            <rect
+              x="27"
+              y="10"
+              width="46"
+              height="80"
+              rx="8"
+              className={isActive ? "fill-slate-800 stroke-slate-900" : "fill-slate-300 stroke-slate-400"}
+              strokeWidth="2"
+            />
+            {placement.id === 'phone_lower_badge' ? (
+              <rect
+                x="33"
+                y="40"
+                width="34"
+                height="42"
+                rx="3"
+                className={isActive ? "fill-amber-400/45 stroke-amber-400 animate-pulse" : "fill-blue-500/25 stroke-blue-500"}
+                strokeWidth="1.6"
+              />
+            ) : (
+              <rect
+                x="30"
+                y="13"
+                width="40"
+                height="74"
+                rx="6"
+                className={isActive ? "fill-amber-400/35 stroke-amber-400 animate-pulse" : "fill-blue-500/20 stroke-blue-500"}
+                strokeWidth="1.5"
+                strokeDasharray={isActive ? "none" : "2 2"}
+              />
+            )}
+            <rect x="32" y="15" width="16" height="18" rx="3.5" className="fill-white stroke-slate-500" strokeWidth="1.3" />
+            <circle cx="37" cy="20" r="2.2" className="fill-slate-700" />
+            <circle cx="37" cy="28" r="2.2" className="fill-slate-700" />
+            <circle cx="43.5" cy="24" r="2" className="fill-slate-700" />
+          </g>
+        ) : isGeneric ? (
+          /* Generic Product Tile */
+          <g>
+            <rect
+              x="16"
+              y="16"
+              width="68"
+              height="68"
+              rx="8"
+              className={isActive ? "fill-slate-800 stroke-slate-900" : "fill-slate-300 stroke-slate-400"}
+              strokeWidth="2"
+            />
+            <rect
+              x="28"
+              y="28"
+              width="44"
+              height="44"
+              rx="3"
+              className={isActive ? "fill-amber-400/40 stroke-amber-400 animate-pulse" : "fill-blue-500/25 stroke-blue-500"}
+              strokeWidth="1.6"
+            />
+          </g>
+        ) : isHoodie ? (
           /* Hoodie Vector Path */
           <g>
             <path
@@ -229,8 +383,8 @@ function GarmentMiniature({
           </g>
         )}
 
-        {/* Highlighted Official Print Area Box for Front/Back (Non-sleeve) Placements */}
-        {!isSleeve && (
+        {/* Highlighted Official Print Area Box for Front/Back Apparel (Non-sleeve) Placements */}
+        {!isSleeve && !isMug && !isHat && !isPhoneCase && !isGeneric && (
           <>
             <rect
               x={box.leftPercent}
@@ -238,24 +392,18 @@ function GarmentMiniature({
               width={box.maxWidthPercent}
               height={box.maxHeightPercent}
               rx="1.5"
-              className={
-                isActive
-                  ? "fill-amber-400 stroke-amber-500 animate-pulse"
-                  : "fill-blue-500/70 stroke-blue-600"
-              }
-              strokeWidth="1.2"
+              className={isActive ? "fill-amber-400/35 stroke-amber-500 animate-pulse" : "fill-blue-500/20 stroke-blue-500/80"}
+              strokeWidth="1.5"
+              strokeDasharray={isActive ? "none" : "2 2"}
             />
-
-            {/* Distance from collar indicator line */}
-            <line
-              x1={box.leftPercent + box.maxWidthPercent / 2}
-              y1={21}
-              x2={box.leftPercent + box.maxWidthPercent / 2}
-              y2={box.topPercent}
-              stroke={isActive ? "#F59E0B" : "#3B82F6"}
-              strokeWidth="1"
-              strokeDasharray="1.5 1.5"
-            />
+            {isActive && (
+              <circle
+                cx={box.leftPercent + box.maxWidthPercent / 2}
+                cy={box.topPercent + box.maxHeightPercent / 2}
+                r="3"
+                className="fill-amber-500 animate-ping"
+              />
+            )}
           </>
         )}
       </svg>
@@ -263,148 +411,9 @@ function GarmentMiniature({
   );
 }
 
-/**
- * Dynamic Typewriter Animated Onboarding Hint
- * Fully bidirectional: in RTL (Arabic) it anchors left-0 on mobile and expands rightwards;
- * in LTR (Turkish, English) it anchors right-0 on mobile and expands leftwards (inwards into the canvas),
- * and on desktop it anchors left-0 expanding rightwards.
- * The sliding arrow pointer adjusts with pixel-perfect accuracy to point directly
- * at [المعتمد / Standards] or [الوضع الحر / Free Mode] across all locales and device screens!
- */
-function TypewriterHint({
-  locale,
-  onOpenPlacements,
-  onOpenFreeMode,
-  hidden = false,
-}: {
-  locale: string;
-  onOpenPlacements: () => void;
-  onOpenFreeMode: () => void;
-  hidden?: boolean;
-}) {
-  const [text, setText] = useState('');
-  const [phraseIndex, setPhraseIndex] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-
-  const isRtl = locale === 'ar';
-
-  const phrases = useMemo(() => {
-    if (locale === 'tr') {
-      return [
-        { type: 'placements', text: '👇 Baskı yerlerini seçmek için dokunun' },
-        { type: 'free', text: '⚡ Veya serbest mod ile özgürce tasarlayın' },
-      ];
-    }
-    if (locale === 'en') {
-      return [
-        { type: 'placements', text: '👇 Tap here to choose print placements' },
-        { type: 'free', text: '⚡ Or design freely with Free Mode' },
-      ];
-    }
-    return [
-      { type: 'placements', text: '👇 اضغط هنا لاختيار مواضع الطباعة' },
-      { type: 'free', text: '⚡ أو صمّم بحرية مع "الوضع الحر"' },
-    ];
-  }, [locale]);
-
-  const currentItem = phrases[phraseIndex % phrases.length];
-
-  useEffect(() => {
-    if (dismissed || hidden) return;
-    const currentTargetText = currentItem.text;
-
-    let timer: NodeJS.Timeout;
-
-    if (!isDeleting && text.length < currentTargetText.length) {
-      // Rapid elegant typing: 35ms per character
-      timer = setTimeout(() => {
-        setText(currentTargetText.slice(0, text.length + 1));
-      }, 35);
-    } else if (!isDeleting && text.length === currentTargetText.length) {
-      // Pause at full sentence: 3200ms
-      timer = setTimeout(() => {
-        setIsDeleting(true);
-      }, 3200);
-    } else if (isDeleting && text.length > 0) {
-      // Fast backspace: 18ms per character
-      timer = setTimeout(() => {
-        setText(currentTargetText.slice(0, text.length - 1));
-      }, 18);
-    } else if (isDeleting && text.length === 0) {
-      // Advance to next tip
-      setIsDeleting(false);
-      setPhraseIndex((prev) => prev + 1);
-    }
-
-    return () => clearTimeout(timer);
-  }, [text, isDeleting, phraseIndex, currentItem.text, dismissed, hidden]);
-
-  if (dismissed || hidden) return null;
-
-  const handleClick = () => {
-    if (currentItem.type === 'free') {
-      onOpenFreeMode();
-    } else {
-      onOpenPlacements();
-    }
-  };
-
-  const isPlacementTip = currentItem.type === 'placements';
-
-  return (
-    <div
-      onClick={handleClick}
-      className={cn(
-        "absolute -top-9 sm:-top-10 z-40 flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white rounded-full shadow-lg shadow-orange-500/25 border border-amber-300/60 animate-in fade-in slide-in-from-bottom-2 duration-300 cursor-pointer select-none whitespace-nowrap max-w-[calc(100vw-36px)] sm:max-w-md active:scale-95 group hover:shadow-xl hover:scale-[1.02] transition-all",
-        // Clamping logic: in RTL, mobile placement is on the left so anchor left-0 to grow rightwards.
-        // in LTR, mobile placement is on the right so anchor right-0 to grow leftwards into the screen.
-        // On desktop, placement is always on the left so anchor sm:left-0 sm:right-auto.
-        isRtl
-          ? "left-0 sm:left-0"
-          : "right-0 left-auto sm:left-0 sm:right-auto"
-      )}
-    >
-      {/* Dynamic Sparkle */}
-      <span className="flex items-center text-amber-200 animate-spin shrink-0" style={{ animationDuration: '4s' }}>
-        <Sparkles size={12} />
-      </span>
-
-      {/* Typed Text */}
-      <span className="text-[10px] sm:text-[11px] font-black tracking-wide text-white drop-shadow-xs truncate">
-        {text}
-      </span>
-
-      {/* Blinking Cursor */}
-      <span className="inline-block w-1 h-3 bg-white rounded-full animate-pulse opacity-90 shrink-0" />
-
-      {/* Intelligent Bidirectional Sliding Speech-Bubble Pointer Tail */}
-      <div 
-        className={cn(
-          "absolute -bottom-1 w-2.5 h-2.5 bg-orange-600 rotate-45 border-r border-b border-amber-300/60 transition-all duration-300",
-          isRtl
-            ? (isPlacementTip ? "left-[88px] sm:left-[190px]" : "left-[22px] sm:left-[65px]")
-            : (isPlacementTip ? "right-[88px] sm:right-auto sm:left-[65px]" : "right-[22px] sm:right-auto sm:left-[190px]")
-        )}
-      />
-
-      {/* Dismiss Button */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setDismissed(true);
-        }}
-        className="ms-1 p-0.5 rounded-full hover:bg-black/20 text-amber-100 hover:text-white transition-colors cursor-pointer shrink-0"
-        title={locale === 'tr' ? 'Kapat' : locale === 'en' ? 'Close' : 'إغلاق التلميح'}
-      >
-        <X size={10} />
-      </button>
-    </div>
-  );
-}
-
 export default function GarmentPlacementGuide({
+  isOpen = true,
+  onClose,
   garmentType = 'tshirt',
   allowedPlacements,
   activeFace,
@@ -413,7 +422,6 @@ export default function GarmentPlacementGuide({
   selectedPlacementIds = [],
   syncPlacementsAcrossColors = false,
   onToggleSyncPlacements,
-  onApplyToAllColors,
   onTogglePlacement,
   onSelectFace,
   onClearAll,
@@ -422,20 +430,30 @@ export default function GarmentPlacementGuide({
   isFreeMode = false,
   onToggleFreeMode,
   allowFreeMode = true,
-  focusedPlacementId,
-  onFocusPlacement,
+  getPlacementPrice,
+  printMethod = 'DTF',
+  allowPrintMethodChoice = false,
+  selectedPrintMethod = 'DTF',
+  onSelectPrintMethod,
+  isCurrentColorDark = false,
 }: GarmentPlacementGuideProps) {
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const isSublimationActive = /sublim|süblim|سبلم|تسام/i.test(printMethod || '');
   const [activeTab, setActiveTab] = useState<'all' | 'front' | 'back' | 'sleeves'>('all');
-  const [mounted, setMounted] = useState<boolean>(false);
-  const [showDisclaimerModal, setShowDisclaimerModal] = useState<boolean>(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const normalizedType = normalizeGarmentType(garmentType);
   const garmentConfig = PRINT_CONFIG[normalizedType] || PRINT_CONFIG.tshirt;
+  const productProfile = useMemo(
+    () => resolveProductStudioProfile({ category: normalizedType, config: { garmentType: normalizedType } }),
+    [normalizedType]
+  );
+  const ProductIcon =
+    productProfile.family === 'mug'
+      ? Coffee
+      : productProfile.family === 'phone_case'
+        ? Smartphone
+        : productProfile.family === 'hat'
+          ? ShoppingBag
+          : Shirt;
   const localizedColorName = getLocalizedColorName(selectedColor, locale);
 
   // Filter allowed placements
@@ -492,373 +510,210 @@ export default function GarmentPlacementGuide({
     return allPlacementsList;
   }, [allPlacementsList, activeTab]);
 
-  if (allPlacementsList.length === 0) return null;
+  if (!isOpen || allPlacementsList.length === 0) return null;
 
   return (
-    <div className={`relative ${className}`}>
-      {/* Dynamic Typewriter Animated Onboarding Hint (Focal interactive guide above the button) */}
-      <TypewriterHint
-        locale={locale}
-        onOpenPlacements={() => setIsExpanded(true)}
-        onOpenFreeMode={() => setShowDisclaimerModal(true)}
-        hidden={isExpanded || showDisclaimerModal}
+    <div className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none ${className}`}>
+      {/* Dim Backdrop with blur */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        onClick={onClose}
       />
 
-      {/* ========================================================= */}
-      {/* 1. MOBILE STREAMLINED VIEW (< sm): Inline Pill Beside Faces */}
-      {/* ========================================================= */}
-      <div className="flex sm:hidden items-center p-0.5 bg-white/95 backdrop-blur-md rounded-full border border-gray-200/90 shadow-md gap-0.5 select-none pointer-events-auto">
-        {!isFreeMode ? (
-          <>
-            {/* Approved Placements Trigger with Animated Arrow Hint */}
-            <button
-              type="button"
-              onClick={() => setIsExpanded(true)}
-              className="px-2.5 py-1 rounded-full text-[10.5px] font-black bg-amber-500 text-white shadow-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all group shrink-0"
-              title={locale === 'tr' ? 'Baskı Konumlarını Seç' : locale === 'en' ? 'Select Print Placements' : 'اضغط لاختيار وعرض مواضع الطباعة'}
-            >
-              <Shirt size={12} className="text-white shrink-0" />
-              <span>{locale === 'tr' ? 'Mevcut' : locale === 'en' ? 'Standards' : 'المعتمد'}</span>
-              {selectedSpecs.length > 0 && (
-                <span className="bg-amber-600/90 text-white text-[9px] px-1 py-0.1 rounded-full font-mono font-bold shrink-0">
-                  {selectedSpecs.length}
-                </span>
-              )}
-              {/* Bouncing Arrow Hint */}
-              <ChevronUp size={13} className="text-amber-100 animate-bounce stroke-[2.5] shrink-0" />
-            </button>
-
-            {/* Switch to Free Mode Button */}
-            <button
-              type="button"
-              onClick={() => setShowDisclaimerModal(true)}
-              className="px-2 py-1 rounded-full text-[10px] font-bold text-amber-700 hover:text-amber-800 hover:bg-amber-50/80 flex items-center gap-0.5 cursor-pointer active:scale-95 shrink-0"
-              title={locale === 'tr' ? 'Serbest Moda Geç' : locale === 'en' ? 'Switch to Free Mode' : 'التحويل للوضع الحر'}
-            >
-              <Zap size={11} className="text-amber-500 shrink-0" />
-              <span>{locale === 'tr' ? 'Serbest' : locale === 'en' ? 'Free' : 'الحر ⚡'}</span>
-            </button>
-          </>
-        ) : (
-          <>
-            {/* Revert to Approved Button */}
-            <button
-              type="button"
-              onClick={() => onToggleFreeMode && onToggleFreeMode(false)}
-              className="px-2 py-1 rounded-full text-[10px] font-bold text-gray-700 hover:bg-gray-100 flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
-              title={locale === 'tr' ? 'Standart Konumlara Dön' : locale === 'en' ? 'Revert to Standards' : 'العودة للمواضع القياسية'}
-            >
-              <Shirt size={11} className="text-gray-500 shrink-0" />
-              <span>{locale === 'tr' ? 'Standarta Dön' : locale === 'en' ? 'Standards' : 'المعتمد'}</span>
-            </button>
-
-            {/* Active Free Mode Pill */}
-            <div className="px-2.5 py-1 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs flex items-center gap-1 animate-pulse shrink-0">
-              <Zap size={11} className="text-white shrink-0" />
-              <span>{locale === 'tr' ? 'Serbest Mod' : locale === 'en' ? 'Free Mode' : 'الوضع الحر ⚡'}</span>
+      {/* Centered Modal Card (Bottom sheet on mobile, centered modal on desktop) */}
+      <div
+        className="relative w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl h-[82dvh] max-h-[82dvh] sm:h-auto sm:max-h-[90vh] flex flex-col shadow-2xl z-10 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 border border-gray-100"
+        dir={locale === 'ar' ? 'rtl' : 'ltr'}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="flex items-center justify-between gap-2 px-5 sm:px-6 py-4 border-b border-gray-100 shrink-0 bg-white">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-orange-500/25 shrink-0">
+              <ProductIcon size={20} />
             </div>
-          </>
-        )}
-      </div>
-
-      {/* ========================================================= */}
-      {/* 2. DESKTOP VIEW (sm:flex): Anchored below "تصاميمي"       */}
-      {/* ========================================================= */}
-      <div className="hidden sm:flex flex-col items-start gap-1.5 w-60 sm:w-68">
-        {/* Mode Switcher Segmented Bar */}
-        <div className="flex items-center w-full p-1 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200/90 shadow-md gap-1 select-none pointer-events-auto">
-          <button
-            type="button"
-            onClick={() => {
-              if (isFreeMode && onToggleFreeMode) {
-                onToggleFreeMode(false);
-              }
-            }}
-            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
-              !isFreeMode
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <Shirt size={13} className={!isFreeMode ? 'text-white' : 'text-gray-500'} />
-            <span className="truncate">{locale === 'tr' ? 'Standart Konumlar' : locale === 'en' ? 'Approved Standards' : 'المواضع المعتمدة'}</span>
-          </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-black text-gray-900 font-heading">
+                  {locale === 'tr' ? `${printMethod || 'DTF'} Baskı ve Yerleşim Rehberi` : locale === 'en' ? 'Print & Placement Guide' : 'دليل مواضع الطباعة والتصميم'}
+                </h3>
+                <span
+                  dir="ltr"
+                  className={`text-[10px] font-black px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 transition-colors ${isSublimationActive
+                      ? 'bg-sky-50 text-sky-700 border-sky-200'
+                      : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    }`}
+                >
+                  {printMethod || 'DTF'} 300DPI
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                {productProfile.getPlacementGuideSubtitle(locale)}
+              </p>
+            </div>
+          </div>
 
           <button
             type="button"
-            onClick={() => {
-              if (!isFreeMode) {
-                setShowDisclaimerModal(true);
-              }
-            }}
-            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
-              isFreeMode
-                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/25 ring-2 ring-amber-400/30'
-                : 'text-amber-700 hover:text-amber-800 hover:bg-amber-50/80'
-            }`}
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-900 flex items-center justify-center transition-all cursor-pointer shrink-0"
+            aria-label="Close"
           >
-            <Zap size={13} className={isFreeMode ? 'text-white' : 'text-amber-500'} />
-            <span className="truncate">{locale === 'tr' ? 'Serbest Mod ⚡' : locale === 'en' ? 'Free Mode ⚡' : 'الوضع الحر ⚡'}</span>
+            <X size={18} />
           </button>
         </div>
 
-        {/* Placements Selection Trigger Pill or Free Mode Status Pill */}
-        {!isFreeMode ? (
-          <button
-            type="button"
-            onClick={() => setIsExpanded(true)}
-            className="w-full bg-white/95 backdrop-blur-md rounded-2xl p-2 border border-gray-200/90 shadow-md hover:shadow-lg flex items-center justify-between gap-2 cursor-pointer select-none active:scale-[0.98] transition-all text-right pointer-events-auto"
-            title={locale === 'tr' ? 'Baskı Konumlarını Seç' : locale === 'en' ? 'Select Print Placements' : 'فتح دليل واختيار مواضع الطباعة'}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="p-1.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 shrink-0">
-                <Shirt size={15} />
-              </div>
-
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs font-black text-gray-900 truncate">
-                    {selectedSpecs.length === 0
-                      ? (locale === 'tr' ? 'Baskı Konumları' : locale === 'en' ? 'Print Placements' : 'مواضع الطباعة المعتمدة')
-                      : (locale === 'tr' ? `Seçili Konumlar (${selectedSpecs.length})` : locale === 'en' ? `Selected Placements (${selectedSpecs.length})` : `المواضع المختارة (${selectedSpecs.length})`)}
-                  </span>
-
-                  {/* Color Scope Pill */}
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-gray-100 text-gray-700 border border-gray-200 flex items-center gap-1 shrink-0">
-                    <span
-                      className="w-2 h-2 rounded-full border border-gray-400 shrink-0"
-                      style={{ backgroundColor: selectedColor === 'navy' ? '#000080' : selectedColor }}
-                    />
-                    <span className="truncate max-w-[65px]">
-                      {syncPlacementsAcrossColors
-                        ? (locale === 'tr' ? 'Tüm Renkler' : locale === 'en' ? 'All' : 'كافة الألوان')
-                        : localizedColorName}
-                    </span>
-                  </span>
-
-                  {selectedSpecs.length > 0 && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-white shrink-0 shadow-2xs">
-                      {selectedSpecs.length}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1 text-[10px] text-gray-500 truncate mt-0.5">
-                  {selectedSpecs.length === 0 ? (
-                    <span className="truncate">
-                      {locale === 'tr' ? 'Konum seçmek için tıklayın' : locale === 'en' ? 'Tap to select placements' : 'اضغط لاختيار موضع أو أكثر'}
-                    </span>
-                  ) : (
-                    <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar max-w-full">
-                      {selectedSpecs.map((s) => {
-                        const isFocused = s.id === focusedPlacementId;
-                        return (
-                          <span
-                            key={s.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onFocusPlacement?.(s.id);
-                              if (onSelectFace && !isFaceMatching(s.targetFace, activeFace)) {
-                                onSelectFace(s.targetFace);
-                              }
-                            }}
-                            className={cn(
-                              "px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold transition-all shrink-0 cursor-pointer",
-                              isFocused
-                                ? "bg-amber-500 text-white shadow-2xs scale-105"
-                                : "bg-amber-100/80 text-amber-800 hover:bg-amber-200"
-                            )}
-                            title={locale === 'tr' ? 'Bu konuma odaklan' : locale === 'en' ? 'Focus this placement' : 'التركيز على هذا الموضع'}
-                          >
-                            {locale === 'tr' ? s.nameTr : locale === 'en' ? s.nameEn : s.nameAr}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-1 rounded-xl bg-gray-100 text-gray-500 shrink-0">
-              <ChevronUp size={15} />
-            </div>
-          </button>
-        ) : (
-          <div className="w-full bg-amber-50/95 backdrop-blur-md rounded-2xl p-2 border border-amber-300 shadow-md flex items-center justify-between gap-2 pointer-events-auto select-none text-right">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="p-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 shadow-xs animate-pulse">
-                <Zap size={15} />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-black text-amber-900 truncate">
-                    {locale === 'tr' ? 'Serbest Mod Aktif ⚡' : locale === 'en' ? 'Free Mode Active ⚡' : 'الوضع الحر مفعّل ⚡'}
-                  </span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-amber-200 text-amber-900 border border-amber-400">
-                    {locale === 'tr' ? 'Tam Yüzey' : locale === 'en' ? 'Full Face' : 'كامل الواجهة'}
-                  </span>
-                </div>
-                <span className="text-[10px] text-amber-800 font-medium truncate mt-0.5">
-                  {locale === 'tr' ? 'Serbestçe tasarlayın' : locale === 'en' ? 'Design freely' : 'حرية التصميم في كامل القطعة'}
-                </span>
-              </div>
-            </div>
+        {/* Mode Switcher: Approved Standards vs Free Mode */}
+        {allowFreeMode && (
+          <div className="px-5 sm:px-6 py-3 bg-slate-50 border-b border-gray-200/80 flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (isFreeMode && onToggleFreeMode) {
+                  onToggleFreeMode(false);
+                }
+              }}
+              className={`flex-1 py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 ${!isFreeMode
+                  ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25 ring-2 ring-amber-400/40'
+                  : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
+                }`}
+            >
+              <ProductIcon size={16} className={!isFreeMode ? 'text-white' : 'text-gray-500'} />
+              <span>{locale === 'tr' ? 'Onaylı Baskı Alanları' : locale === 'en' ? 'Approved Standards' : 'المواضع المعتمدة عالمياً'}</span>
+            </button>
 
             <button
               type="button"
-              onClick={() => onToggleFreeMode && onToggleFreeMode(false)}
-              className="px-2.5 py-1 rounded-xl bg-white hover:bg-gray-100 text-gray-700 text-[10px] font-bold border border-gray-300 shadow-2xs shrink-0 cursor-pointer active:scale-95"
-              title="العودة للمواضع القياسية"
+              onClick={() => {
+                if (!isFreeMode && onToggleFreeMode) {
+                  onToggleFreeMode(true);
+                }
+              }}
+              className={`flex-1 py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 ${isFreeMode
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-orange-500/25 ring-2 ring-amber-400/40'
+                  : 'bg-white hover:bg-amber-50/80 text-amber-800 border border-amber-200'
+                }`}
             >
-              {locale === 'tr' ? 'Standarta Dön' : locale === 'en' ? 'Revert' : 'رجوع'}
+              <Zap size={16} className={isFreeMode ? 'text-white fill-white' : 'text-amber-500'} />
+              <span>{locale === 'tr' ? 'Serbest Mod ⚡' : locale === 'en' ? 'Free Mode ⚡' : 'الوضع الحر ⚡'}</span>
             </button>
           </div>
         )}
-      </div>
 
-      {/* 2. Professional Native-Feel Mobile Bottom Sheet & Desktop Modal (Rendered via React Portal) */}
-      {isExpanded && mounted && createPortal(
-        <div className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center sm:items-center">
-          {/* Dim Backdrop with blur */}
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
-            onClick={() => setIsExpanded(false)}
-          />
+        {/* Print Method Switcher Bar (When product supports Customer Choice) */}
+        {allowPrintMethodChoice && onSelectPrintMethod && (
+          <div className="px-5 sm:px-6 py-2 bg-white border-b border-gray-100 flex items-center justify-between gap-2 shrink-0 flex-wrap">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[11px] font-bold text-gray-700">
+                {locale === 'tr' ? 'Baskı Yöntemi:' : locale === 'en' ? 'Print Method:' : 'نوع الطباعة:'}
+              </span>
+              {isCurrentColorDark && (
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                  {locale === 'tr' ? 'Koyu renk: DTF' : locale === 'en' ? 'Dark: DTF only' : 'داكن: DTF فقط'}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => onSelectPrintMethod('DTF')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${selectedPrintMethod !== 'Sublimation'
+                    ? 'bg-orange-50 border-orange-400 text-orange-900 shadow-2xs ring-1 ring-orange-200'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                  }`}
+              >
+                <span>🔥</span>
+                <span>DTF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectPrintMethod('Sublimation')}
+                disabled={isCurrentColorDark}
+                title={
+                  isCurrentColorDark
+                    ? (locale === 'tr' ? 'Koyu kumaşlarda süblimasyon yapılamaz' : locale === 'en' ? 'Sublimation requires light fabrics' : 'السبليميشن يتطلب ألواناً فاتحة')
+                    : undefined
+                }
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1 ${isCurrentColorDark
+                    ? 'bg-gray-100 border-dashed border-gray-300 text-gray-400 opacity-60 cursor-not-allowed'
+                    : selectedPrintMethod === 'Sublimation'
+                      ? 'bg-sky-50 border-sky-400 text-sky-900 shadow-2xs ring-1 ring-sky-200 cursor-pointer'
+                      : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 cursor-pointer'
+                  }`}
+              >
+                <span>☕</span>
+                <span>{locale === 'tr' ? 'Süblimasyon' : locale === 'en' ? 'Sublimation' : 'سبليميشن'}</span>
+              </button>
+            </div>
+          </div>
+        )}
 
-          {/* Bottom Sheet Card on Mobile / Centered Modal on Desktop */}
-          <div
-            className="relative w-full sm:max-w-[480px] bg-white rounded-t-[32px] sm:rounded-3xl max-h-[88vh] sm:max-h-[82vh] flex flex-col shadow-2xl z-10 overflow-hidden animate-in slide-in-from-bottom duration-300"
-            dir={locale === 'ar' ? 'rtl' : 'ltr'}
-          >
-            {/* Mobile Drag Indicator Handle */}
-            <div className="sm:hidden w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-2.5 mb-1 shrink-0" />
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-100 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 shrink-0">
-                  <Shirt size={18} />
+        {/* Modal Content */}
+        {isFreeMode ? (
+          <div className="p-5 sm:p-6 flex flex-col gap-4 overflow-y-auto min-h-0 flex-1">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 via-orange-50/40 to-amber-50 border border-amber-200 flex flex-col gap-3.5 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 shadow-md">
+                  <Zap size={24} className="fill-white" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="text-sm font-black text-gray-900">
-                      {locale === 'tr' ? 'Termal Baskı ve Konumlandırma' : locale === 'en' ? 'DTF Print & Placement Guide' : 'دليل مواضع الطباعة والتصميم'}
-                    </h3>
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      DTF
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-gray-500">
-                    {locale === 'tr' ? 'Standart onaylı konumlar veya serbest mod' : locale === 'en' ? 'Standard approved positions or free mode' : 'المواضع القياسية المعتمدة أو وضع التصميم الحر'}
+                  <h4 className="text-sm sm:text-base font-black text-amber-950 font-heading">
+                    {locale === 'tr' ? 'Serbest Yerleşim Modu Aktif' : locale === 'en' ? 'Free Placement Mode Active' : 'الوضع الحر مفعّل حالياً'}
+                  </h4>
+                  <p className="text-xs text-amber-900/80 mt-1 leading-relaxed">
+                    {locale === 'tr'
+                      ? 'Tüm yüzey baskı alanına açıldı. Tasarımınızı dilediğiniz gibi büyütebilir, döndürebilir ve taşıyabilirsiniz.'
+                      : locale === 'en'
+                        ? 'Full garment face boundary is unlocked. You can freely resize, rotate, and move your designs anywhere across the piece.'
+                        : 'تم فتح كامل حدود الواجهة لتصميمك. يمكنك تحريك، تدوير، وتكبير عناصرك بحرية تامة في أي مكان على القطعة.'}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsExpanded(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-all cursor-pointer shrink-0"
-                aria-label="Close"
-              >
-                <X size={16} />
-              </button>
+              <div className="p-3.5 rounded-xl bg-white/95 border border-amber-300 text-xs text-amber-950 flex items-start gap-2.5">
+                <ShieldAlert size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-bold block text-xs">
+                    {locale === 'tr' ? 'Sorumluluk Reddi Onaylandı:' : locale === 'en' ? 'Disclaimer Acknowledged:' : 'إخلاء المسؤولية معتمد:'}
+                  </strong>
+                  <span className="text-gray-600 text-[11px] leading-relaxed block mt-0.5">
+                    {locale === 'tr'
+                      ? 'Standart dışı yerleşimlerin sorumluluğu size aittir. Mağaza ve atölye ideal görünmeme konusunda sorumluluk taşımaz.'
+                      : locale === 'en'
+                        ? 'Full responsibility for non-standard placement lies with you. Store and workshop are disclaimed from non-ideal placement outcomes.'
+                        : 'المتجر والمطبعة يخليان مسؤوليتهما تماماً عن عدم ظهور التصميم بالمكان المعتاد عند الخروج عن المقاييس الفنية العالمية.'}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            {/* Mode Switcher: Approved Standards vs Free Mode */}
-            {allowFreeMode && (
-              <div className="px-4 sm:px-5 py-2.5 bg-slate-50 border-b border-gray-200/80 flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isFreeMode && onToggleFreeMode) {
-                      onToggleFreeMode(false);
-                    }
-                  }}
-                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    !isFreeMode
-                      ? 'bg-white text-gray-900 border border-gray-300 shadow-xs'
-                      : 'text-gray-500 hover:text-gray-800'
-                  }`}
-                >
-                  <Shirt size={14} className={!isFreeMode ? 'text-amber-500' : 'text-gray-400'} />
-                  <span>{locale === 'tr' ? 'Onaylı Standart Konumlar' : locale === 'en' ? 'Approved Standards' : 'المواضع المعتمدة عالمياً'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!isFreeMode) {
-                      setShowDisclaimerModal(true);
-                    }
-                  }}
-                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    isFreeMode
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20'
-                      : 'text-amber-700 hover:text-amber-800 bg-amber-50/80 border border-amber-200/80'
-                  }`}
-                >
-                  <Zap size={14} className={isFreeMode ? 'text-white' : 'text-amber-500'} />
-                  <span>{locale === 'tr' ? 'Serbest Mod ⚡' : locale === 'en' ? 'Free Mode ⚡' : 'الوضع الحر ⚡'}</span>
-                </button>
-              </div>
-            )}
-
-            {isFreeMode ? (
-              <div className="p-5 flex flex-col gap-4 overflow-y-auto max-h-[60vh]">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 flex flex-col gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0 shadow-md">
-                      <Zap size={22} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-amber-950">
-                        {locale === 'tr' ? 'Serbest Konumlandırma Modu Aktif' : locale === 'en' ? 'Free Placement Mode Active' : 'الوضع الحر مفعّل حالياً'}
-                      </h4>
-                      <p className="text-xs text-amber-900/80 mt-1 leading-relaxed">
-                        {locale === 'tr'
-                          ? 'Tüm yüzey baskı alanına açıldı. Tasarımınızı tırnakları kullanarak dilediğiniz gibi büyütebilir, döndürebilir ve taşıyabilirsiniz.'
-                          : locale === 'en'
-                          ? 'Full garment face boundary is unlocked. You can freely resize, rotate, and move your designs anywhere across the piece.'
-                          : 'تم فتح كامل حدود الواجهة لتصميمك. يمكنك تحريك، تدوير، وتكبير عناصرك بحرية تامة في أي مكان على القطعة.'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-white/95 border border-amber-300 text-[11px] text-amber-950 flex items-start gap-2">
-                    <ShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="font-bold block">
-                        {locale === 'tr' ? 'Sorumluluk Reddi Onaylandı:' : locale === 'en' ? 'Disclaimer Acknowledged:' : 'إخلاء المسؤولية معتمد:'}
-                      </strong>
-                      <span className="text-gray-600">
-                        {locale === 'tr'
-                          ? 'Standart dışı yerleşimlerin sorumluluğu size aittir. Mağaza ve atölye ideal görünmeme konusunda sorumluluk taşımaz.'
-                          : locale === 'en'
-                          ? 'Full responsibility for non-standard placement lies with you. Store and workshop are disclaimed from non-ideal placement outcomes.'
-                          : 'المتجر والمطبعة يخليان مسؤوليتهما تماماً عن عدم ظهور التصميم بالمكان المعتاد عند الخروج عن المقاييس الفنية العالمية.'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onToggleFreeMode) onToggleFreeMode(false);
-                  }}
-                  className="w-full py-3 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border border-gray-300"
-                >
-                  <Shirt size={15} />
-                  <span>
-                    {locale === 'tr' ? 'Onaylı Standart Konumlara Geri Dön' : locale === 'en' ? 'Return to Approved Standards' : 'الرجوع للمواضع القياسية المعتمدة'}
-                  </span>
-                </button>
-              </div>
-            ) : (
-              <>
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-black text-xs sm:text-sm shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer transition active:scale-95"
+              >
+                <CheckCircle2 size={16} />
+                <span>{locale === 'tr' ? 'Serbest Mod ile Devam Et' : locale === 'en' ? 'Continue in Free Mode' : 'متابعة التصميم بالوضع الحر'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onToggleFreeMode) onToggleFreeMode(false);
+                }}
+                className="py-3 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border border-gray-300"
+              >
+                <ProductIcon size={15} />
+                <span>
+                  {locale === 'tr' ? 'Onaylı Baskı Alanlarına Geri Dön' : locale === 'en' ? 'Return to Approved Standards' : 'الرجوع للمواضع القياسية المعتمدة'}
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
             {/* Color Scope & Unification Toggle Banner */}
-            <div className="px-4 sm:px-5 py-2.5 bg-amber-50/70 border-b border-amber-200/70 flex items-center justify-between gap-2 text-xs shrink-0">
+            <div className="px-5 sm:px-6 py-2.5 bg-amber-50/70 border-b border-amber-200/70 flex items-center justify-between gap-2 text-xs shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <span
                   className="w-4 h-4 rounded-full border border-gray-400 block shadow-2xs shrink-0"
@@ -874,7 +729,7 @@ export default function GarmentPlacementGuide({
                   <span className="text-[10px] text-gray-500 truncate">
                     {syncPlacementsAcrossColors
                       ? (locale === 'tr' ? 'Tüm renklerde aynı uygulanır' : locale === 'en' ? 'Applied to all colors' : 'أي موضع يتم اختياره يُطبّق على جميع ألوان التيشيرت')
-                      : (locale === 'tr' ? 'Her rengin bağımsız konumu korunur' : locale === 'en' ? 'Each color has independent placements' : 'كل لون له مواضع طباعة مستقلة خاصة به')}
+                      : (locale === 'tr' ? 'Her rengin bağımsız baskı alanı korunur' : locale === 'en' ? 'Each color has independent placements' : 'كل لون له مواضع طباعة مستقلة خاصة به')}
                   </span>
                 </div>
               </div>
@@ -885,49 +740,33 @@ export default function GarmentPlacementGuide({
                   <button
                     type="button"
                     onClick={onToggleSyncPlacements}
-                    className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors cursor-pointer ${
-                      syncPlacementsAcrossColors ? 'bg-amber-500' : 'bg-gray-300'
-                    }`}
+                    className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors cursor-pointer ${syncPlacementsAcrossColors ? 'bg-amber-500' : 'bg-gray-300'
+                      }`}
                     title={locale === 'tr' ? 'Renkler arası birleştir/ayır' : locale === 'en' ? 'Toggle unify across colors' : 'تبديل التوحيد / الاستقلالية لكل لون'}
                   >
                     <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-xs transition-transform ${
-                        syncPlacementsAcrossColors
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-xs transition-transform ${syncPlacementsAcrossColors
                           ? (locale === 'ar' ? '-translate-x-5' : 'translate-x-5')
                           : (locale === 'ar' ? '-translate-x-1' : 'translate-x-1')
-                      }`}
+                        }`}
                     />
-                  </button>
-                )}
-
-                {/* Instant copy button when in independent mode */}
-                {!syncPlacementsAcrossColors && onApplyToAllColors && selectedSpecs.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={onApplyToAllColors}
-                    className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
-                    title={locale === 'tr' ? 'Bu rengin konumlarını diğer tüm renklere kopyala' : locale === 'en' ? 'Copy this color placements to all other colors' : 'نسخ مواضع هذا اللون لباقي الألوان'}
-                  >
-                    <Copy size={11} />
-                    <span className="hidden sm:inline">{locale === 'tr' ? 'Kopyala' : locale === 'en' ? 'Copy' : 'نسخ للكل'}</span>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Face Filter Tabs */}
-            <div className="px-4 sm:px-5 py-2 border-b border-gray-100 shrink-0">
-              <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-2xl">
+            {/* Category Filter Tabs */}
+            <div className="px-5 sm:px-6 pt-3 pb-2 border-b border-gray-100 bg-white shrink-0">
+              <div className="flex items-center bg-gray-100 p-1 rounded-2xl gap-1 text-xs font-bold">
                 <button
                   type="button"
                   onClick={() => setActiveTab('all')}
-                  className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                    activeTab === 'all'
-                      ? 'bg-white text-gray-900 shadow-2xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
+                  className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${activeTab === 'all'
+                      ? 'bg-white text-gray-900 shadow-2xs font-black'
+                      : 'text-gray-600 hover:text-gray-900'
+                    }`}
                 >
-                  <span>{locale === 'tr' ? 'Tümü' : locale === 'en' ? 'All' : 'الكل'}</span>
+                  <span>{locale === 'tr' ? 'Tümü' : locale === 'en' ? 'All' : 'جميع المواضع'}</span>
                   {countsPerCategory.total > 0 && (
                     <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center font-mono">
                       {countsPerCategory.total}
@@ -939,15 +778,22 @@ export default function GarmentPlacementGuide({
                   type="button"
                   onClick={() => {
                     setActiveTab('front');
-                    if (onSelectFace && activeFace !== 'front') onSelectFace('front');
+                    if (onSelectFace && !isFaceMatching(activeFace, 'front')) {
+                      onSelectFace('front');
+                    }
                   }}
-                  className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                    activeTab === 'front'
-                      ? 'bg-white text-gray-900 shadow-2xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
+                  className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${activeTab === 'front'
+                      ? 'bg-white text-gray-900 shadow-2xs font-black'
+                      : 'text-gray-600 hover:text-gray-900'
+                    }`}
                 >
-                  <span>{locale === 'tr' ? 'Ön' : locale === 'en' ? 'Front' : 'الصدر (الأمام)'}</span>
+                  <span>
+                    {productProfile.family === 'mug'
+                      ? (locale === 'tr' ? 'Ön / 360°' : locale === 'en' ? 'Front / 360°' : 'الأمام / 360°')
+                      : productProfile.family === 'phone_case'
+                        ? (locale === 'tr' ? 'Arka Yüzey' : locale === 'en' ? 'Case Back' : 'ظهر الغلاف')
+                        : (locale === 'tr' ? 'Ön Yüz' : locale === 'en' ? 'Front' : 'الواجهة الأمامية')}
+                  </span>
                   {countsPerCategory.front > 0 && (
                     <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center font-mono">
                       {countsPerCategory.front}
@@ -955,71 +801,71 @@ export default function GarmentPlacementGuide({
                   )}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('back');
-                    if (onSelectFace && activeFace !== 'back') onSelectFace('back');
-                  }}
-                  className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                    activeTab === 'back'
-                      ? 'bg-white text-gray-900 shadow-2xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  <span>{locale === 'tr' ? 'Arka' : locale === 'en' ? 'Back' : 'الظهر (الخلف)'}</span>
-                  {countsPerCategory.back > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center font-mono">
-                      {countsPerCategory.back}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('sleeves');
-                    if (onSelectFace) {
-                      // If already on a sleeve face, keep it
-                      if (
-                        isFaceMatching(activeFace, 'right') ||
-                        isFaceMatching(activeFace, 'left')
-                      ) {
-                        return;
+                {productProfile.family !== 'phone_case' && productProfile.family !== 'generic' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('back');
+                      if (onSelectFace && !isFaceMatching(activeFace, 'back')) {
+                        onSelectFace('back');
                       }
-
-                      // Check if user already has a selected sleeve placement to switch to its face
-                      const selectedSleeve = selectedSpecs.find(p => isFaceMatching(p.targetFace, 'right') || isFaceMatching(p.targetFace, 'left'));
-                      const preferredTarget = selectedSleeve?.targetFace;
-
-                      // Find an available sleeve face from availableFaces
-                      const availableSleeveFace = (availableFaces || []).find(af => 
-                        (preferredTarget && isFaceMatching(af, preferredTarget)) ||
-                        isFaceMatching(af, 'right') ||
-                        isFaceMatching(af, 'left')
-                      );
-
-                      onSelectFace(availableSleeveFace || preferredTarget || 'right_shoulder');
-                    }
-                  }}
-                  className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                    activeTab === 'sleeves'
-                      ? 'bg-white text-gray-900 shadow-2xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  <span>{locale === 'tr' ? 'Kollar' : locale === 'en' ? 'Sleeves' : 'الأكمام'}</span>
-                  {countsPerCategory.sleeves > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center font-mono">
-                      {countsPerCategory.sleeves}
+                    }}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${activeTab === 'back'
+                        ? 'bg-white text-gray-900 shadow-2xs font-black'
+                        : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                  >
+                    <span>
+                      {productProfile.family === 'mug'
+                        ? (locale === 'tr' ? 'Karşı Yüz' : locale === 'en' ? 'Opposite' : 'الجهة المقابلة')
+                        : (locale === 'tr' ? 'Arka Yüz' : locale === 'en' ? 'Back' : 'الجهة الخلفية')}
                     </span>
-                  )}
-                </button>
+                    {countsPerCategory.back > 0 && (
+                      <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center font-mono">
+                        {countsPerCategory.back}
+                      </span>
+                    )}
+                  </button>
+                )}
+
+                {(productProfile.hasSleeves || productProfile.family === 'hat') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('sleeves');
+                      if (onSelectFace && availableFaces && availableFaces.length > 0) {
+                        const preferredTarget = activeFace.includes('shoulder') || activeFace.includes('sleeve') ? activeFace : 'right_shoulder';
+                        const availableSleeveFace = availableFaces.find(
+                          (af) =>
+                            isFaceMatching(af, preferredTarget) ||
+                            isFaceMatching(af, 'right') ||
+                            isFaceMatching(af, 'left')
+                        );
+                        onSelectFace(availableSleeveFace || preferredTarget || 'right_shoulder');
+                      }
+                    }}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${activeTab === 'sleeves'
+                        ? 'bg-white text-gray-900 shadow-2xs font-black'
+                        : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                  >
+                    <span>
+                      {productProfile.family === 'hat'
+                        ? (locale === 'tr' ? 'Yanlar' : locale === 'en' ? 'Sides' : 'الجانبين')
+                        : (locale === 'tr' ? 'Kollar' : locale === 'en' ? 'Sleeves' : 'الأكمام')}
+                    </span>
+                    {countsPerCategory.sleeves > 0 && (
+                      <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center font-mono">
+                        {countsPerCategory.sleeves}
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Scrollable Placements Cards Area */}
-            <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-3 space-y-2.5">
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 py-4 space-y-3">
               {filteredPlacements.map((placement) => {
                 const isSelected = selectedPlacementIds.includes(placement.id);
 
@@ -1045,11 +891,10 @@ export default function GarmentPlacementGuide({
                         }
                       }
                     }}
-                    className={`w-full p-3 rounded-2xl border transition-all flex items-center gap-3 text-right cursor-pointer select-none active:scale-[0.99] ${
-                      isSelected
+                    className={`w-full p-3.5 rounded-2xl border transition-all flex items-center gap-3.5 text-right cursor-pointer select-none active:scale-[0.99] ${isSelected
                         ? 'bg-amber-50/90 border-amber-500 ring-2 ring-amber-400/25 shadow-xs'
                         : 'bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300'
-                    }`}
+                      }`}
                   >
                     {/* Multi-Select Checkbox Box */}
                     <div className="shrink-0">
@@ -1075,27 +920,59 @@ export default function GarmentPlacementGuide({
                         <span className="text-xs sm:text-sm font-black text-gray-900 truncate">
                           {locale === 'tr' ? placement.nameTr : locale === 'en' ? placement.nameEn : placement.nameAr}
                         </span>
-                        <span className="text-[11px] font-mono font-black text-amber-700 bg-amber-500/15 px-2 py-0.5 rounded-md shrink-0" dir="ltr">
-                          {placement.dimensions.recommended.widthCm}×{placement.dimensions.recommended.heightCm} cm
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {getPlacementPrice && (
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${getPlacementPrice(placement) === 0
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                              }`}>
+                              {getPlacementPrice(placement) === 0
+                                ? (locale === 'tr' ? 'Dahil' : locale === 'en' ? 'Included' : 'مشمول')
+                                : `+${getPlacementPrice(placement)} ₺`}
+                            </span>
+                          )}
+                          <span className="text-[11px] font-mono font-black text-amber-700 bg-amber-500/15 px-2 py-0.5 rounded-md" dir="ltr">
+                            {placement.dimensions.recommended.widthCm}×{placement.dimensions.recommended.heightCm} cm
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2 text-[10.5px] text-gray-500 mt-1 flex-wrap">
-                        <span className="flex items-center gap-0.5 text-indigo-700 font-bold shrink-0">
-                          <Ruler size={11} />
-                          {locale === 'tr' ? `${placement.offsetFromCollarCm} cm yaka altı` : locale === 'en' ? `${placement.offsetFromCollarCm} cm below collar` : `نزولاً ${placement.offsetFromCollarCm} سم من الياقة`}
-                        </span>
-                        <span>•</span>
-                        <span className="text-gray-400 font-medium">
+                        {placement.offsetFromCollarCm > 0 && productProfile.hasCollarOffset && (
+                          <>
+                            <span className="flex items-center gap-0.5 text-indigo-700 font-bold shrink-0">
+                              <Ruler size={11} />
+                              {locale === 'tr' ? `${placement.offsetFromCollarCm} cm yaka altı` : locale === 'en' ? `${placement.offsetFromCollarCm} cm below collar` : `نزولاً ${placement.offsetFromCollarCm} سم من الياقة`}
+                            </span>
+                            <span>•</span>
+                          </>
+                        )}
+                        {placement.isWrapAround && (
+                          <>
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[9.5px] shrink-0">
+                              {locale === 'tr' ? '360° Tam Çevre' : locale === 'en' ? '360° Wrap' : 'دوران كامل 360°'}
+                            </span>
+                            <span>•</span>
+                          </>
+                        )}
+                        <span className="text-gray-500 font-medium">
                           {placement.targetFace === 'front'
-                            ? (locale === 'tr' ? 'Ön Yüz' : locale === 'en' ? 'Front' : 'الواجهة الأمامية')
+                            ? (productProfile.family === 'mug'
+                              ? (locale === 'tr' ? 'Ön / Çevre' : locale === 'en' ? 'Front / Wrap' : 'الأمام / البانوراما')
+                              : productProfile.family === 'phone_case'
+                                ? (locale === 'tr' ? 'Arka Yüzey' : locale === 'en' ? 'Case Back' : 'ظهر الغلاف')
+                                : (locale === 'tr' ? 'Ön Yüz' : locale === 'en' ? 'Front' : 'الواجهة الأمامية'))
                             : placement.targetFace === 'back'
-                              ? (locale === 'tr' ? 'Arka Yüz' : locale === 'en' ? 'Back' : 'الواجهة الخلفية')
-                              : (locale === 'tr' ? 'Kol / Omuz' : locale === 'en' ? 'Sleeve' : 'الكتف / الكم')}
+                              ? (productProfile.family === 'mug'
+                                ? (locale === 'tr' ? 'Karşı Yüz' : locale === 'en' ? 'Opposite Side' : 'الجهة المقابلة')
+                                : (locale === 'tr' ? 'Arka Yüz' : locale === 'en' ? 'Back' : 'الجهة الخلفية'))
+                              : productProfile.family === 'hat'
+                                ? (locale === 'tr' ? 'Yan Panel' : locale === 'en' ? 'Side Panel' : 'اللوح الجانبي')
+                                : (locale === 'tr' ? 'Kollar' : locale === 'en' ? 'Sleeve' : 'الكتف / الكم')}
                         </span>
                       </div>
 
-                      <p className="text-[10px] text-gray-400 mt-1 line-clamp-1">
+                      <p className="text-[10.5px] text-gray-400 mt-1 line-clamp-1">
                         {locale === 'tr' ? placement.descriptionTr : locale === 'en' ? placement.descriptionEn : placement.descriptionAr}
                       </p>
                     </div>
@@ -1105,12 +982,12 @@ export default function GarmentPlacementGuide({
             </div>
 
             {/* Sticky Bottom Actions Bar */}
-            <div className="px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/80 flex items-center justify-between gap-3 shrink-0">
+            <div className="px-5 sm:px-6 py-3.5 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs text-gray-700 font-bold truncate">
+                <span className="text-xs sm:text-sm text-gray-800 font-bold truncate">
                   {selectedSpecs.length === 0
-                    ? (locale === 'tr' ? 'Konum seçilmedi' : locale === 'en' ? 'No placement' : 'لم يتم اختيار مواضع')
-                    : (locale === 'tr' ? `${selectedSpecs.length} konum seçildi` : locale === 'en' ? `${selectedSpecs.length} selected` : `تم اختيار (${selectedSpecs.length}) مواضع`)}
+                    ? (locale === 'tr' ? 'Baskı alanı seçilmedi' : locale === 'en' ? 'No placement' : 'لم يتم اختيار مواضع')
+                    : (locale === 'tr' ? `${selectedSpecs.length} alan seçildi` : locale === 'en' ? `${selectedSpecs.length} selected` : `تم اختيار (${selectedSpecs.length}) مواضع`)}
                 </span>
 
                 {selectedSpecs.length > 0 && onClearAll && (
@@ -1126,97 +1003,16 @@ export default function GarmentPlacementGuide({
 
               <button
                 type="button"
-                onClick={() => setIsExpanded(false)}
-                className="py-2 px-5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                onClick={onClose}
+                className="py-2.5 px-6 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-black shadow-md transition-all cursor-pointer flex items-center gap-2 shrink-0"
               >
-                <Check size={14} strokeWidth={3} />
-                <span>{locale === 'tr' ? 'Konumları Onayla' : locale === 'en' ? 'Confirm Placements' : 'تأكيد المواضع'}</span>
+                <Check size={16} strokeWidth={3} />
+                <span>{locale === 'tr' ? 'Baskı Alanlarını Onayla' : locale === 'en' ? 'Confirm Placements' : 'تأكيد المواضع'}</span>
               </button>
             </div>
-            </>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 3. Free Mode Disclaimer & Terms Modal (Rendered via React Portal) */}
-      {showDisclaimerModal && mounted && createPortal(
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
-          {/* Dim Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
-            onClick={() => setShowDisclaimerModal(false)}
-          />
-
-          {/* Dialog Card */}
-          <div
-            className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-amber-400/50 p-5 sm:p-6 z-10 flex flex-col gap-4 animate-in zoom-in-95 duration-200 text-right"
-            dir={locale === 'ar' ? 'rtl' : 'ltr'}
-          >
-            {/* Header Icon */}
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-600 flex items-center justify-center shrink-0">
-                <AlertTriangle size={24} className="text-amber-600 stroke-[2.2]" />
-              </div>
-              <div className="flex flex-col">
-                <h3 className="text-base font-black text-gray-900">
-                  {locale === 'tr' ? 'Önemli Uyarı ve Sorumluluk Reddi' : locale === 'en' ? 'Important Warning & Disclaimer' : 'تنبيه هام وإخلاء مسؤولية'}
-                </h3>
-                <span className="text-xs font-bold text-amber-600">
-                  {locale === 'tr' ? 'Serbest Konumlandırma Modu' : locale === 'en' ? 'Free Placement Mode' : 'الوضع الحر في التصميم'}
-                </span>
-              </div>
-            </div>
-
-            {/* Disclaimer Description */}
-            <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-950 leading-relaxed space-y-2">
-              <p>
-                {locale === 'tr'
-                  ? 'Serbest Modu etkinleştirdiğinizde, tasarımınızın ürün üzerindeki konumu, boyutları ve hizalamasının tüm sorumluluğu size aittir.'
-                  : locale === 'en'
-                  ? 'When activating Free Mode, you assume complete responsibility for the positioning, sizing, and alignment of your artwork on the piece.'
-                  : 'عند تفعيل (الوضع الحر)، تصبح أنت المسؤول الوحيد عن تحديد موضع وأبعاد ومحاذاة التصميم على كامل القطعة.'}
-              </p>
-              <div className="p-2.5 rounded-xl bg-white/95 border border-amber-300 font-bold text-gray-800 text-[11px]">
-                {locale === 'tr'
-                  ? '⚠️ Mağazamız ve atölyemiz, uluslararası kabul görmüş standart ölçülerin dışına çıkıldığında baskının beklenen veya ideal görünmemesinden sorumlu değildir. Devam etmeniz bu koşulu kabul ettiğiniz anlamına gelir.'
-                  : locale === 'en'
-                  ? '⚠️ The store and print workshop are completely disclaimed from any liability if the print does not appear ideal or standard due to deviating from globally approved placement standards. Proceeding indicates your explicit consent.'
-                  : '⚠️ المتجر وورشة الطباعة يخليان مسؤوليتهما تماماً عن عدم ظهور التصميم بالمكان المعتاد أو بشكل غير مثالي نتيجة الخروج عن المقاييس الفنية المعتمدة عالمياً. متابعتك تعني موافقتك الصريحة على هذه الشروط.'}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDisclaimerModal(false);
-                  if (onToggleFreeMode) onToggleFreeMode(true);
-                }}
-                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
-              >
-                <CheckCircle2 size={16} />
-                <span>
-                  {locale === 'tr' ? 'Kabul Ediyorum, Serbest Modu Başlat' : locale === 'en' ? 'I Agree, Enable Free Mode' : 'أوافق، تفعيل الوضع الحر'}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowDisclaimerModal(false)}
-                className="py-3 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs transition-all cursor-pointer active:scale-95"
-              >
-                <span>
-                  {locale === 'tr' ? 'Standart Konumlarda Kal' : locale === 'en' ? 'Stay with Standards' : 'الرجوع للمواضع المعتمدة'}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

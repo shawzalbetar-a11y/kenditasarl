@@ -16,11 +16,11 @@ export default function ValidationModal({ isOpen, onClose, onSafeMode, onFreeMod
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
-        
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md p-6 h-[82dvh] max-h-[82dvh] sm:h-auto sm:max-h-none overflow-y-auto shadow-2xl border border-slate-100 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
+
         {/* Header */}
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-3 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
               <Sparkles size={22} />
@@ -29,9 +29,10 @@ export default function ValidationModal({ isOpen, onClose, onSafeMode, onFreeMod
               {t('validationTitle', { fallback: 'Design Review & Confirmation' })}
             </h3>
           </div>
-          <button 
-            onClick={onClose} 
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-900 flex items-center justify-center transition-all cursor-pointer shrink-0"
+            aria-label="Close"
           >
             <X size={18} />
           </button>
@@ -57,7 +58,7 @@ export default function ValidationModal({ isOpen, onClose, onSafeMode, onFreeMod
         {/* Action Options */}
         <div className="flex flex-col gap-3">
           {/* Option 1: Recommended Auto-fit */}
-          <button 
+          <button
             type="button"
             onClick={onSafeMode}
             className="flex items-center gap-3.5 w-full bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl transition-all shadow-md shadow-blue-600/20 text-start group cursor-pointer"
@@ -76,7 +77,7 @@ export default function ValidationModal({ isOpen, onClose, onSafeMode, onFreeMod
           </button>
 
           {/* Option 2: Keep current layout */}
-          <button 
+          <button
             type="button"
             onClick={onFreeMode}
             className="flex items-center gap-3.5 w-full bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200/90 p-4 rounded-2xl transition-all text-start group cursor-pointer"

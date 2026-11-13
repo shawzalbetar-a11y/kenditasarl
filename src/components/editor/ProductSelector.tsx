@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { getProductFrontImage } from '@/lib/products';
 import { useTranslations } from 'next-intl';
-import { Loader2, Shirt, ShoppingBag, Coffee, ArrowRight } from 'lucide-react';
+import { Loader2, Shirt, ShoppingBag, Coffee, Smartphone, ArrowRight } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import Image from 'next/image';
 
@@ -18,6 +18,7 @@ const CATEGORIES = [
   { id: 'hoodies', icon: Shirt, labelKey: 'hoodies' },
   { id: 'hats', icon: ShoppingBag, labelKey: 'hats' },
   { id: 'mugs', icon: Coffee, labelKey: 'mugs' },
+  { id: 'phone_cases', icon: Smartphone, labelKey: 'phone_cases' },
 ];
 
 export default function ProductSelector({ onSelectProduct }: ProductSelectorProps) {
@@ -28,25 +29,65 @@ export default function ProductSelector({ onSelectProduct }: ProductSelectorProp
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const getCategoryLabel = (labelKey: string) => {
+    try {
+      const val = tNav(labelKey);
+      if (val && !val.includes('.')) return val;
+    } catch { }
+    const fallbackMap: Record<string, Record<string, string>> = {
+      tshirts: { ar: 'تيشيرتات', en: 'T-Shirts', tr: 'Tişörtler' },
+      hoodies: { ar: 'هوديز', en: 'Hoodies', tr: 'Kapüşonlular' },
+      hats: { ar: 'قبعات', en: 'Hats', tr: 'Şapkalar' },
+      mugs: { ar: 'أكواب', en: 'Mugs', tr: 'Kupalar' },
+      phone_cases: { ar: 'أغلفة هواتف', en: 'Phone Cases', tr: 'Telefon Kılıfları' },
+    };
+    return fallbackMap[labelKey]?.[locale] || labelKey;
+  };
+
   useEffect(() => {
     async function fetchProducts() {
       if (!db) return;
       setLoading(true);
       try {
         const snap = await getDocs(collection(db, 'products'));
-        
+
         const matchedDocs = snap.docs.filter(doc => {
           const d = doc.data();
           if (d.is_active === false || d.isActive === false) return false;
+          if (d.is_customizable === false || d.isCustomizable === false) return false;
+
           const cat = (d.category_id || d.category || '').toLowerCase().trim();
           const target = activeCategory.toLowerCase().trim();
-          return cat === target || (target === 'tshirts' && cat === 't-shirts');
+
+          let matchesCategory = cat === target;
+          if (target === 'tshirts') {
+            matchesCategory = cat === 'tshirts' || cat === 't-shirts' || cat === 'tshirt';
+          } else if (target === 'hoodies') {
+            matchesCategory = cat === 'hoodies' || cat === 'hoodie' || cat === 'sweatshirts' || cat === 'sweatshirt';
+          } else if (target === 'hats') {
+            matchesCategory = cat === 'hats' || cat === 'hat' || cat === 'caps' || cat === 'cap';
+          } else if (target === 'mugs') {
+            matchesCategory = cat === 'mugs' || cat === 'mug' || cat === 'cups' || cat === 'cup';
+          } else if (target === 'phone_cases') {
+            matchesCategory = cat === 'phone_cases' || cat === 'phone_case' || cat === 'phone-cases' || cat === 'phone-case' || cat === 'cases';
+          }
+          if (!matchesCategory) return false;
+
+          // Products in Design Studio must be customizable blank products (or have blank mockups)
+          const allImgs = Array.isArray(d.images) ? d.images : (Array.isArray(d.raw_images) ? d.raw_images : []);
+          const hasBlankImgs = allImgs.some((i: any) => i.type === 'blank');
+          const hasBaseFront = !!d.base_images?.front;
+          const isOnlyReady = allImgs.length > 0 && allImgs.every((i: any) => i.type === 'ready') && !hasBaseFront;
+          if (isOnlyReady && !hasBlankImgs) return false;
+
+          return true;
         });
 
         const fetchedProducts = await Promise.all(
           matchedDocs.map(async (doc) => {
             const data = doc.data();
-            const frontImage = await getProductFrontImage(doc.id);
+            // ALWAYS request 'blank' to show clean mockups without prints or stickers
+            const frontImage = await getProductFrontImage(doc.id, 'blank');
             return {
               id: doc.id,
               name: data[`name_${locale}`] || data.name_en || data.name_ar || 'Product',
@@ -62,13 +103,13 @@ export default function ProductSelector({ onSelectProduct }: ProductSelectorProp
         setLoading(false);
       }
     }
-    
+
     fetchProducts();
   }, [activeCategory, locale]);
 
   return (
     <div className="w-full max-w-5xl mx-auto bg-white rounded-3xl shadow-lg border border-border overflow-hidden flex flex-col md:flex-row min-h-[600px]">
-      
+
       {/* Sidebar Categories */}
       <div className="w-full md:w-64 bg-gray-50 p-6 border-b md:border-b-0 md:border-r md:rtl:border-l md:rtl:border-r-0 border-border">
         <h2 className="text-xl font-bold text-gray-900 mb-6">{t('selectCategory', { fallback: 'Select Category' })}</h2>
@@ -77,14 +118,13 @@ export default function ProductSelector({ onSelectProduct }: ProductSelectorProp
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all whitespace-nowrap md:whitespace-normal font-medium ${
-                activeCategory === cat.id 
-                  ? 'bg-[var(--color-primary)] text-white shadow-md' 
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all whitespace-nowrap md:whitespace-normal font-medium ${activeCategory === cat.id
+                  ? 'bg-[var(--color-primary)] text-white shadow-md'
                   : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
+                }`}
             >
               <cat.icon className="w-5 h-5" />
-              {tNav(cat.labelKey)}
+              {getCategoryLabel(cat.labelKey)}
             </button>
           ))}
         </div>
@@ -112,14 +152,14 @@ export default function ProductSelector({ onSelectProduct }: ProductSelectorProp
         ) : products.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
             {products.map(product => (
-              <div 
-                key={product.id} 
+              <div
+                key={product.id}
                 onClick={() => onSelectProduct(product.id)}
                 className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 cursor-pointer hover:shadow-xl hover:border-[var(--color-primary)] transition-all group relative overflow-hidden"
               >
                 <div className="relative w-full aspect-[4/5] bg-gray-50 rounded-xl mb-4 overflow-hidden flex items-center justify-center p-4">
-                  <Image 
-                    src={product.image} 
+                  <Image
+                    src={product.image}
                     alt={product.name}
                     fill
                     className="object-contain group-hover:scale-105 transition-transform duration-500"
@@ -127,7 +167,7 @@ export default function ProductSelector({ onSelectProduct }: ProductSelectorProp
                 </div>
                 <h3 className="font-bold text-gray-900 truncate">{product.name}</h3>
                 <p className="text-[var(--color-primary)] font-bold">{product.price} ₺</p>
-                
+
                 <div className="absolute inset-0 bg-[var(--color-primary)]/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl">
                   <ArrowRight className="text-white w-10 h-10 mb-2 rtl:rotate-180" />
                   <span className="text-white font-bold">{t('startDesigning', { fallback: 'Start Designing' })}</span>

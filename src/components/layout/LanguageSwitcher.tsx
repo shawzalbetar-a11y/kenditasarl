@@ -5,7 +5,12 @@ import { useRouter, usePathname } from '@/i18n/routing';
 import { Globe } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
-export default function LanguageSwitcher() {
+interface LanguageSwitcherProps {
+  compact?: boolean;
+  direction?: string;
+}
+
+export default function LanguageSwitcher({ compact, direction }: LanguageSwitcherProps = {}) {
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();

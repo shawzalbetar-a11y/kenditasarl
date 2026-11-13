@@ -25,7 +25,7 @@ const isColorEqual = (c1?: string | null, c2?: string | null): boolean => {
   const s1 = c1.trim().toLowerCase();
   const s2 = c2.trim().toLowerCase();
   if (s1 === s2) return true;
-  
+
   const hex1 = COLOR_MAP[s1]?.toLowerCase() || s1;
   const hex2 = COLOR_MAP[s2]?.toLowerCase() || s2;
   if (hex1 === hex2) return true;
@@ -41,6 +41,7 @@ const isSizeEqual = (s1?: string | null, s2?: string | null): boolean => {
 };
 
 import { getProductMedia, getProductFrontImage } from '@/lib/products';
+import { resolveProductStudioProfile, resolveMugMeta } from '@/lib/productStudioProfile';
 
 export default function ProductDetailsPage() {
   const params = useParams();
@@ -49,17 +50,17 @@ export default function ProductDetailsPage() {
   const locale = params.locale as string;
   const t = useTranslations('ProductPage');
   const tDetails = useTranslations('ProductDetails');
-  
+
   const defaultColorParam = searchParams.get('color');
   const defaultSizeParam = searchParams.get('size');
   const defaultQtyParam = searchParams.get('quantity');
   const defaultTypeParam = (searchParams.get('type') as 'ready' | 'blank') || null;
-  
+
   const [product, setProduct] = useState<any>(null);
   const [variants, setVariants] = useState<any[]>([]);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [viewType, setViewType] = useState<'ready' | 'blank'>(defaultTypeParam || 'ready');
   const [selectedColor, setSelectedColor] = useState<string | null>(defaultColorParam || null);
   const [selectedSize, setSelectedSize] = useState<string | null>(defaultSizeParam || null);
@@ -74,7 +75,7 @@ export default function ProductDetailsPage() {
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
-  
+
   const [readyDesigns, setReadyDesigns] = useState<any[]>([]);
   const [selectedReadyDesignId, setSelectedReadyDesignId] = useState<string | null>(null);
 
@@ -84,11 +85,11 @@ export default function ProductDetailsPage() {
       try {
         const docRef = doc(db, 'products', id);
         const docSnap = await getDoc(docRef);
-        
+
         if (docSnap.exists()) {
           const data = docSnap.data();
           const variantsSnap = await getDocs(collection(docRef, 'variants'));
-          
+
           let fetchedVariants: any[] = [];
           variantsSnap.docs.forEach(v => {
             const data = v.data();
@@ -112,9 +113,9 @@ export default function ProductDetailsPage() {
               fetchedVariants.push(data);
             }
           });
-          
+
           setVariants(fetchedVariants);
-          
+
           const images = Array.isArray(data.images) ? data.images.map((img: any) => ({
             url: typeof img === 'string' ? img : img.url,
             name: (typeof img === 'object' && img.face) ? t(img.face) : t('front')
@@ -126,7 +127,7 @@ export default function ProductDetailsPage() {
             raw_images: data.images || [],
             images: images.length > 0 ? images : [{ url: 'https://via.placeholder.com/800', name: t('front') }],
           });
-          
+
           // Fetch Ready Designs
           let linkedIds = data.linked_ready_designs || [];
           if (linkedIds.length === 0 && data.ready_design_id) {
@@ -142,7 +143,7 @@ export default function ProductDetailsPage() {
               setSelectedReadyDesignId(rdData[0].id);
             }
           }
-          
+
           // Initial selections prioritizing URL params then localStorage
           if (fetchedVariants.length > 0) {
             let savedPref: any = null;
@@ -150,22 +151,22 @@ export default function ProductDetailsPage() {
               try {
                 const raw = localStorage.getItem(`product_pref_${id}`);
                 if (raw) savedPref = JSON.parse(raw);
-              } catch (e) {}
+              } catch (e) { }
             }
 
             const targetColorParam = defaultColorParam || savedPref?.color;
             const targetSizeParam = defaultSizeParam || savedPref?.size;
             const targetQtyParam = defaultQtyParam || savedPref?.quantity;
 
-            const matchedColorVariant = targetColorParam 
+            const matchedColorVariant = targetColorParam
               ? fetchedVariants.find(v => isColorEqual(v.color, targetColorParam))
               : null;
             const initialColor = matchedColorVariant ? matchedColorVariant.color : fetchedVariants[0].color;
             setSelectedColor(initialColor);
 
-            const matchedSizeVariant = targetSizeParam 
+            const matchedSizeVariant = targetSizeParam
               ? (fetchedVariants.find(v => isColorEqual(v.color, initialColor) && isSizeEqual(v.size, targetSizeParam)) ||
-                 fetchedVariants.find(v => isSizeEqual(v.size, targetSizeParam)))
+                fetchedVariants.find(v => isSizeEqual(v.size, targetSizeParam)))
               : null;
             const initialSize = matchedSizeVariant ? matchedSizeVariant.size : fetchedVariants[0].size;
             setSelectedSize(initialSize);
@@ -218,10 +219,10 @@ export default function ProductDetailsPage() {
       return { hasReadyOption: false, hasBlankOption: false };
     }
     const catalog = product.raw_images as any[];
-    const colorImages = selectedColor 
+    const colorImages = selectedColor
       ? catalog.filter(img => img.colorHex?.toLowerCase() === selectedColor.toLowerCase())
       : catalog;
-    
+
     return {
       hasReadyOption: colorImages.some(img => img.type === 'ready') || catalog.some(img => img.type === 'ready'),
       hasBlankOption: colorImages.some(img => img.type === 'blank') || catalog.some(img => img.type === 'blank')
@@ -263,7 +264,7 @@ export default function ProductDetailsPage() {
     const v = variants.find(v => isColorEqual(v.color, color) && isSizeEqual(v.size, size));
     return v && v.stock > 0;
   };
-  
+
   // Size Sorting
   const SIZE_ORDER = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
   const availableSizes = uniqueSizes
@@ -358,7 +359,7 @@ export default function ProductDetailsPage() {
 
       if (selectedColor) {
         const colorImgs = catalog.filter(img => img.colorHex?.toLowerCase() === selectedColor.toLowerCase());
-        
+
         // Priority: target viewType for this color
         const colorTargetType = colorImgs.filter(img => img.type === viewType);
         if (colorTargetType.length > 0) {
@@ -414,11 +415,11 @@ export default function ProductDetailsPage() {
         ].filter(Boolean);
       }
     }
-    
+
     if (imgs.length === 0 && product.images) {
       imgs = product.images;
     }
-    
+
     return imgs.length > 0 ? imgs : [{ url: 'https://via.placeholder.com/800', name: getFaceLabel('front'), face: 'front' }];
   }, [product, selectedColor, viewType, variants, locale, t]);
 
@@ -491,24 +492,38 @@ export default function ProductDetailsPage() {
     setIsAddingToCart(true);
     try {
       const variantId = `${selectedColor}_${selectedSize}`;
-      
-      // Check if this exact product+variant already exists in cart for this user (with design_id: null)
+      const isBlank = viewType === 'blank';
+      const targetDesignId = isBlank ? null : (selectedReadyDesignId || product.ready_design_id || null);
+      const targetDesignType: 'ready' | 'blank' = isBlank ? 'blank' : 'ready';
+
+      // Find appropriate preview image matching selectedColor and viewType
+      let previewImageUrl = '';
+      if (isBlank) {
+        const blankImg = displayImages.find(img => img.type === 'blank') || displayImages.find(img => !img.type) || displayImages[0];
+        previewImageUrl = blankImg?.url || '';
+      } else {
+        const readyImg = displayImages.find(img => img.type === 'ready') || displayImages[0];
+        previewImageUrl = readyImg?.url || '';
+      }
+
+      // Check if this exact product+variant already exists in cart for this user
       const q = query(
         collection(db, 'cart_items'),
         where('user_id', '==', auth.currentUser.uid),
         where('product_id', '==', id),
         where('variant_id', '==', variantId),
-        where('design_id', '==', null)
+        where('design_id', '==', targetDesignId)
       );
-      
+
       const snap = await getDocs(q);
       if (!snap.empty) {
         // Merge: Update quantity
         const existingDoc = snap.docs[0];
         const newQty = existingDoc.data().quantity + quantity;
-        
+
         await updateDoc(doc(db, 'cart_items', existingDoc.id), {
-          quantity: newQty > maxStock ? maxStock : newQty
+          quantity: newQty > maxStock ? maxStock : newQty,
+          preview_image_url: previewImageUrl || existingDoc.data().preview_image_url || ''
         });
       } else {
         // Create new
@@ -516,14 +531,17 @@ export default function ProductDetailsPage() {
           user_id: auth.currentUser.uid,
           product_id: id,
           variant_id: variantId,
-          design_id: selectedReadyDesignId || product.ready_design_id || null,
-          design_type: (selectedReadyDesignId || product.ready_design_id) ? 'ready' : null,
+          color: selectedColor,
+          size: selectedSize,
+          design_id: targetDesignId,
+          design_type: targetDesignType,
+          preview_image_url: previewImageUrl,
           quantity: quantity,
           unit_price: product.base_price,
           created_at: new Date().toISOString()
         });
       }
-      alert(t?.('addedToCartSuccess') || 'تمت الإضافة للسلة بنجاح!');
+      alert(t?.('addedToCartSuccess') || (isBlank ? 'تمت إضافة المنتج السادة (بدون طباعة) للسلة بنجاح!' : 'تمت الإضافة للسلة بنجاح!'));
     } catch (err) {
       console.error("Add to cart error:", err);
       alert(t?.('errorAddingToCart') || 'حدث خطأ أثناء الإضافة للسلة');
@@ -544,9 +562,9 @@ export default function ProductDetailsPage() {
   const activeFace = displayImages[activeImage]?.face || 'front';
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)] pt-8 pb-32 md:pb-16 px-4 md:px-8">
-      <div className="max-w-[95rem] mx-auto">
-        
+    <div className="min-h-screen bg-[var(--color-background)] pt-28 sm:pt-32 md:pt-36 pb-32 md:pb-16 px-3 sm:px-4 md:px-8 w-full max-w-full overflow-x-hidden">
+      <div className="max-w-[95rem] mx-auto w-full">
+
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold text-[var(--color-text)]">{title}</h1>
@@ -560,8 +578,8 @@ export default function ProductDetailsPage() {
                 onClick={() => setViewType('ready')}
                 className={cn(
                   "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2",
-                  viewType === 'ready' 
-                    ? "bg-white text-zinc-900 shadow-sm border border-black/5" 
+                  viewType === 'ready'
+                    ? "bg-white text-zinc-900 shadow-sm border border-black/5"
                     : "text-zinc-600 hover:text-zinc-900"
                 )}
               >
@@ -573,8 +591,8 @@ export default function ProductDetailsPage() {
                 onClick={() => setViewType('blank')}
                 className={cn(
                   "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2",
-                  viewType === 'blank' 
-                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/20" 
+                  viewType === 'blank'
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/20"
                     : "text-zinc-600 hover:text-zinc-900"
                 )}
               >
@@ -586,11 +604,11 @@ export default function ProductDetailsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          
+
           {/* Image Gallery */}
           <div className="flex flex-col gap-4">
             {/* Main Image Container with Swipe & Arrow Navigation */}
-            <div 
+            <div
               className="w-full bg-white rounded-3xl overflow-hidden border border-border/50 shadow-sm aspect-[4/5] md:aspect-[4/4] lg:aspect-[4/5] relative select-none group/mainimg"
               onTouchStart={onTouchStart}
               onTouchMove={onTouchMove}
@@ -598,9 +616,9 @@ export default function ProductDetailsPage() {
             >
               {displayImages[activeImage] && (
                 <>
-                  <img 
-                    src={displayImages[activeImage].url} 
-                    alt={title} 
+                  <img
+                    src={displayImages[activeImage].url}
+                    alt={title}
                     className="w-full h-full object-cover transition-opacity duration-300"
                   />
                   <div className="absolute top-4 start-4 bg-white/90 backdrop-blur text-[var(--color-secondary)] px-3 py-1 rounded-full text-sm font-bold shadow-sm z-10">
@@ -649,9 +667,9 @@ export default function ProductDetailsPage() {
             </div>
 
             {/* Thumbnails + Magic "Design it Yourself" CTA Container */}
-            <div className="flex flex-row items-center justify-between gap-3 sm:gap-4 w-full mt-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 w-full mt-2">
               {/* Thumbnails List */}
-              <div className="shrink-0 flex gap-2 overflow-x-auto scrollbar-hide py-1 max-w-[55%] sm:max-w-[50%]">
+              <div className="w-full sm:w-auto sm:shrink-0 flex gap-2 overflow-x-auto scrollbar-hide py-1 sm:max-w-[50%]">
                 {displayImages.map((img: any, idx: number) => (
                   <button
                     key={idx}
@@ -671,13 +689,13 @@ export default function ProductDetailsPage() {
               </div>
 
               {/* Magic CTA Button */}
-              <Link 
+              <Link
                 href={
                   `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&quantity=${quantity}&face=${activeFace}${selectedReadyDesignId || product.ready_design_id ? `&designId=${selectedReadyDesignId || product.ready_design_id}&mode=remix` : ''}`
                 }
-                className="flex-1 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-bold text-white text-sm sm:text-base bg-gradient-to-r from-purple-600 via-pink-600 to-[var(--color-primary)] shadow-lg shadow-purple-500/30 transform transition-all hover:-translate-y-1 active:scale-95 text-center"
+                className="w-full sm:flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl font-bold text-white text-sm sm:text-base bg-gradient-to-r from-purple-600 via-pink-600 to-[var(--color-primary)] shadow-lg shadow-purple-500/30 transform transition-all hover:-translate-y-1 active:scale-95 text-center shrink-0"
               >
-                <Paintbrush size={20} className="shrink-0" />
+                <Paintbrush size={19} className="shrink-0" />
                 <span className="truncate">{locale === 'ar' ? 'صمم هذا المنتج بنفسك 🎨' : locale === 'tr' ? 'Kendin Tasarla 🎨' : 'Design It Yourself 🎨'}</span>
               </Link>
             </div>
@@ -686,7 +704,7 @@ export default function ProductDetailsPage() {
           {/* Product Details */}
           <div className="flex flex-col">
             <p className="text-3xl font-black text-[var(--color-primary)] mb-6">{product.base_price} ₺</p>
-            
+
             <p className="text-zinc-600 mb-8 leading-relaxed">
               {description}
             </p>
@@ -731,39 +749,61 @@ export default function ProductDetailsPage() {
               </div>
             )}
 
-            {/* Size Selector */}
-            {uniqueSizes.length > 0 && (
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-semibold">{t?.('size') || 'المقاس'}:</span>
-                  <button 
-                    onClick={() => setIsSizeGuideOpen(true)}
-                    className="text-sm text-[var(--color-primary)] underline font-medium hover:text-[var(--color-action)]"
-                  >
-                    {t?.('size_guide') || 'دليل المقاسات'}
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {availableSizes.map((size: string) => {
-                    const inStock = true; // since we filter them above
-                    return (
+            {/* Size / Capacity Selector */}
+            {uniqueSizes.length > 0 && (() => {
+              const pStudioProfile = resolveProductStudioProfile(product);
+              const pMugMeta = pStudioProfile.family === 'mug' ? resolveMugMeta(product) : null;
+              const sizeHeading = pStudioProfile.family === 'mug'
+                ? (locale === 'tr' ? 'Kupa Hacmi:' : locale === 'en' ? 'Mug Capacity:' : 'سعة الكوب:')
+                : !pStudioProfile.hasApparelSizes
+                  ? (locale === 'tr' ? 'Seçenek / Model:' : locale === 'en' ? 'Option:' : 'الخيار:')
+                  : `${t?.('size') || 'المقاس'}:`;
+              return (
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold">{sizeHeading}</span>
+                      {pMugMeta?.mugStyle === 'magic' && (
+                        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                          {locale === 'tr' ? '✨ Sihirli Kupa (Isıya Duyarlı)' : locale === 'en' ? '✨ Magic Heat-Reveal Mug' : '✨ كوب سحري حراري'}
+                        </span>
+                      )}
+                      {pMugMeta?.mugStyle === 'inner_color' && (
+                        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                          {locale === 'tr' ? '🎨 Renkli Kulp & İç Yüzey' : locale === 'en' ? '🎨 Colored Handle & Inner Rim' : '🎨 مقبض وبطانة داخلية ملونة'}
+                        </span>
+                      )}
+                    </div>
+                    {pStudioProfile.hasGarmentSizeGuide && (
                       <button
-                        key={size}
-                        onClick={() => setSelectedSize(size)}
-                        className={cn(
-                          "min-w-[3.5rem] h-12 px-4 rounded-xl font-bold transition-all border-2",
-                          selectedSize === size 
-                            ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-md shadow-[var(--color-primary)]/20" 
-                            : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400"
-                        )}
+                        onClick={() => setIsSizeGuideOpen(true)}
+                        className="text-sm text-[var(--color-primary)] underline font-medium hover:text-[var(--color-action)]"
                       >
-                        {size}
+                        {t?.('size_guide') || 'دليل المقاسات'}
                       </button>
-                    );
-                  })}
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {availableSizes.map((size: string) => {
+                      return (
+                        <button
+                          key={size}
+                          onClick={() => setSelectedSize(size)}
+                          className={cn(
+                            "min-w-[3.5rem] h-12 px-4 rounded-xl font-bold transition-all border-2",
+                            selectedSize === size
+                              ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-md shadow-[var(--color-primary)]/20"
+                              : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400"
+                          )}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Quantity Selector */}
             <div className="mb-10">
@@ -774,7 +814,7 @@ export default function ProductDetailsPage() {
                 </span>
               </div>
               <div className="flex items-center w-40 h-14 bg-gray-50 border-2 border-gray-200 rounded-2xl overflow-hidden">
-                <button 
+                <button
                   onClick={() => handleQuantityChange('decrease')}
                   disabled={maxStock === 0 || quantity <= 1}
                   className="w-14 h-full flex items-center justify-center text-gray-700 hover:bg-gray-200 hover:text-black disabled:opacity-30 transition-all font-bold"
@@ -784,7 +824,7 @@ export default function ProductDetailsPage() {
                 <div className="flex-1 h-full flex items-center justify-center font-black text-xl bg-white border-x-2 border-gray-200 text-[var(--color-primary)]">
                   {maxStock === 0 ? 0 : quantity}
                 </div>
-                <button 
+                <button
                   onClick={() => handleQuantityChange('increase')}
                   disabled={maxStock === 0 || quantity >= maxStock}
                   className="w-14 h-full flex items-center justify-center text-gray-700 hover:bg-gray-200 hover:text-black disabled:opacity-30 transition-all font-bold"
@@ -796,22 +836,22 @@ export default function ProductDetailsPage() {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 mb-10">
-              <Link 
+              <Link
                 href={
-                  selectedReadyDesignId || product.ready_design_id 
-                  ? `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&quantity=${quantity}&designId=${selectedReadyDesignId || product.ready_design_id}&mode=remix`
-                  : `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&quantity=${quantity}`
+                  selectedReadyDesignId || product.ready_design_id
+                    ? `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&quantity=${quantity}&designId=${selectedReadyDesignId || product.ready_design_id}&mode=remix`
+                    : `/design-studio/${id}?color=${encodeURIComponent(selectedColor || '')}&size=${encodeURIComponent(selectedSize || '')}&quantity=${quantity}`
                 }
                 className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:opacity-90 text-white py-4 px-6 rounded-2xl font-bold text-lg transition-all hover:-translate-y-1 shadow-lg shadow-[var(--color-primary)]/30 disabled:opacity-50 disabled:pointer-events-none"
                 style={{ pointerEvents: maxStock === 0 ? 'none' : 'auto', opacity: maxStock === 0 ? 0.5 : 1 }}
               >
                 <Paintbrush size={22} />
-                {product.ready_design_id && !selectedReadyDesignId ? (t?.('customize_this_design') || 'خصص هذا التصميم 🎨') : 
-                 selectedReadyDesignId ? (t?.('customize_this_design') || 'خصص هذا التصميم 🎨') : 
-                 (t?.('design_it_now') || 'صمم بنفسك الآن')}
+                {product.ready_design_id && !selectedReadyDesignId ? (t?.('customize_this_design') || 'خصص هذا التصميم 🎨') :
+                  selectedReadyDesignId ? (t?.('customize_this_design') || 'خصص هذا التصميم 🎨') :
+                    (t?.('design_it_now') || 'صمم بنفسك الآن')}
               </Link>
-              
-              <button 
+
+              <button
                 onClick={handleAddToCart}
                 disabled={maxStock === 0 || isAddingToCart}
                 className="flex-1 flex items-center justify-center gap-2 bg-white text-[var(--color-primary)] border-2 border-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white py-4 px-6 rounded-2xl font-bold text-lg transition-all hover:-translate-y-1 shadow-lg shadow-black/5 disabled:opacity-50 disabled:pointer-events-none"
@@ -833,9 +873,8 @@ export default function ProductDetailsPage() {
                     <button
                       key={rd.id}
                       onClick={() => setSelectedReadyDesignId(rd.id)}
-                      className={`flex-shrink-0 w-24 h-24 md:w-32 md:h-32 rounded-xl border-2 overflow-hidden relative transition-all ${
-                        selectedReadyDesignId === rd.id ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/20 shadow-md' : 'border-gray-200 hover:border-gray-300 bg-white'
-                      }`}
+                      className={`flex-shrink-0 w-24 h-24 md:w-32 md:h-32 rounded-xl border-2 overflow-hidden relative transition-all ${selectedReadyDesignId === rd.id ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/20 shadow-md' : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
                     >
                       {rd.preview_image_url ? (
                         <img src={rd.preview_image_url} alt="Ready Design" className="w-full h-full object-contain p-2" />
@@ -851,7 +890,7 @@ export default function ProductDetailsPage() {
                   ))}
                 </div>
                 {selectedReadyDesignId && (
-                  <button 
+                  <button
                     onClick={() => setSelectedReadyDesignId(null)}
                     className="text-sm text-red-500 font-semibold hover:text-red-700 mt-2 flex items-center gap-1"
                   >
@@ -865,7 +904,7 @@ export default function ProductDetailsPage() {
             {(() => {
               const isMug = product.category_id === 'mugs' || product.category === 'mugs';
               const isHat = product.category_id === 'hats' || product.category === 'hats';
-              
+
               let qLabels = {
                 ar: { fabric: "نوع القماش", print: "نوع الطباعة", features: "المميزات", instructions: "التعليمات", quality: "جودة القماش والطباعة" },
                 en: { fabric: "Fabric Type", print: "Print Type", features: "Features", instructions: "Care Instructions", quality: "Material & Quality" },
@@ -888,10 +927,10 @@ export default function ProductDetailsPage() {
 
               const l = qLabels[locale as keyof typeof qLabels] || qLabels.en;
 
-              if (!((product[`fabric_type_${locale}`] || product.fabric_type_en) || 
-                  (product[`print_type_${locale}`] || product.print_type_en) ||
-                  (product[`features_${locale}`] || product.features_en) ||
-                  (product[`instructions_${locale}`] || product.instructions_en))) {
+              if (!((product[`fabric_type_${locale}`] || product.fabric_type_en) ||
+                (product[`print_type_${locale}`] || product.print_type_en) ||
+                (product[`features_${locale}`] || product.features_en) ||
+                (product[`instructions_${locale}`] || product.instructions_en))) {
                 return null;
               }
 
@@ -940,8 +979,8 @@ export default function ProductDetailsPage() {
             <h2 className="text-2xl font-bold mb-8 text-[var(--color-secondary)]">{t('similarProducts')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               {similarProducts.map(prod => (
-                <ProductCard 
-                  key={prod.id} 
+                <ProductCard
+                  key={prod.id}
                   id={prod.id}
                   title={prod[`name_${locale}`] || prod.name_en}
                   price={prod.base_price}
@@ -958,7 +997,7 @@ export default function ProductDetailsPage() {
       {isSizeGuideOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative">
-            <button 
+            <button
               onClick={() => setIsSizeGuideOpen(false)}
               className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 rounded-full transition-colors"
             >
@@ -1011,9 +1050,9 @@ export default function ProductDetailsPage() {
       )}
 
       {/* Auth Modal */}
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
         onSuccess={() => {
           setIsAuthModalOpen(false);
           handleAddToCart();
@@ -1030,8 +1069,8 @@ export default function ProductDetailsPage() {
         const pt = pLabels[locale as keyof typeof pLabels] || pLabels.en;
 
         return (
-          <div className="md:hidden fixed bottom-2 left-2 right-2 z-40 bg-white/70 backdrop-blur-xl border border-white/50 px-5 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-3xl flex flex-row items-center justify-between overflow-hidden">
-            
+          <div className="md:hidden fixed bottom-2 inset-x-2 max-w-[calc(100vw-1rem)] mx-auto z-40 bg-white/85 backdrop-blur-xl border border-white/60 px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-3xl flex flex-row items-center justify-between overflow-hidden">
+
             {/* Animated Glow Effects on Sides */}
             <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-[var(--color-primary)]/10 to-transparent animate-pulse pointer-events-none"></div>
             <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-[var(--color-primary)]/10 to-transparent animate-pulse pointer-events-none"></div>
@@ -1040,8 +1079,8 @@ export default function ProductDetailsPage() {
               <span className="text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{pt.total}</span>
               <span className="text-2xl font-black text-[var(--color-primary)] leading-none">{product.base_price * quantity} ₺</span>
             </div>
-            
-            <button 
+
+            <button
               onClick={handleAddToCart}
               disabled={maxStock === 0 || isAddingToCart}
               className="relative z-10 bg-[var(--color-primary)] text-white px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-[var(--color-primary)]/30 disabled:opacity-50 transition-transform active:scale-95"

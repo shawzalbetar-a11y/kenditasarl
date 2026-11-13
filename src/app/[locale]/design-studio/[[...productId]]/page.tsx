@@ -9,6 +9,7 @@ import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getProductMedia } from '@/lib/products';
 import { getCustomizationConfig, CustomizationConfig } from '@/lib/customizationConfig';
 import { resolveImagePrintAreaGeometry } from '@/lib/coordinateMapping';
+import { resolveProductStudioProfile } from '@/lib/productStudioProfile';
 import ProductSelector from '@/components/editor/ProductSelector';
 import { Loader2, Upload, RefreshCw } from 'lucide-react';
 
@@ -26,16 +27,16 @@ export default function DesignStudioPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  
+
   const selectedColor = searchParams.get('color');
   const selectedSize = searchParams.get('size');
   const quantityParam = searchParams.get('quantity');
   const initialQuantity = quantityParam ? Math.max(1, parseInt(quantityParam, 10) || 1) : 1;
-  
+
   // Safe parsing of productId for catch-all route [[...productId]]
   const paramId = params.productId;
   let initialProductId = '';
-  
+
   if (Array.isArray(paramId)) {
     if (paramId.length > 1) {
       console.warn("Extra path segments ignored in design studio route.");
@@ -60,27 +61,48 @@ export default function DesignStudioPage() {
     }
   };
 
+  // Lock mobile viewport strictly at top so studio toolbar can never slide up under site header
+  useEffect(() => {
+    const lockScroll = () => {
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo(0, 0);
+      }
+      const main = document.querySelector('main.flex-grow');
+      if (main && (main.scrollTop !== 0 || main.scrollLeft !== 0)) {
+        main.scrollTop = 0;
+        main.scrollLeft = 0;
+      }
+    };
+    lockScroll();
+    window.addEventListener('scroll', lockScroll, { passive: true });
+    window.addEventListener('resize', lockScroll);
+    return () => {
+      window.removeEventListener('scroll', lockScroll);
+      window.removeEventListener('resize', lockScroll);
+    };
+  }, []);
+
   useEffect(() => {
     async function loadProduct() {
       if (!db || !activeProductId) {
         setLoading(false);
         return;
       }
-      
+
       setLoading(true);
       setError(null);
-      
+
       try {
         const pDoc = await getDoc(doc(db, 'products', activeProductId));
         if (pDoc.exists()) {
           const data = pDoc.data();
-          
+
           // Get customization config from product document or fallback to category defaults
           const config = data.customization_config || getCustomizationConfig(data.category_id);
-          
+
           // 1. Get raw product images array (from Admin Panel's unified ProductImageItem schema)
           const productImagesList = Array.isArray(data.images) ? data.images : [];
-          
+
           // Canonical face normalizer to strictly merge 'left'/'left_shoulder' and 'right'/'right_shoulder'
           const canonicalFaceId = (face: string): string => {
             const f = (face || '').trim().toLowerCase();
@@ -96,7 +118,7 @@ export default function DesignStudioPage() {
           // Candidate canonical faces configured or available for this product
           const baseFaces = config.faces || {};
           const configuredCanonicalFaces = Object.keys(baseFaces).map(canonicalFaceId);
-          
+
           const candidateFaces = Array.from(new Set([
             'front', 'back', 'right_shoulder', 'left_shoulder', 'collar', 'other',
             ...configuredCanonicalFaces,
@@ -108,16 +130,16 @@ export default function DesignStudioPage() {
           // Step 1: For each canonical face, prioritize BLANK mockups matching selectedColor, then any BLANK mockup
           candidateFaces.forEach(faceKey => {
             let matchingBlank = selectedColor
-              ? productImagesList.find((img: any) => 
-                  img.type === 'blank' && 
-                  canonicalFaceId(img.face) === faceKey && 
-                  img.colorHex && 
-                  (img.colorHex.toLowerCase() === selectedColor.toLowerCase())
-                )
+              ? productImagesList.find((img: any) =>
+                img.type === 'blank' &&
+                canonicalFaceId(img.face) === faceKey &&
+                img.colorHex &&
+                (img.colorHex.toLowerCase() === selectedColor.toLowerCase())
+              )
               : null;
 
             if (!matchingBlank) {
-              matchingBlank = productImagesList.find((img: any) => 
+              matchingBlank = productImagesList.find((img: any) =>
                 img.type === 'blank' && canonicalFaceId(img.face) === faceKey
               );
             }
@@ -186,6 +208,16 @@ export default function DesignStudioPage() {
           delete resolvedFaces['left'];
           delete resolvedFaces['right'];
 
+          // For mugs, ensure both front and opposite back faces exist even if only one blank mug image was uploaded
+          const resolvedEarlyFamily = resolveProductStudioProfile({
+            ...data,
+            config,
+            category_id: data.category_id || data.category,
+          }).family;
+          if (resolvedEarlyFamily === 'mug' && resolvedFaces.front && !resolvedFaces.back) {
+            resolvedFaces.back = resolvedFaces.front;
+          }
+
           // 5. Resolve Image-Driven print area geometry for each resolved face
           const resolvedFacesConfig: any = {};
           const activeFaceKeys = Object.keys(resolvedFaces).filter(f => resolvedFaces[f]);
@@ -198,7 +230,7 @@ export default function DesignStudioPage() {
               currentImage: faceImageUrl,
             });
 
-            const baseFaceConfig = baseFaces[faceId] || 
+            const baseFaceConfig = baseFaces[faceId] ||
               (faceId === 'left_shoulder' ? (baseFaces['left'] || baseFaces['left_shoulder']) : null) ||
               (faceId === 'right_shoulder' ? (baseFaces['right'] || baseFaces['right_shoulder']) : null);
 
@@ -214,15 +246,43 @@ export default function DesignStudioPage() {
             faces: resolvedFacesConfig,
           };
 
+          const studioProfile = resolveProductStudioProfile({
+            ...data,
+            config: finalizedConfig,
+            category_id: data.category_id || data.category,
+          });
+
+          const variantSizeKeys = Array.from(
+            new Set(
+              allVariants.flatMap((v: any) =>
+                v?.sizes && typeof v.sizes === 'object' ? Object.keys(v.sizes) : []
+              )
+            )
+          ).filter(Boolean);
+          const APPAREL_SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL'];
+          variantSizeKeys.sort((a, b) => {
+            const ia = APPAREL_SIZE_ORDER.indexOf(a.toUpperCase());
+            const ib = APPAREL_SIZE_ORDER.indexOf(b.toUpperCase());
+            if (ia !== -1 && ib !== -1) return ia - ib;
+            if (ia !== -1) return -1;
+            if (ib !== -1) return 1;
+            return a.localeCompare(b);
+          });
+
           const derivedColors = (Array.isArray(data.colors) && data.colors.length > 0)
             ? data.colors
             : allVariants.map((v: any) => v.hex || v.color).filter(Boolean);
 
           const derivedSizes = (Array.isArray(data.sizes) && data.sizes.length > 0)
             ? data.sizes
-            : ['S', 'M', 'L', 'XL', '2XL'];
+            : (variantSizeKeys.length > 0 ? variantSizeKeys : studioProfile.defaultVariantSizes);
+
+          const defaultSizeFallback = derivedSizes.includes(studioProfile.defaultSelectedSize)
+            ? studioProfile.defaultSelectedSize
+            : (derivedSizes[0] || studioProfile.defaultSelectedSize);
 
           setProductData({
+            ...data,
             id: activeProductId,
             basePrice: data.base_price || 250,
             category_id: data.category_id,
@@ -232,7 +292,7 @@ export default function DesignStudioPage() {
             colors: derivedColors.length > 0 ? derivedColors : ['white', 'black', 'navy', '#DC2626', '#4B5563'],
             sizes: derivedSizes,
             selectedColor: selectedColor || (derivedColors[0] || 'white'),
-            selectedSize: selectedSize || (derivedSizes[0] || 'M'),
+            selectedSize: selectedSize || defaultSizeFallback,
             initialQuantity: initialQuantity,
             faces: resolvedFaces,
             raw_images: productImagesList
@@ -250,7 +310,7 @@ export default function DesignStudioPage() {
         setLoading(false);
       }
     }
-    
+
     loadProduct();
   }, [activeProductId, t]);
 
@@ -260,93 +320,96 @@ export default function DesignStudioPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)] pt-0 pb-16 px-2 sm:px-4 md:px-8">
-      {/* Design Studio Layout Optimizations: Override Main Padding & Hide Footer */}
-      <style>{`
-        main {
-          padding-top: 80px !important;
-        }
-        @media (min-width: 768px) {
-          main {
-            padding-top: 96px !important;
-          }
-        }
-        footer, .site-footer, #footer {
-          display: none !important;
-        }
-      `}</style>
-
-      <div className="w-full max-w-[1920px] mx-auto px-2 sm:px-4 lg:px-6 xl:px-8 flex flex-col gap-2 md:gap-3.5">
-        
-        {/* Top Quick Actions Bar (Upload Design, Change Product, and Choose from Gallery - 3 Equal Columns in One Row) */}
-        <div className="grid grid-cols-3 items-center gap-2.5 sm:gap-3.5 w-full mt-0 mb-1">
-          {/* 1. Upload Design Button */}
-          <label className="flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:bg-[#e04826] text-white shadow-sm hover:shadow-md rounded-2xl py-2.5 sm:py-3 px-3 sm:px-5 font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-98 cursor-pointer text-center truncate border border-transparent">
-            <Upload size={18} className="shrink-0 drop-shadow-xs" />
-            <span className="truncate">{tStudio('uploadDesign')}</span>
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
-              onChange={handleTopFileUpload} 
-            />
-          </label>
-
-          {/* 2. Change Product Button (Moved between Upload & Gallery, Equal Size) */}
-          <button 
-            type="button"
-            onClick={() => {
-              setActiveProductId('');
-              setProductData(null);
-            }}
-            className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-400 text-gray-800 shadow-sm hover:shadow-md rounded-2xl py-2.5 sm:py-3 px-3 sm:px-5 font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-98 text-center cursor-pointer truncate"
-          >
-            <RefreshCw size={17} className="shrink-0 text-gray-700" />
-            <span className="truncate">{t('changeProduct', { fallback: 'تغيير المنتج' })}</span>
-          </button>
-
-          {/* 3. Choose from Gallery Button */}
-          <button 
-            type="button"
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('STUDIO_OPEN_GALLERY_MODAL'));
+    <div className="h-full max-h-full flex-1 min-h-0 flex flex-col bg-[var(--color-background)] pt-0 sm:pt-1 pb-0.5 sm:pb-2 ps-1 sm:ps-2 md:ps-16 pe-1 sm:pe-3 md:pe-4 overflow-hidden w-full max-w-full">
+      {/* Design Studio Layout Optimizations: Zero Top Padding & Locked Viewport */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            html, body {
+              overflow: hidden !important;
+              height: 100% !important;
+              height: 100dvh !important;
+              max-height: 100dvh !important;
+              position: fixed !important;
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            main.flex-grow {
+              box-sizing: border-box !important;
+              position: fixed !important;
+              inset: 0 !important;
+              top: 0 !important;
+              bottom: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
+              width: 100vw !important;
+              max-width: 100vw !important;
+              height: 100dvh !important;
+              max-height: 100dvh !important;
+              padding-top: 48px !important;
+              padding-bottom: 0 !important;
+              margin: 0 !important;
+              overflow: hidden !important;
+              z-index: 20 !important;
+            }
+            @media (min-width: 768px) {
+              main.flex-grow {
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
               }
-            }}
-            className="flex items-center justify-center gap-2 bg-white hover:bg-orange-50/80 border-2 border-[var(--color-primary)] text-[var(--color-primary)] shadow-sm hover:shadow-md rounded-2xl py-2.5 sm:py-3 px-3 sm:px-5 font-bold text-xs sm:text-sm tracking-wide transition-all active:scale-98 text-center cursor-pointer truncate"
-          >
-            <img src="/images/logo.png" alt="Logo" className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" />
-            <span className="truncate">{tStudio('chooseFromGallery')}</span>
-          </button>
-        </div>
+            }
+            body.studio-drawer-open header.md\:hidden {
+              transform: translateY(-150%) !important;
+              opacity: 0 !important;
+              pointer-events: none !important;
+              transition: all 0.3s ease-in-out !important;
+            }
+            body.studio-drawer-open main.flex-grow {
+              z-index: 60 !important;
+            }
+            .studio-workspace-container {
+              padding-top: 0 !important;
+            }
+            footer, .site-footer, #footer {
+              display: none !important;
+            }
+          `
+        }}
+      />
 
+      <div className="w-full max-w-[1920px] mx-auto px-1 sm:px-2 lg:px-4 flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-xl text-center border border-red-100 font-medium mx-2 md:mx-0">
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl text-center border border-red-100 font-medium mx-2 md:mx-0 shrink-0">
             {error}
           </div>
         )}
-        
+
         {/* Main Content Area */}
         {loading ? (
-          <div className="h-[70vh] md:min-h-[500px] flex flex-col items-center justify-center bg-white rounded-3xl shadow-sm border border-border/50">
+          <div className="h-full flex-1 min-h-[500px] flex flex-col items-center justify-center bg-white rounded-3xl shadow-sm border border-border/50">
             <Loader2 className="w-12 h-12 animate-spin text-[var(--color-primary)] mb-4" />
             <p className="font-bold text-gray-500">{t('initializingCanvas')}</p>
           </div>
         ) : !activeProductId || !productData ? (
-          <div className="p-4 md:p-0">
+          <div className="p-4 md:p-0 flex-1 overflow-y-auto custom-scrollbar">
             <ProductSelector onSelectProduct={handleSelectProduct} />
           </div>
         ) : (
-          <div className="h-full flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <FabricCanvas 
-              productId={activeProductId} 
-              basePrice={productData.basePrice} 
-              productFaces={productData.faces} 
+          <div className="h-full flex-1 min-h-0 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden">
+            <FabricCanvas
+              productId={activeProductId}
+              basePrice={productData.basePrice}
+              productFaces={productData.faces}
               productData={productData}
               initialColor={productData.selectedColor}
               initialSize={productData.selectedSize}
               initialQuantity={productData.initialQuantity}
+              onChangeProduct={() => {
+                setActiveProductId('');
+                setProductData(null);
+              }}
             />
           </div>
         )}

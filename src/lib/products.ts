@@ -120,7 +120,7 @@ export async function getProductMedia(productId: string) {
   }
 }
 
-export async function getProductFrontImage(productId: string) {
+export async function getProductFrontImage(productId: string, preferredType?: string, preferredColor?: string) {
   const media = await getProductMedia(productId);
   return media.front;
 }

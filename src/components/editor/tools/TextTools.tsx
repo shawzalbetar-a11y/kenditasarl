@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { fabric } from 'fabric';
 import { useTranslations } from 'next-intl';
-import { 
-  Bold, 
-  Italic, 
+import {
+  Bold,
+  Italic,
   Underline,
-  AlignLeft, 
-  AlignCenter, 
-  AlignRight, 
-  Type, 
-  Search, 
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Type,
+  Search,
   Sparkles,
   Palette,
   Sun,
@@ -24,22 +24,37 @@ interface TextToolsProps {
 }
 
 const FONTS = [
-  // Arabic Master Fonts
+  // 1. Arabic Master Fonts (الخطوط العربية الفاخرة)
   { name: 'Cairo', category: 'Arabic' },
+  { name: 'Alexandria', category: 'Arabic' },
   { name: 'Tajawal', category: 'Arabic' },
   { name: 'Almarai', category: 'Arabic' },
   { name: 'Changa', category: 'Arabic' },
-  
-  // Latin / Turkish / Universal Modern Fonts
+  { name: 'Lalezar', category: 'Arabic' },
+  { name: 'Amiri', category: 'Arabic' },
+  { name: 'Aref Ruqaa', category: 'Arabic' },
+  { name: 'Marhey', category: 'Arabic' },
+  { name: 'Readex Pro', category: 'Arabic' },
+  { name: 'Reem Kufi', category: 'Arabic' },
+  { name: 'El Messiri', category: 'Arabic' },
+  { name: 'Rubik', category: 'Arabic' },
+
+  // 2. Streetwear & Display Fonts (خطوط التيشيرتات والستريت وير - تدعم التركية)
+  { name: 'Bebas Neue', category: 'Streetwear' },
+  { name: 'Anton', category: 'Streetwear' },
+  { name: 'Oswald', category: 'Streetwear' },
+  { name: 'Permanent Marker', category: 'Streetwear' },
+  { name: 'Righteous', category: 'Streetwear' },
+  { name: 'Pacifico', category: 'Script' },
+
+  // 3. Modern Latin & Turkish Fonts (الخطوط العالمية والتركية)
   { name: 'Montserrat', category: 'Modern Sans' },
-  { name: 'Roboto', category: 'Clean Sans' },
-  { name: 'Open Sans', category: 'Balanced' },
-  { name: 'Ubuntu', category: 'Dynamic' },
   { name: 'Playfair Display', category: 'Serif' },
   { name: 'Inter', category: 'Tech' },
+  { name: 'Roboto', category: 'Clean Sans' },
+  { name: 'Ubuntu', category: 'Dynamic' },
+  { name: 'Open Sans', category: 'Balanced' },
   { name: 'Arial', category: 'Standard' },
-  { name: 'Times New Roman', category: 'Classic Serif' },
-  { name: 'Courier New', category: 'Monospace' },
 ];
 
 const TEXT_COLOR_SWATCHES = [
@@ -71,7 +86,7 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
     stroke: '',
     strokeWidth: 0,
   });
-  
+
   const [showFontPicker, setShowFontPicker] = useState(false);
   const [fontSearch, setFontSearch] = useState('');
   const [hasShadow, setHasShadow] = useState(false);
@@ -137,9 +152,9 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
     if (!txt) return;
 
     // Check if the user has selected/highlighted a specific character or substring
-    const hasSelection = 
-      typeof txt.selectionStart === 'number' && 
-      typeof txt.selectionEnd === 'number' && 
+    const hasSelection =
+      typeof txt.selectionStart === 'number' &&
+      typeof txt.selectionEnd === 'number' &&
       txt.selectionStart !== txt.selectionEnd;
 
     if (hasSelection) {
@@ -149,7 +164,7 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
       // Apply to entire textbox
       txt.set(key as any, value);
     }
-    
+
     // Auto RTL detection when text changes
     if (key === 'text') {
       const isRtl = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(value);
@@ -158,7 +173,14 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
         txt.set('textAlign', isRtl ? 'right' : 'left');
       }
     }
-    
+
+    if (key === 'fontFamily' && typeof document !== 'undefined' && (document as any).fonts) {
+      (document as any).fonts.load(`16px "${value}"`).then(() => {
+        canvas?.requestRenderAll();
+        canvas?.renderAll();
+      }).catch(() => { });
+    }
+
     canvas?.requestRenderAll();
     canvas?.renderAll();
     onSaveHistory();
@@ -201,8 +223,8 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
     onSaveHistory();
   };
 
-  const filteredFonts = FONTS.filter(f => 
-    f.name.toLowerCase().includes(fontSearch.toLowerCase()) || 
+  const filteredFonts = FONTS.filter(f =>
+    f.name.toLowerCase().includes(fontSearch.toLowerCase()) ||
     f.category.toLowerCase().includes(fontSearch.toLowerCase())
   );
 
@@ -217,7 +239,7 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
           {typeof (activeObject as any).selectionStart === 'number' && (activeObject as any).selectionStart !== (activeObject as any).selectionEnd ? t('selectionFormatted') : t('fullFormatted')}
         </span>
       </div>
-      
+
       {/* Live Text Content Input */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-bold text-gray-700 flex items-center justify-between">
@@ -238,7 +260,7 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
 
       {/* Font Picker & Size */}
       <div className="flex gap-2 relative">
-        <button 
+        <button
           onClick={() => setShowFontPicker(!showFontPicker)}
           className="flex-1 p-2.5 border border-gray-300 rounded-xl text-sm bg-white flex justify-between items-center shadow-sm hover:border-gray-400 transition-all"
         >
@@ -258,7 +280,7 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
             <Minus size={13} />
           </button>
 
-          <input 
+          <input
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
@@ -285,15 +307,15 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
             <Plus size={13} />
           </button>
         </div>
-        
+
         {/* Custom Font Picker Dropdown */}
         {showFontPicker && (
           <div className="absolute top-full left-0 w-full mt-1.5 bg-white border border-gray-200 shadow-2xl rounded-2xl z-50 max-h-64 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-2 border-b flex items-center gap-2 bg-gray-50">
               <Search size={14} className="text-gray-400" />
-              <input 
-                type="text" 
-                placeholder={t('searchFont')} 
+              <input
+                type="text"
+                placeholder={t('searchFont')}
                 className="w-full bg-transparent outline-none text-xs font-medium"
                 value={fontSearch}
                 onChange={e => setFontSearch(e.target.value)}
@@ -301,7 +323,7 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
             </div>
             <div className="overflow-y-auto flex-1 p-1">
               {filteredFonts.map(font => (
-                <div 
+                <div
                   key={font.name}
                   onClick={() => {
                     updateProp('fontFamily', font.name);
@@ -321,50 +343,50 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
       {/* Styles & Alignment Bar */}
       <div className="flex gap-1.5 justify-between bg-white p-1.5 rounded-xl border border-gray-300 shadow-sm">
         <div className="flex gap-1">
-          <button 
+          <button
             onClick={() => updateProp('fontWeight', textProps.fontWeight === 'bold' ? 'normal' : 'bold')}
             className={`p-2 rounded-lg transition-colors ${textProps.fontWeight === 'bold' ? 'bg-[var(--color-primary)] text-white shadow-sm' : 'hover:bg-gray-100 text-gray-700'}`}
             title={t('bold')}
           >
-            <Bold size={15}/>
+            <Bold size={15} />
           </button>
-          <button 
+          <button
             onClick={() => updateProp('fontStyle', textProps.fontStyle === 'italic' ? 'normal' : 'italic')}
             className={`p-2 rounded-lg transition-colors ${textProps.fontStyle === 'italic' ? 'bg-[var(--color-primary)] text-white shadow-sm' : 'hover:bg-gray-100 text-gray-700'}`}
             title={t('italic')}
           >
-            <Italic size={15}/>
+            <Italic size={15} />
           </button>
-          <button 
+          <button
             onClick={() => updateProp('underline', !textProps.underline)}
             className={`p-2 rounded-lg transition-colors ${textProps.underline ? 'bg-[var(--color-primary)] text-white shadow-sm' : 'hover:bg-gray-100 text-gray-700'}`}
             title={t('underline')}
           >
-            <Underline size={15}/>
+            <Underline size={15} />
           </button>
         </div>
 
         <div className="flex gap-1 border-r pr-1.5">
-          <button 
-            onClick={() => updateProp('textAlign', 'right')} 
+          <button
+            onClick={() => updateProp('textAlign', 'right')}
             className={`p-2 rounded-lg transition-colors ${textProps.textAlign === 'right' ? 'bg-gray-200 text-gray-900 font-bold' : 'hover:bg-gray-100 text-gray-600'}`}
             title={t('alignRight')}
           >
-            <AlignRight size={15}/>
+            <AlignRight size={15} />
           </button>
-          <button 
-            onClick={() => updateProp('textAlign', 'center')} 
+          <button
+            onClick={() => updateProp('textAlign', 'center')}
             className={`p-2 rounded-lg transition-colors ${textProps.textAlign === 'center' ? 'bg-gray-200 text-gray-900 font-bold' : 'hover:bg-gray-100 text-gray-600'}`}
             title={t('alignCenter')}
           >
-            <AlignCenter size={15}/>
+            <AlignCenter size={15} />
           </button>
-          <button 
-            onClick={() => updateProp('textAlign', 'left')} 
+          <button
+            onClick={() => updateProp('textAlign', 'left')}
             className={`p-2 rounded-lg transition-colors ${textProps.textAlign === 'left' ? 'bg-gray-200 text-gray-900 font-bold' : 'hover:bg-gray-100 text-gray-600'}`}
             title={t('alignLeft')}
           >
-            <AlignLeft size={15}/>
+            <AlignLeft size={15} />
           </button>
         </div>
       </div>
@@ -376,9 +398,9 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
             <Palette size={14} className="text-[var(--color-primary)]" />
             {t('textColor')}
           </span>
-          <input 
-            type="color" 
-            value={textProps.fill} 
+          <input
+            type="color"
+            value={textProps.fill}
             onChange={e => updateProp('fill', e.target.value)}
             className="w-6 h-6 rounded-lg cursor-pointer border border-gray-300 p-0"
             title={t('textColor')}
@@ -405,7 +427,7 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
         </span>
 
         <div className="grid grid-cols-2 gap-2">
-          <button 
+          <button
             onClick={toggleShadow}
             className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm ${hasShadow ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
           >
@@ -415,9 +437,9 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
 
           <div className="flex items-center justify-between bg-white border border-gray-300 rounded-xl px-2.5 py-1">
             <span className="text-[11px] font-bold text-gray-600">{t('stroke')}</span>
-            <input 
-              type="color" 
-              value={strokeColor} 
+            <input
+              type="color"
+              value={strokeColor}
               onChange={e => updateStroke(e.target.value, strokeWidth || 1)}
               className="w-5 h-5 rounded cursor-pointer border-0 p-0"
               title={t('stroke')}
@@ -429,11 +451,11 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
         <div className="flex justify-between items-center bg-white p-2 rounded-xl border border-gray-200">
           <span className="text-[11px] font-medium text-gray-600">{t('strokeWidth')}</span>
           <div className="flex items-center gap-2">
-            <input 
-              type="range" min="0" max="10" step="1" 
-              value={strokeWidth} 
-              onChange={e => updateStroke(strokeColor, parseInt(e.target.value) || 0)} 
-              className="w-24 accent-[var(--color-primary)] cursor-pointer" 
+            <input
+              type="range" min="0" max="10" step="1"
+              value={strokeWidth}
+              onChange={e => updateStroke(strokeColor, parseInt(e.target.value) || 0)}
+              className="w-24 accent-[var(--color-primary)] cursor-pointer"
             />
             <span className="text-[11px] font-mono text-gray-700 w-5">{strokeWidth}px</span>
           </div>
@@ -444,29 +466,29 @@ export default function TextTools({ canvas, activeObject, onSaveHistory }: TextT
       <div className="flex flex-col gap-2 pt-2 border-t border-gray-200">
         <div className="flex justify-between items-center">
           <span className="text-xs text-gray-600 font-medium">{t('opacity')}</span>
-          <input 
-            type="range" min="0" max="1" step="0.05" 
-            value={textProps.opacity} 
-            onChange={e => updateProp('opacity', parseFloat(e.target.value))} 
-            className="w-28 accent-[var(--color-primary)] cursor-pointer" 
+          <input
+            type="range" min="0" max="1" step="0.05"
+            value={textProps.opacity}
+            onChange={e => updateProp('opacity', parseFloat(e.target.value))}
+            className="w-28 accent-[var(--color-primary)] cursor-pointer"
           />
         </div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-gray-600 font-medium">{t('charSpacing')}</span>
-          <input 
-            type="range" min="-50" max="400" step="10" 
-            value={textProps.charSpacing} 
-            onChange={e => updateProp('charSpacing', parseInt(e.target.value))} 
-            className="w-28 accent-[var(--color-primary)] cursor-pointer" 
+          <input
+            type="range" min="-50" max="400" step="10"
+            value={textProps.charSpacing}
+            onChange={e => updateProp('charSpacing', parseInt(e.target.value))}
+            className="w-28 accent-[var(--color-primary)] cursor-pointer"
           />
         </div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-gray-600 font-medium">{t('lineHeight')}</span>
-          <input 
-            type="range" min="0.8" max="2.5" step="0.1" 
-            value={textProps.lineHeight} 
-            onChange={e => updateProp('lineHeight', parseFloat(e.target.value))} 
-            className="w-28 accent-[var(--color-primary)] cursor-pointer" 
+          <input
+            type="range" min="0.8" max="2.5" step="0.1"
+            value={textProps.lineHeight}
+            onChange={e => updateProp('lineHeight', parseFloat(e.target.value))}
+            className="w-28 accent-[var(--color-primary)] cursor-pointer"
           />
         </div>
       </div>

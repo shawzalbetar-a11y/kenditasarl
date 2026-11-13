@@ -1,8 +1,8 @@
 "use client";
 
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { Search, ShoppingCart, User, Menu, X } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, Shirt, Coffee, Sparkles } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/routing';
@@ -15,6 +15,7 @@ import { usePathname } from 'next/navigation';
 
 export default function Header() {
   const t = useTranslations('Header');
+  const locale = useLocale();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -23,8 +24,21 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  const [isStudioDrawerOpen, setIsStudioDrawerOpen] = useState(false);
   const pathname = usePathname();
   const isDesignStudio = pathname.includes('/design-studio');
+
+  // Listen to drawer and modal toggle events from design studio to hide mobile top bar
+  useEffect(() => {
+    const handleStudioDrawer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isOpen?: boolean }>;
+      setIsStudioDrawerOpen(Boolean(customEvent.detail?.isOpen));
+    };
+    window.addEventListener('STUDIO_DRAWER_TOGGLE', handleStudioDrawer);
+    return () => {
+      window.removeEventListener('STUDIO_DRAWER_TOGGLE', handleStudioDrawer);
+    };
+  }, []);
 
   // Close mobile navigation drawer on route change
   useEffect(() => {
@@ -33,16 +47,16 @@ export default function Header() {
 
   useEffect(() => {
     let unsubscribeCart: () => void;
-    
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      
+
       if (currentUser) {
         // Enforce onboarding check globally
         try {
           const userDocRef = doc(db, 'users', currentUser.uid);
           const userDocSnap = await getDoc(userDocRef);
-          
+
           if (!userDocSnap.exists() || !userDocSnap.data().full_name || (!userDocSnap.data().email && !userDocSnap.data().phone)) {
             setIsAuthModalOpen(true);
           }
@@ -65,7 +79,7 @@ export default function Header() {
         if (unsubscribeCart) unsubscribeCart();
       }
     });
-    
+
     return () => {
       unsubscribeAuth();
       if (unsubscribeCart) unsubscribeCart();
@@ -74,7 +88,7 @@ export default function Header() {
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
-    
+
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       setIsScrolled(currentScrollY > 20);
@@ -90,7 +104,7 @@ export default function Header() {
           setIsHidden(false);
         }
       }
-      
+
       lastScrollY = currentScrollY;
     };
 
@@ -100,10 +114,10 @@ export default function Header() {
         setIsHovering(e.clientY < 150);
       }
     };
-    
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('mousemove', handleMouseMove);
-    
+
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('mousemove', handleMouseMove);
@@ -121,143 +135,341 @@ export default function Header() {
 
   const shouldHide = isHidden && !isHovering;
 
-  return (
-    <>
-      <header className={`fixed top-1 md:top-3 left-0 right-0 z-50 w-full px-2 sm:px-4 lg:px-8 transition-all duration-500 flex flex-col items-center pointer-events-none ${shouldHide ? '-translate-y-[150%] opacity-0' : 'translate-y-0 opacity-100'}`}>
-        <div 
-          className={`pointer-events-auto w-full max-w-[1720px] flex flex-col rounded-[2rem] border transition-all duration-500 shadow-xl ${
-          isScrolled || isHovering
-            ? 'bg-white/70 backdrop-blur-2xl border-white/40 shadow-black/5' 
-            : 'bg-white/95 backdrop-blur-xl border-white/60 shadow-black/8'
-        }`}
-      >
-        {/* Announcement Bar (Collapsed completely on Design Studio) */}
-        {!isDesignStudio && (
-          <div className={`transition-all duration-500 text-center py-2 text-xs font-bold px-4 flex items-center justify-center rounded-t-[2rem] tracking-wide ${
-            (isScrolled || isHovering) ? 'bg-primary/90 text-white shadow-xs' : 'bg-primary text-white'
-          }`}>
-            {t('announcement')}
-          </div>
-        )}
+  // DESIGN STUDIO: Move navigation to a sleek vertical rail in the side margin
+  if (isDesignStudio) {
+    return (
+      <>
+        {/* DESKTOP VERTICAL NAVIGATION RAIL (Fixed in the side margin) */}
+        <aside
+          aria-label="شريط التنقل الجانبي"
+          className="hidden md:flex fixed start-2.5 sm:start-3.5 top-1/2 -translate-y-1/2 z-50 flex-col items-center select-none"
+        >
+          <div className="flex flex-col items-center bg-white/80 hover:bg-white/95 backdrop-blur-xl border border-gray-200/90 hover:border-orange-300 shadow-lg hover:shadow-2xl rounded-3xl p-1.5 transition-all duration-300 gap-1.5 group/dock ring-1 ring-black/5 hover:ring-orange-500/20">
+            {/* Logo / Home */}
+            <Link
+              href="/"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center hover:bg-orange-50 transition-all group/item relative cursor-pointer active:scale-95"
+              title={locale === 'tr' ? 'Ana Sayfa' : locale === 'en' ? 'Home' : 'الرئيسية'}
+            >
+              <img
+                src="/favicon.svg"
+                alt="Kenditasarl Logo"
+                className="w-7 h-7 object-contain group-hover/item:scale-110 transition-transform"
+              />
+              <span className="absolute start-full ms-3 px-2.5 py-1 bg-gray-900/95 backdrop-blur-md text-white text-xs font-bold rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto transition-all shadow-xl z-50 border border-gray-700/60 scale-95 group-hover/item:scale-100">
+                {locale === 'tr' ? 'Ana Sayfa' : locale === 'en' ? 'Home' : 'الرئيسية'}
+              </span>
+            </Link>
 
-        <div className="px-5 sm:px-8">
-          <div className="relative flex justify-between items-center h-16 md:h-18">
-            
-            {/* Logo */}
-            <div className="flex-shrink-0 flex items-center z-10">
-              <Link href="/" className="flex items-center">
-                <img src="/images/logo.png" alt="Kenditasarl Logo" className={`w-auto object-contain transition-all duration-500 ${isScrolled ? 'h-8 md:h-10' : 'h-10 md:h-12'}`} />
-              </Link>
-            </div>
+            <div className="w-6 h-px bg-gray-200/80 my-0.5" />
 
-            {/* Desktop Navigation - Mathematically Centered in Rectangle (Auto-centers regardless of items added) */}
-            <nav className="hidden md:flex items-center justify-center absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 space-x-5 lg:space-x-8 rtl:space-x-reverse pointer-events-auto z-10">
-              <Link href="/tshirts" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide whitespace-nowrap">
+            {/* T-shirts */}
+            <Link
+              href="/tshirts"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-gray-700 hover:text-primary hover:bg-orange-50 transition-all group/item relative cursor-pointer active:scale-95"
+              title={t('tshirts')}
+            >
+              <Shirt size={20} className="stroke-[2.2] group-hover/item:scale-110 transition-transform" />
+              <span className="absolute start-full ms-3 px-2.5 py-1 bg-gray-900/95 backdrop-blur-md text-white text-xs font-bold rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto transition-all shadow-xl z-50 border border-gray-700/60 scale-95 group-hover/item:scale-100">
                 {t('tshirts')}
-              </Link>
-              <Link href="/hats" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide whitespace-nowrap">
-                {t('hats')}
-              </Link>
-              <Link href="/mugs" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide whitespace-nowrap">
-                {t('mugs')}
-              </Link>
-              <Link href="/design-studio" className="bg-orange-50 hover:bg-orange-100 text-primary border border-orange-200 px-3.5 py-1.5 rounded-full transition-all font-black text-[15px] lg:text-[17px] tracking-wide hover:scale-105 active:scale-95 shadow-2xs inline-flex items-center gap-1.5 whitespace-nowrap">
-                <span>✨</span>
-                <span>{t('designYourself')}</span>
-              </Link>
-            </nav>
+              </span>
+            </Link>
 
-            {/* Icons / Actions - 4 Icons enlarged and sharp */}
-            <div className="hidden md:flex items-center space-x-5 lg:space-x-6 rtl:space-x-reverse z-10">
-              <button className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('search')}>
-                <Search className="w-6 h-6 stroke-[2.2]" />
-              </button>
-              <LanguageSwitcher />
-              <button onClick={handleAccountClick} className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('account')}>
-                <User className="w-6 h-6 stroke-[2.2]" />
-              </button>
-              <Link href="/cart" className="text-gray-700 hover:text-primary transition-colors relative p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('cart')}>
-                <ShoppingCart className="w-6 h-6 stroke-[2.2]" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-offer text-white text-[10px] min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center font-bold shadow-xs">
-                    {cartCount > 99 ? '99+' : cartCount}
-                  </span>
-                )}
-              </Link>
+            {/* Hats */}
+            <Link
+              href="/hats"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-gray-700 hover:text-primary hover:bg-orange-50 transition-all group/item relative cursor-pointer active:scale-95"
+              title={t('hats')}
+            >
+              <svg className="w-5 h-5 stroke-[2.2] fill-none stroke-current group-hover/item:scale-110 transition-transform" viewBox="0 0 24 24">
+                <path d="M4 14c0-4.4 3.6-8 8-8s8 3.6 8 8" />
+                <path d="M2 14h18c1.5 0 2.5.8 2.5 2s-1 2-2.5 2H2" />
+                <circle cx="12" cy="6.5" r="0.75" fill="currentColor" />
+              </svg>
+              <span className="absolute start-full ms-3 px-2.5 py-1 bg-gray-900/95 backdrop-blur-md text-white text-xs font-bold rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto transition-all shadow-xl z-50 border border-gray-700/60 scale-95 group-hover/item:scale-100">
+                {t('hats')}
+              </span>
+            </Link>
+
+            {/* Mugs */}
+            <Link
+              href="/mugs"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-gray-700 hover:text-primary hover:bg-orange-50 transition-all group/item relative cursor-pointer active:scale-95"
+              title={t('mugs')}
+            >
+              <Coffee size={20} className="stroke-[2.2] group-hover/item:scale-110 transition-transform" />
+              <span className="absolute start-full ms-3 px-2.5 py-1 bg-gray-900/95 backdrop-blur-md text-white text-xs font-bold rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto transition-all shadow-xl z-50 border border-gray-700/60 scale-95 group-hover/item:scale-100">
+                {t('mugs')}
+              </span>
+            </Link>
+
+            {/* Design Studio (Active Highlight) */}
+            <Link
+              href="/design-studio"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center bg-orange-500 text-white shadow-md shadow-orange-500/30 transition-all group/item relative cursor-pointer ring-2 ring-orange-300 active:scale-95"
+              title={t('designYourself')}
+            >
+              <Sparkles size={20} className="stroke-[2.2] group-hover/item:rotate-12 transition-transform" />
+              <span className="absolute start-full ms-3 px-2.5 py-1 bg-gray-900/95 backdrop-blur-md text-white text-xs font-bold rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto transition-all shadow-xl z-50 border border-gray-700/60 scale-95 group-hover/item:scale-100">
+                ✨ {t('designYourself')} ({locale === 'tr' ? 'Aktif' : locale === 'en' ? 'Active' : 'نشط'})
+              </span>
+            </Link>
+
+            <div className="w-6 h-px bg-gray-200/80 my-0.5" />
+
+            {/* Search */}
+            <button
+              type="button"
+              onClick={() => router.push('/tshirts')}
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-gray-700 hover:text-primary hover:bg-orange-50 transition-all group/item relative cursor-pointer active:scale-95"
+              title={t('search')}
+            >
+              <Search size={20} className="stroke-[2.2] group-hover/item:scale-110 transition-transform" />
+              <span className="absolute start-full ms-3 px-2.5 py-1 bg-gray-900/95 backdrop-blur-md text-white text-xs font-bold rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto transition-all shadow-xl z-50 border border-gray-700/60 scale-95 group-hover/item:scale-100">
+                {t('search')}
+              </span>
+            </button>
+
+            {/* Language Switcher */}
+            <div className="group/item relative">
+              <LanguageSwitcher compact direction="side" />
             </div>
 
-          {/* Mobile menu button */}
-          <div className="flex items-center md:hidden gap-3 sm:gap-4">
-            <LanguageSwitcher />
-            <Link href="/cart" className="text-textPrimary relative p-1.5" aria-label={t('cart')}>
-              <ShoppingCart className="w-6 h-6 stroke-[2.2]" />
+            {/* Account / User */}
+            <button
+              type="button"
+              onClick={handleAccountClick}
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-gray-700 hover:text-primary hover:bg-orange-50 transition-all group/item relative cursor-pointer active:scale-95"
+              title={t('account')}
+            >
+              <User size={20} className="stroke-[2.2] group-hover/item:scale-110 transition-transform" />
+              <span className="absolute start-full ms-3 px-2.5 py-1 bg-gray-900/95 backdrop-blur-md text-white text-xs font-bold rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto transition-all shadow-xl z-50 border border-gray-700/60 scale-95 group-hover/item:scale-100">
+                {user ? (user.displayName || t('account')) : t('account')}
+              </span>
+            </button>
+
+            {/* Shopping Cart */}
+            <Link
+              href="/cart"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-gray-700 hover:text-primary hover:bg-orange-50 transition-all group/item relative cursor-pointer active:scale-95"
+              title={t('cart')}
+            >
+              <ShoppingCart size={20} className="stroke-[2.2] group-hover/item:scale-110 transition-transform" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-offer text-white text-[10px] min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -end-1 bg-offer text-white text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold shadow-xs">
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              )}
+              <span className="absolute start-full ms-3 px-2.5 py-1 bg-gray-900/95 backdrop-blur-md text-white text-xs font-bold rounded-xl whitespace-nowrap opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto transition-all shadow-xl z-50 border border-gray-700/60 scale-95 group-hover/item:scale-100">
+                {t('cart')} ({cartCount})
+              </span>
+            </Link>
+
+          </div>
+        </aside>
+
+        {/* MOBILE TOP SLIM BAR FOR STUDIO ONLY */}
+        <header className={`md:hidden fixed top-1 left-2 right-2 z-50 flex items-center justify-between px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200/90 shadow-md transition-all duration-300 ease-in-out ${isStudioDrawerOpen ? '-translate-y-28 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+          }`}>
+          <Link href="/" className="flex items-center gap-1.5">
+            <img src="/favicon.svg" alt="Kenditasarl Logo" className="h-7 w-7 object-contain drop-shadow-2xs" />
+            <span className="font-black text-xs tracking-tight text-gray-900">KENDİN TASARLA</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <Link href="/cart" className="relative p-1 text-gray-700">
+              <ShoppingCart size={20} />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -end-1 bg-offer text-white text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
                   {cartCount > 99 ? '99+' : cartCount}
                 </span>
               )}
             </Link>
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-textPrimary hover:text-primary p-1.5 cursor-pointer"
+              className="p-1 text-gray-700"
               aria-label="Toggle Menu"
             >
-              {isMobileMenuOpen ? <X className="w-7 h-7 stroke-[2.2]" /> : <Menu className="w-7 h-7 stroke-[2.2]" />}
+              {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
-          </div>
-        </div>
-      </div>
+        </header>
 
-      {/* Mobile Navigation Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden mt-2 pointer-events-auto w-full max-w-6xl rounded-[2rem] bg-white/95 backdrop-blur-2xl border border-white/60 shadow-xl overflow-hidden p-2">
-          <div className="px-2 pt-2 pb-3 space-y-1.5 flex flex-col">
-            <Link 
-              href="/tshirts" 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="block px-4 py-3 rounded-xl text-lg font-bold text-gray-800 hover:bg-orange-50/60 hover:text-primary transition-colors"
-            >
-              {t('tshirts')}
-            </Link>
-            <Link 
-              href="/hats" 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="block px-4 py-3 rounded-xl text-lg font-bold text-gray-800 hover:bg-orange-50/60 hover:text-primary transition-colors"
-            >
-              {t('hats')}
-            </Link>
-            <Link 
-              href="/mugs" 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="block px-4 py-3 rounded-xl text-lg font-bold text-gray-800 hover:bg-orange-50/60 hover:text-primary transition-colors"
-            >
-              {t('mugs')}
-            </Link>
-            <Link 
-              href="/design-studio" 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="block px-4 py-3 rounded-xl text-lg font-black text-primary bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors"
-            >
-              ✨ {t('designYourself')}
-            </Link>
-            <div className="border-t border-gray-100 my-2"></div>
-            <button onClick={(e) => { handleAccountClick(e); setIsMobileMenuOpen(false); }} className="flex items-center gap-3 px-4 py-3 rounded-xl text-lg font-bold text-gray-800 hover:bg-gray-50 w-full text-start cursor-pointer">
-              <User className="w-6 h-6 stroke-[2.2]" /> {t('account')}
-            </button>
+        {/* Mobile drawer if opened on mobile */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden fixed inset-x-2 top-12 z-50 rounded-2xl bg-white/95 backdrop-blur-2xl border border-white/60 shadow-xl overflow-hidden p-2">
+            <div className="px-2 pt-2 pb-3 space-y-1.5 flex flex-col">
+              <Link href="/tshirts" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-2.5 rounded-xl text-base font-bold text-gray-800 hover:bg-orange-50/60">
+                {t('tshirts')}
+              </Link>
+              <Link href="/hats" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-2.5 rounded-xl text-base font-bold text-gray-800 hover:bg-orange-50/60">
+                {t('hats')}
+              </Link>
+              <Link href="/mugs" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-2.5 rounded-xl text-base font-bold text-gray-800 hover:bg-orange-50/60">
+                {t('mugs')}
+              </Link>
+              <Link href="/design-studio" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-2.5 rounded-xl text-base font-black text-primary bg-orange-50">
+                ✨ {t('designYourself')}
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Auth Modal */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={() => {
+            setIsAuthModalOpen(false);
+            router.push('/account');
+          }}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <header className={`fixed top-1 md:top-3 left-0 right-0 z-50 w-full px-2 sm:px-4 lg:px-8 transition-all duration-500 flex flex-col items-center pointer-events-none ${shouldHide ? '-translate-y-[150%] opacity-0' : 'translate-y-0 opacity-100'}`}>
+        <div
+          className={`pointer-events-auto w-full max-w-[1720px] flex flex-col rounded-[2rem] border transition-all duration-500 shadow-xl ${isScrolled || isHovering
+              ? 'bg-white/70 backdrop-blur-2xl border-white/40 shadow-black/5'
+              : 'bg-white/95 backdrop-blur-xl border-white/60 shadow-black/8'
+            }`}
+        >
+          {/* Announcement Bar (Collapsed completely on Design Studio) */}
+          {!isDesignStudio && (
+            <div className={`transition-all duration-500 text-center py-2 text-xs font-bold px-4 flex items-center justify-center rounded-t-[2rem] tracking-wide ${(isScrolled || isHovering) ? 'bg-primary/90 text-white shadow-xs' : 'bg-primary text-white'
+              }`}>
+              {t('announcement')}
+            </div>
+          )}
+
+          <div className="px-5 sm:px-8">
+            <div className="relative flex justify-between items-center h-16 md:h-18">
+
+              {/* Logo */}
+              <div className="flex-shrink-0 flex items-center z-10">
+                <Link href="/" className="flex items-center gap-2.5 group">
+                  <img
+                    src="/favicon.svg"
+                    alt="Kenditasarl Logo"
+                    className={`w-auto object-contain transition-all duration-300 drop-shadow-sm group-hover:scale-105 ${isScrolled ? 'h-9 md:h-11' : 'h-11 md:h-13'}`}
+                  />
+                  <span className="font-black text-xl md:text-2xl tracking-tight text-gray-950 group-hover:text-primary transition-colors hidden sm:inline">
+                    KENDİN TASARLA
+                  </span>
+                </Link>
+              </div>
+
+              {/* Desktop Navigation - Mathematically Centered in Rectangle (Auto-centers regardless of items added) */}
+              <nav className="hidden md:flex items-center justify-center absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 space-x-5 lg:space-x-8 rtl:space-x-reverse pointer-events-auto z-10">
+                <Link href="/tshirts" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide whitespace-nowrap">
+                  {t('tshirts')}
+                </Link>
+                <Link href="/hats" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide whitespace-nowrap">
+                  {t('hats')}
+                </Link>
+                <Link href="/mugs" className="text-gray-800 hover:text-primary transition-colors font-extrabold text-[16px] lg:text-[18px] tracking-wide whitespace-nowrap">
+                  {t('mugs')}
+                </Link>
+                <Link href="/design-studio" className="bg-orange-50 hover:bg-orange-100 text-primary border border-orange-200 px-3.5 py-1.5 rounded-full transition-all font-black text-[15px] lg:text-[17px] tracking-wide hover:scale-105 active:scale-95 shadow-2xs inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <span>✨</span>
+                  <span>{t('designYourself')}</span>
+                </Link>
+              </nav>
+
+              {/* Icons / Actions - 4 Icons enlarged and sharp */}
+              <div className="hidden md:flex items-center space-x-5 lg:space-x-6 rtl:space-x-reverse z-10">
+                <button className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('search')}>
+                  <Search className="w-6 h-6 stroke-[2.2]" />
+                </button>
+                <LanguageSwitcher />
+                <button onClick={handleAccountClick} className="text-gray-700 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('account')}>
+                  <User className="w-6 h-6 stroke-[2.2]" />
+                </button>
+                <Link href="/cart" className="text-gray-700 hover:text-primary transition-colors relative p-1.5 rounded-full hover:bg-gray-100/80 cursor-pointer" aria-label={t('cart')}>
+                  <ShoppingCart className="w-6 h-6 stroke-[2.2]" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-offer text-white text-[10px] min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center font-bold shadow-xs">
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </span>
+                  )}
+                </Link>
+              </div>
+
+              {/* Mobile menu button */}
+              <div className="flex items-center md:hidden gap-3 sm:gap-4">
+                <LanguageSwitcher />
+                <Link href="/cart" className="text-textPrimary relative p-1.5" aria-label={t('cart')}>
+                  <ShoppingCart className="w-6 h-6 stroke-[2.2]" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-offer text-white text-[10px] min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center font-bold">
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </span>
+                  )}
+                </Link>
+                <button
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                  className="text-textPrimary hover:text-primary p-1.5 cursor-pointer"
+                  aria-label="Toggle Menu"
+                >
+                  {isMobileMenuOpen ? <X className="w-7 h-7 stroke-[2.2]" /> : <Menu className="w-7 h-7 stroke-[2.2]" />}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+
+        {/* Mobile Navigation Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden mt-2 pointer-events-auto w-full max-w-6xl rounded-[2rem] bg-white/95 backdrop-blur-2xl border border-white/60 shadow-xl overflow-hidden p-2">
+            <div className="px-2 pt-2 pb-3 space-y-1.5 flex flex-col">
+              <Link
+                href="/tshirts"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block px-4 py-3 rounded-xl text-lg font-bold text-gray-800 hover:bg-orange-50/60 hover:text-primary transition-colors"
+              >
+                {t('tshirts')}
+              </Link>
+              <Link
+                href="/hats"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block px-4 py-3 rounded-xl text-lg font-bold text-gray-800 hover:bg-orange-50/60 hover:text-primary transition-colors"
+              >
+                {t('hats')}
+              </Link>
+              <Link
+                href="/mugs"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block px-4 py-3 rounded-xl text-lg font-bold text-gray-800 hover:bg-orange-50/60 hover:text-primary transition-colors"
+              >
+                {t('mugs')}
+              </Link>
+              <Link
+                href="/design-studio"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block px-4 py-3 rounded-xl text-lg font-black text-primary bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors"
+              >
+                ✨ {t('designYourself')}
+              </Link>
+              <div className="border-t border-gray-100 my-2"></div>
+              <button onClick={(e) => { handleAccountClick(e); setIsMobileMenuOpen(false); }} className="flex items-center gap-3 px-4 py-3 rounded-xl text-lg font-bold text-gray-800 hover:bg-gray-50 w-full text-start cursor-pointer">
+                <User className="w-6 h-6 stroke-[2.2]" /> {t('account')}
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Auth Modal */}
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
         onSuccess={() => {
           setIsAuthModalOpen(false);
           router.push('/account');
-        }} 
+        }}
       />
     </>
   );
