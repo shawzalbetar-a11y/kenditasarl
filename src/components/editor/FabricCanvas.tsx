@@ -974,19 +974,19 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     return allSelectedPlacements.filter(
       (p) =>
         isFaceMatching(p.targetFace, activeFace) ||
-        (studioProfile.family === 'mug' && p.id === 'mug_full_wrap')
+        (studioProfile.family === 'mug' && activeMugMode === 'mug_full_wrap' && p.id === 'mug_full_wrap')
     );
-  }, [allSelectedPlacements, activeFace, studioProfile.family]);
+  }, [allSelectedPlacements, activeFace, studioProfile.family, activeMugMode]);
 
   const otherFacesSelectedPlacements = useMemo(() => {
     return allSelectedPlacements.filter(
       (p) =>
         !(
           isFaceMatching(p.targetFace, activeFace) ||
-          (studioProfile.family === 'mug' && p.id === 'mug_full_wrap')
+          (studioProfile.family === 'mug' && activeMugMode === 'mug_full_wrap' && p.id === 'mug_full_wrap')
         )
     );
-  }, [allSelectedPlacements, activeFace, studioProfile.family]);
+  }, [allSelectedPlacements, activeFace, studioProfile.family, activeMugMode]);
 
   const otherFacesSummary = useMemo(() => {
     const groups: Record<string, { face: string; count: number; firstPlacementId: string; label: string }> = {};
@@ -1068,12 +1068,25 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   // Placements available for the current garment face
   const availablePlacementsForActiveFace = useMemo(() => {
     const gType = productData?.config?.garmentType || productData?.category || 'tshirt';
-    const allForFace = getPlacementsForGarment(gType, activeFace);
+    let allForFace = getPlacementsForGarment(gType, activeFace);
+    if (studioProfile.family === 'mug') {
+      if (activeMugMode === 'mug_full_wrap') {
+        allForFace = allForFace.filter(p => p.id === 'mug_full_wrap');
+      } else {
+        allForFace = allForFace.filter(p => p.id !== 'mug_full_wrap');
+        if (isMugSingleMode && (activeFace === 'other' || isFaceMatching('other', activeFace))) {
+          const sidePlacement = allSelectedPlacements.find(s => s.targetFace === 'other') || getPlacementById('mug_front', 'mug');
+          if (sidePlacement && !allForFace.some(s => s.id === sidePlacement.id)) {
+            allForFace = [sidePlacement, ...allForFace];
+          }
+        }
+      }
+    }
     if (productData?.config?.allowedPlacements && productData.config.allowedPlacements.length > 0) {
       return allForFace.filter(p => productData.config.allowedPlacements.includes(p.id));
     }
     return allForFace;
-  }, [productData, activeFace]);
+  }, [productData, activeFace, studioProfile.family, activeMugMode, isMugSingleMode, allSelectedPlacements]);
 
   // Placement Required Modal state (triggers when user attempts to add art without selecting a placement)
   const [isPlacementRequiredModalOpen, setIsPlacementRequiredModalOpen] = useState(false);
@@ -2537,28 +2550,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const br = obj.getBoundingRect(true, true);
     if (!br || br.width <= 0 || br.height <= 0) return true;
 
-    const objArea = br.width * br.height;
-    const centerPt = obj.getCenterPoint();
-
-    // Helper to test if object is reasonably contained inside a rectangular print zone
-    const checkZoneContainment = (zone: { left: number; top: number; width: number; height: number }, isStandardPlacement: boolean = false) => {
-      // Proportional tolerance: generous margin based on zone dimensions
-      // In professional print customizers (e.g. Printful / CustomInk), a design isn't out-of-bounds unless it noticeably breaches the area.
-      // 12% tolerance allows slight positioning adjustments and multi-object compositions (e.g. text + graphic).
-      const tolX = Math.max(isStandardPlacement ? 70 : 120, zone.width * 0.12);
-      const tolY = Math.max(isStandardPlacement ? 70 : 120, zone.height * 0.12);
-
-      // Condition A: Entire bounding box is within zone + tolerance margin
-      const withinMargin = 
-        br.left >= zone.left - tolX &&
-        (br.left + br.width) <= zone.left + zone.width + tolX &&
-        br.top >= zone.top - tolY &&
-        (br.top + br.height) <= zone.top + zone.height + tolY;
-
-      if (withinMargin) return true;
-
-      // Condition B: Area overlap test
-      // If object's center is reasonably within the zone and at least 70% of the graphic is inside the zone:
+    // Helper to test if object intersects with a rectangular print zone
+    const checkZoneContainment = (zone: { left: number; top: number; width: number; height: number }) => {
       const interLeft = Math.max(br.left, zone.left);
       const interTop = Math.max(br.top, zone.top);
       const interRight = Math.min(br.left + br.width, zone.left + zone.width);
@@ -2567,28 +2560,24 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       const interW = Math.max(0, interRight - interLeft);
       const interH = Math.max(0, interBottom - interTop);
       const interArea = interW * interH;
-      const overlapRatio = objArea > 0 ? interArea / objArea : 1;
 
-      const centerInside = 
-        centerPt.x >= zone.left - tolX &&
-        centerPt.x <= zone.left + zone.width + tolX &&
-        centerPt.y >= zone.top - tolY &&
-        centerPt.y <= zone.top + zone.height + tolY;
-
-      if (centerInside && overlapRatio >= 0.70) {
-        return true;
-      }
-
-      return false;
+      // The object remains valid as long as ANY portion of it intersects the print zone.
+      // Customers frequently position graphics partially cropped / bleeding at borders.
+      // It is ONLY out of bounds if it has completely exited the zone (0% overlap / interArea === 0).
+      return interArea > 0;
     };
 
     if (isFreeModeRef.current) {
-      return checkZoneContainment(freePrintZone, false);
+      return checkZoneContainment(freePrintZone);
     }
 
-    if (activeFaceSelectedPlacementsRef.current.length > 0) {
-      // Return true if object is inside ANY selected placement on this face
-      for (const spec of activeFaceSelectedPlacementsRef.current) {
+    const candidatePlacements = activeFaceSelectedPlacementsRef.current.length > 0
+      ? activeFaceSelectedPlacementsRef.current
+      : (studioProfile.family === 'mug' ? allSelectedPlacements : []);
+
+    if (candidatePlacements.length > 0) {
+      // Return true if object intersects ANY candidate placement on this face
+      for (const spec of candidatePlacements) {
         const p = getPlacementFabricBounds(spec);
         const zone = {
           left: p.fabricLeft,
@@ -2596,7 +2585,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           width: p.fabricWidth,
           height: p.fabricHeight,
         };
-        if (checkZoneContainment(zone, true)) {
+        if (checkZoneContainment(zone)) {
           return true;
         }
       }
@@ -2605,12 +2594,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
     // Default garment surface bounds (keeps element within canvas margins)
     return (
-      br.left >= -80 &&
-      (br.left + br.width) <= nativeWidth + 80 &&
-      br.top >= -80 &&
-      (br.top + br.height) <= nativeHeight + 80
+      br.left + br.width > 0 &&
+      br.left < nativeWidth &&
+      br.top + br.height > 0 &&
+      br.top < nativeHeight
     );
-  }, [freePrintZone, getPlacementFabricBounds, nativeWidth, nativeHeight]);
+  }, [freePrintZone, getPlacementFabricBounds, nativeWidth, nativeHeight, studioProfile.family, allSelectedPlacements]);
 
   const isObjectInsidePrintBoundsRef = useRef(isObjectInsidePrintBounds);
   isObjectInsidePrintBoundsRef.current = isObjectInsidePrintBounds;
@@ -2638,10 +2627,25 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       const assignedId = (obj as any).assignedPlacementId;
       if (assignedId) {
         const found = getPlacementById(assignedId, gType);
-        if (found && isFaceMatching(found.targetFace, currentFace)) {
+        if (
+          found &&
+          (isFaceMatching(found.targetFace, currentFace) ||
+           (studioProfile.family === 'mug' && isMugSingleMode && (assignedId === 'mug_front' || assignedId === 'mug_back')))
+        ) {
           spec = found;
         }
       }
+
+      if (!spec && studioProfile.family === 'mug') {
+        const mugPlacementId =
+          activeMugMode === 'mug_full_wrap'
+            ? 'mug_full_wrap'
+            : activeMugMode === 'mug_two_sided'
+              ? (isFaceMatching('back', currentFace) ? 'mug_back' : 'mug_front')
+              : 'mug_front';
+        spec = getPlacementById(mugPlacementId, 'mug');
+      }
+
       if (!spec && activeFaceSelectedPlacementsRef.current.length > 0) {
         const centerPt = obj.getCenterPoint ? obj.getCenterPoint() : { x: obj.left || 0, y: obj.top || 0 };
         const allFaceSpecs = getPlacementsForGarment(gType, currentFace);
@@ -3553,168 +3557,190 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         const centerPt = activeObj.getCenterPoint();
         const gType = productData?.config?.garmentType || productData?.category || 'tshirt';
         const currentFace = activeFaceRef.current || activeFace;
-        const allFaceSpecs = getPlacementsForGarment(gType, currentFace);
 
-        // Placements that already contain a locked object shouldn't snatch new elements
-        const lockedPlacementIds = new Set<string>();
-        initCanvas.getObjects().forEach((o: any) => {
-          if ((o.isLocked || o.selectable === false) && o.assignedPlacementId && o !== activeObj) {
-            lockedPlacementIds.add(o.assignedPlacementId);
-          }
-        });
+        if (studioProfile.family === 'mug') {
+          // Strict Mug Mode Isolation:
+          // Moving or adjusting an object on a mug must NEVER switch the mug mode,
+          // nor should it ever add 'mug_full_wrap' to placements when in Single Face or Two Faces mode.
+          const expectedMugPlacementId =
+            activeMugMode === 'mug_full_wrap'
+              ? 'mug_full_wrap'
+              : activeMugMode === 'mug_two_sided'
+                ? (isFaceMatching('back', currentFace) ? 'mug_back' : 'mug_front')
+                : 'mug_front';
 
-        // Search in selected placements first, or fallback to all face specs
-        const searchSpecs = activeFaceSelectedPlacementsRef.current.length > 0
-          ? activeFaceSelectedPlacementsRef.current
-          : allFaceSpecs;
-
-        // Find candidate placements
-        const candidates = searchSpecs
-          .map(spec => {
-            const p = getPlacementFabricBounds(spec);
-            const isDirectlyInside =
-              centerPt.x >= p.fabricLeft &&
-              centerPt.x <= p.fabricLeft + p.fabricWidth &&
-              centerPt.y >= p.fabricTop &&
-              centerPt.y <= p.fabricTop + p.fabricHeight;
-            const isNear =
-              centerPt.x >= p.fabricLeft - 40 &&
-              centerPt.x <= p.fabricLeft + p.fabricWidth + 40 &&
-              centerPt.y >= p.fabricTop - 40 &&
-              centerPt.y <= p.fabricTop + p.fabricHeight + 40;
-            const area = p.fabricWidth * p.fabricHeight;
-            const dist = Math.hypot(centerPt.x - p.fabricCenterX, centerPt.y - p.fabricCenterY);
-            const isPlacementLocked = lockedPlacementIds.has(spec.id);
-            const isAssigned = (activeObj as any).assignedPlacementId === spec.id;
-            const isFocused = focusedPlacementId === spec.id;
-            return { spec, p, isDirectlyInside, isNear, area, dist, isPlacementLocked, isAssigned, isFocused };
-          })
-          .filter(c => c.isDirectlyInside || c.isNear);
-
-        // If not directly inside or near, check allFaceSpecs for direct containment
-        if (candidates.length === 0 && allFaceSpecs.length > 0) {
-          allFaceSpecs.forEach(spec => {
-            if (lockedPlacementIds.has(spec.id)) return;
-            const p = getPlacementFabricBounds(spec);
-            const isDirectlyInside =
-              centerPt.x >= p.fabricLeft &&
-              centerPt.x <= p.fabricLeft + p.fabricWidth &&
-              centerPt.y >= p.fabricTop &&
-              centerPt.y <= p.fabricTop + p.fabricHeight;
-            if (isDirectlyInside) {
-              candidates.push({
-                spec,
-                p,
-                isDirectlyInside: true,
-                isNear: true,
-                area: p.fabricWidth * p.fabricHeight,
-                dist: Math.hypot(centerPt.x - p.fabricCenterX, centerPt.y - p.fabricCenterY),
-                isPlacementLocked: false,
-                isAssigned: false,
-                isFocused: focusedPlacementId === spec.id,
-              });
-            }
-          });
-        }
-
-        // Snap radius fallback if selected placements exist
-        if (candidates.length === 0 && activeFaceSelectedPlacementsRef.current.length > 0) {
-          activeFaceSelectedPlacementsRef.current.forEach(spec => {
-            if (lockedPlacementIds.has(spec.id)) return;
-            const p = getPlacementFabricBounds(spec);
-            const dist = Math.hypot(centerPt.x - p.fabricCenterX, centerPt.y - p.fabricCenterY);
-            if (dist < 200) {
-              const area = p.fabricWidth * p.fabricHeight;
-              candidates.push({
-                spec,
-                p,
-                isDirectlyInside: false,
-                isNear: false,
-                area,
-                dist,
-                isPlacementLocked: false,
-                isAssigned: false,
-                isFocused: focusedPlacementId === spec.id,
-              });
-            }
-          });
-        }
-
-        candidates.sort((a, b) => {
-          if (a.isPlacementLocked !== b.isPlacementLocked) return a.isPlacementLocked ? 1 : -1;
-          if (a.isAssigned !== b.isAssigned) return a.isAssigned ? -1 : 1;
-          if (a.isFocused !== b.isFocused) return a.isFocused ? -1 : 1;
-          if (a.isDirectlyInside !== b.isDirectlyInside) return a.isDirectlyInside ? -1 : 1;
-          if (Math.abs(a.area - b.area) > 500) return a.area - b.area;
-          return a.dist - b.dist;
-        });
-
-        const bestMatch = candidates[0];
-
-        if (bestMatch) {
-          const targetSpec = bestMatch.spec;
-          const p = bestMatch.p;
-          const previousPlacementId = (activeObj as any).assignedPlacementId;
-          const wasFreeMode = (activeObj as any).originMode === 'free';
-
-          // If dropped directly inside this placement (isDirectlyInside):
-          // RESPECT USER MANUAL POSITION! Only snap to center if switching from a different placement or outside!
-          if (!bestMatch.isDirectlyInside && (!previousPlacementId || previousPlacementId !== targetSpec.id)) {
-            activeObj.set({
-              originX: 'center',
-              originY: 'center',
-              left: p.fabricCenterX,
-              top: p.fabricCenterY,
-            });
-          }
-
-          // Scale down only if genuinely oversized for the placement bounds
-          const maxW = p.fabricWidth * 0.95;
-          const maxH = p.fabricHeight * 0.95;
-          const curW = activeObj.getScaledWidth();
-          const curH = activeObj.getScaledHeight();
-          if (curW > maxW || curH > maxH) {
-            const scaleFactor = Math.min(maxW / (activeObj.width || 1), maxH / (activeObj.height || 1));
-            activeObj.scale(scaleFactor);
-          }
-
-          if (previousPlacementId !== targetSpec.id || wasFreeMode) {
-            showToast(
-              locale === 'tr' ? `Tasarım ${targetSpec.nameTr} alanına yerleştirildi ve onaylı fiyatlandırma uygulandı 🎯` :
-              locale === 'en' ? `Design placed in ${targetSpec.nameEn} and standard pricing applied 🎯` :
-              `تم وضع وتثبيت التصميم في: ${targetSpec.nameAr} واعتماد تسعير المواضع 🎯`,
-              'success',
-              2500
-            );
-          }
-
-          (activeObj as any).assignedPlacementId = targetSpec.id;
+          (activeObj as any).assignedPlacementId = expectedMugPlacementId;
           (activeObj as any).originMode = 'approved';
           activeObj.setCoords();
           initCanvas.renderAll();
-          setFocusedPlacementId(targetSpec.id);
+          setFocusedPlacementId(expectedMugPlacementId);
+          recalculatePrice(initCanvas);
+          hoveredPlacementIdRef.current = null;
+          setHoveredPlacementId(null);
+        } else {
+          const allFaceSpecs = getPlacementsForGarment(gType, currentFace);
 
-          // Ensure target placement is added to selected placements list
-          const activeColor = normalizeColorKey(selectedColorRef.current || selectedColor);
-          const currentPlacements = placementsByColorRef.current[activeColor] || [];
-          if (!currentPlacements.includes(targetSpec.id)) {
-            const updated = [...currentPlacements, targetSpec.id];
-            const nextMap = { ...placementsByColorRef.current, [activeColor]: updated };
-            setPlacementsByColor(nextMap);
-            placementsByColorRef.current = nextMap;
-            currentSelectedPlacementIdsRef.current = updated;
+          // Placements that already contain a locked object shouldn't snatch new elements
+          const lockedPlacementIds = new Set<string>();
+          initCanvas.getObjects().forEach((o: any) => {
+            if ((o.isLocked || o.selectable === false) && o.assignedPlacementId && o !== activeObj) {
+              lockedPlacementIds.add(o.assignedPlacementId);
+            }
+          });
+
+          // Search in selected placements first, or fallback to all face specs
+          const searchSpecs = activeFaceSelectedPlacementsRef.current.length > 0
+            ? activeFaceSelectedPlacementsRef.current
+            : allFaceSpecs;
+
+          // Find candidate placements
+          const candidates = searchSpecs
+            .map(spec => {
+              const p = getPlacementFabricBounds(spec);
+              const isDirectlyInside =
+                centerPt.x >= p.fabricLeft &&
+                centerPt.x <= p.fabricLeft + p.fabricWidth &&
+                centerPt.y >= p.fabricTop &&
+                centerPt.y <= p.fabricTop + p.fabricHeight;
+              const isNear =
+                centerPt.x >= p.fabricLeft - 40 &&
+                centerPt.x <= p.fabricLeft + p.fabricWidth + 40 &&
+                centerPt.y >= p.fabricTop - 40 &&
+                centerPt.y <= p.fabricTop + p.fabricHeight + 40;
+              const area = p.fabricWidth * p.fabricHeight;
+              const dist = Math.hypot(centerPt.x - p.fabricCenterX, centerPt.y - p.fabricCenterY);
+              const isPlacementLocked = lockedPlacementIds.has(spec.id);
+              const isAssigned = (activeObj as any).assignedPlacementId === spec.id;
+              const isFocused = focusedPlacementId === spec.id;
+              return { spec, p, isDirectlyInside, isNear, area, dist, isPlacementLocked, isAssigned, isFocused };
+            })
+            .filter(c => c.isDirectlyInside || c.isNear);
+
+          // If not directly inside or near, check allFaceSpecs for direct containment
+          if (candidates.length === 0 && allFaceSpecs.length > 0) {
+            allFaceSpecs.forEach(spec => {
+              if (lockedPlacementIds.has(spec.id)) return;
+              const p = getPlacementFabricBounds(spec);
+              const isDirectlyInside =
+                centerPt.x >= p.fabricLeft &&
+                centerPt.x <= p.fabricLeft + p.fabricWidth &&
+                centerPt.y >= p.fabricTop &&
+                centerPt.y <= p.fabricTop + p.fabricHeight;
+              if (isDirectlyInside) {
+                candidates.push({
+                  spec,
+                  p,
+                  isDirectlyInside: true,
+                  isNear: true,
+                  area: p.fabricWidth * p.fabricHeight,
+                  dist: Math.hypot(centerPt.x - p.fabricCenterX, centerPt.y - p.fabricCenterY),
+                  isPlacementLocked: false,
+                  isAssigned: false,
+                  isFocused: focusedPlacementId === spec.id,
+                });
+              }
+            });
           }
 
-          // Recalculate price in real time
-          recalculatePrice(initCanvas);
-        } else if ((activeObj as any).originMode === 'free') {
-          // Object remains unaligned free mode outside approved placements
-          (activeObj as any).assignedPlacementId = null;
-          recalculatePrice(initCanvas);
-        }
+          // Snap radius fallback if selected placements exist
+          if (candidates.length === 0 && activeFaceSelectedPlacementsRef.current.length > 0) {
+            activeFaceSelectedPlacementsRef.current.forEach(spec => {
+              if (lockedPlacementIds.has(spec.id)) return;
+              const p = getPlacementFabricBounds(spec);
+              const dist = Math.hypot(centerPt.x - p.fabricCenterX, centerPt.y - p.fabricCenterY);
+              if (dist < 200) {
+                const area = p.fabricWidth * p.fabricHeight;
+                candidates.push({
+                  spec,
+                  p,
+                  isDirectlyInside: false,
+                  isNear: false,
+                  area,
+                  dist,
+                  isPlacementLocked: false,
+                  isAssigned: false,
+                  isFocused: focusedPlacementId === spec.id,
+                });
+              }
+            });
+          }
 
-        hoveredPlacementIdRef.current = null;
-        setHoveredPlacementId(null);
+          candidates.sort((a, b) => {
+            if (a.isPlacementLocked !== b.isPlacementLocked) return a.isPlacementLocked ? 1 : -1;
+            if (a.isAssigned !== b.isAssigned) return a.isAssigned ? -1 : 1;
+            if (a.isFocused !== b.isFocused) return a.isFocused ? -1 : 1;
+            if (a.isDirectlyInside !== b.isDirectlyInside) return a.isDirectlyInside ? -1 : 1;
+            if (Math.abs(a.area - b.area) > 500) return a.area - b.area;
+            return a.dist - b.dist;
+          });
+
+          const bestMatch = candidates[0];
+
+          if (bestMatch) {
+            const targetSpec = bestMatch.spec;
+            const p = bestMatch.p;
+            const previousPlacementId = (activeObj as any).assignedPlacementId;
+            const wasFreeMode = (activeObj as any).originMode === 'free';
+
+            // If dropped directly inside this placement (isDirectlyInside):
+            // RESPECT USER MANUAL POSITION! Only snap to center if switching from a different placement or outside!
+            if (!bestMatch.isDirectlyInside && (!previousPlacementId || previousPlacementId !== targetSpec.id)) {
+              activeObj.set({
+                originX: 'center',
+                originY: 'center',
+                left: p.fabricCenterX,
+                top: p.fabricCenterY,
+              });
+            }
+
+            // Scale down only if genuinely oversized for the placement bounds
+            const maxW = p.fabricWidth * 0.95;
+            const maxH = p.fabricHeight * 0.95;
+            const curW = activeObj.getScaledWidth();
+            const curH = activeObj.getScaledHeight();
+            if (curW > maxW || curH > maxH) {
+              const scaleFactor = Math.min(maxW / (activeObj.width || 1), maxH / (activeObj.height || 1));
+              activeObj.scale(scaleFactor);
+            }
+
+            if (previousPlacementId !== targetSpec.id || wasFreeMode) {
+              showToast(
+                locale === 'tr' ? `Tasarım ${targetSpec.nameTr} alanına yerleştirildi ve onaylı fiyatlandırma uygulandı 🎯` :
+                locale === 'en' ? `Design placed in ${targetSpec.nameEn} and standard pricing applied 🎯` :
+                `تم وضع وتثبيت التصميم في: ${targetSpec.nameAr} واعتماد تسعير المواضع 🎯`,
+                'success',
+                2500
+              );
+            }
+
+            (activeObj as any).assignedPlacementId = targetSpec.id;
+            (activeObj as any).originMode = 'approved';
+            activeObj.setCoords();
+            initCanvas.renderAll();
+            setFocusedPlacementId(targetSpec.id);
+
+            // Ensure target placement is added to selected placements list
+            const activeColor = normalizeColorKey(selectedColorRef.current || selectedColor);
+            const currentPlacements = placementsByColorRef.current[activeColor] || [];
+            if (!currentPlacements.includes(targetSpec.id)) {
+              const updated = [...currentPlacements, targetSpec.id];
+              const nextMap = { ...placementsByColorRef.current, [activeColor]: updated };
+              setPlacementsByColor(nextMap);
+              placementsByColorRef.current = nextMap;
+              currentSelectedPlacementIdsRef.current = updated;
+            }
+
+            // Recalculate price in real time
+            recalculatePrice(initCanvas);
+          } else if ((activeObj as any).originMode === 'free') {
+            // Object remains unaligned free mode outside approved placements
+            (activeObj as any).assignedPlacementId = null;
+            recalculatePrice(initCanvas);
+          }
+
+          hoveredPlacementIdRef.current = null;
+          setHoveredPlacementId(null);
+        }
       }
 
       if (isObjectDraggingRef.current) {
@@ -4876,7 +4902,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     // 1. Process active canvas objects
     if (c && !(c as any).disposed && c.getElement && c.getElement()) {
       const currentFace = activeFaceRef.current || activeFace;
-      const rawFacePlacements = getPlacementsForGarment(gType, currentFace);
+      let rawFacePlacements = getPlacementsForGarment(gType, currentFace);
+      if (studioProfile.family === 'mug') {
+        rawFacePlacements = activeMugMode === 'mug_full_wrap'
+          ? rawFacePlacements.filter(s => s.id === 'mug_full_wrap')
+          : rawFacePlacements.filter(s => s.id !== 'mug_full_wrap');
+      }
       const facePlacements = rawFacePlacements.length > 0 ? rawFacePlacements : activeFaceSelectedPlacementsRef.current;
 
       if (facePlacements.length > 0) {
@@ -4962,7 +4993,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         if (k.includes(':::')) {
           fFace = k.split(':::')[1];
         }
-        const facePlacements = getPlacementsForGarment(gType, fFace);
+        let facePlacements = getPlacementsForGarment(gType, fFace);
+        if (studioProfile.family === 'mug') {
+          facePlacements = activeMugMode === 'mug_full_wrap'
+            ? facePlacements.filter(s => s.id === 'mug_full_wrap')
+            : facePlacements.filter(s => s.id !== 'mug_full_wrap');
+        }
         if (facePlacements.length === 0) return;
 
         const raw = facesData.current[k];
@@ -5078,7 +5114,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     // 1. Check active canvas objects
     if (c && !(c as any).disposed && c.getElement && c.getElement()) {
       const currentFace = activeFaceRef.current || activeFace;
-      const rawFacePlacements = getPlacementsForGarment(gType, currentFace);
+      let rawFacePlacements = getPlacementsForGarment(gType, currentFace);
+      if (studioProfile.family === 'mug') {
+        rawFacePlacements = activeMugMode === 'mug_full_wrap'
+          ? rawFacePlacements.filter(s => s.id === 'mug_full_wrap')
+          : rawFacePlacements.filter(s => s.id !== 'mug_full_wrap');
+      }
       const facePlacements = rawFacePlacements.length > 0 ? rawFacePlacements : activeFaceSelectedPlacementsRef.current;
 
       c.getObjects().forEach((o: any) => {
@@ -5120,7 +5161,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         if (k.includes(':::')) {
           fFace = k.split(':::')[1];
         }
-        const facePlacements = getPlacementsForGarment(gType, fFace);
+        let facePlacements = getPlacementsForGarment(gType, fFace);
+        if (studioProfile.family === 'mug') {
+          facePlacements = activeMugMode === 'mug_full_wrap'
+            ? facePlacements.filter(s => s.id === 'mug_full_wrap')
+            : facePlacements.filter(s => s.id !== 'mug_full_wrap');
+        }
         const raw = facesData.current[k];
         if (!raw) return;
 
@@ -6857,8 +6903,20 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const assignedPlacementId = (obj as any).assignedPlacementId || focusedPlacementId;
     const gType = productData?.config?.garmentType || productData?.category || 'tshirt';
     const currentFace = activeFaceRef.current || activeFace;
-    const allFaceSpecs = getPlacementsForGarment(gType, currentFace);
-    const spec = allFaceSpecs.find(s => s.id === assignedPlacementId);
+
+    let spec: PlacementSpec | undefined;
+    if (studioProfile.family === 'mug') {
+      const mugPlacementId =
+        activeMugMode === 'mug_full_wrap'
+          ? 'mug_full_wrap'
+          : activeMugMode === 'mug_two_sided'
+            ? (isFaceMatching('back', currentFace) ? 'mug_back' : 'mug_front')
+            : 'mug_front';
+      spec = getPlacementById(mugPlacementId, 'mug');
+    } else {
+      const allFaceSpecs = getPlacementsForGarment(gType, currentFace);
+      spec = allFaceSpecs.find(s => s.id === assignedPlacementId) || activeFaceSelectedPlacementsRef.current[0] || allFaceSpecs[0];
+    }
 
     if (spec) {
       const p = getPlacementFabricBounds(spec);
