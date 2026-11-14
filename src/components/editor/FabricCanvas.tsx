@@ -912,6 +912,33 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   isMugPanoramicWorkspaceRef.current = isMugPanoramicWorkspace;
   const isPanoramicFace = isFaceMatching('front', activeFace) && isMugPanoramicWorkspace;
 
+  const scheduleLiveMugTextureRefresh = useCallback((targetCanvas?: fabric.Canvas | null, delayMs: number = 60) => {
+    if (liveTextureTimerRef.current) clearTimeout(liveTextureTimerRef.current);
+    liveTextureTimerRef.current = setTimeout(() => {
+      const c = targetCanvas || canvas;
+      if (!c || !isMugPanoramicWorkspaceRef.current) return;
+      try {
+        const userObjects = c.getObjects().filter((o: any) => {
+          const n = (o?.name || '').toLowerCase();
+          return n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline';
+        });
+        if (userObjects.length === 0) {
+          setLiveMugTextureUrl(null);
+          return;
+        }
+        const dataUrl = c.toDataURL({
+          format: 'png',
+          multiplier: 0.75,
+          enableRetinaScaling: false,
+        });
+        setLiveMugTextureUrl(dataUrl);
+      } catch (err) {
+        console.warn("Live mug texture refresh error:", err);
+      }
+    }, delayMs);
+  }, [canvas]);
+  scheduleLiveMugTextureRefreshRef.current = scheduleLiveMugTextureRefresh;
+
   const isMugSingleMode = useMemo(() => (
     studioProfile.family === 'mug'
     && currentSelectedPlacementIds.includes('mug_front')
@@ -1203,29 +1230,35 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const selectedColorRef = useRef(selectedColor);
   selectedColorRef.current = selectedColor;
 
-  const getFaceStateKey = useCallback((face: string, color: string): string => {
+  const getFaceStateKey = useCallback((face: string, color: string, forcePano?: boolean): string => {
     const normColor = (color || 'default').trim().toLowerCase();
-    return `${normColor}:::${face}`;
-  }, []);
+    const isPano = forcePano !== undefined
+      ? forcePano
+      : (studioProfile.family === 'mug' && !isFreeMode && (isMugPanoramicWorkspaceRef.current || face === 'mug_full_wrap'));
+    const effectiveFace = (isPano && isFaceMatching('front', face)) ? 'mug_full_wrap' : face;
+    return `${normColor}:::${effectiveFace}`;
+  }, [studioProfile.family, isFreeMode]);
 
   const getFaceJson = useCallback((face: string, color: string): string | null => {
-    const exactKey = getFaceStateKey(face, color);
+    const isPano = studioProfile.family === 'mug' && !isFreeMode && isMugPanoramicWorkspaceRef.current;
+    const exactKey = getFaceStateKey(face, color, isPano);
     if (facesData.current[exactKey] !== undefined && facesData.current[exactKey] !== null) {
       return facesData.current[exactKey];
     }
     
     // Check color aliases with isColorEqual
+    const effectiveFace = (isPano && isFaceMatching('front', face)) ? 'mug_full_wrap' : face;
     for (const k of Object.keys(facesData.current)) {
       if (k.includes(':::')) {
         const [storedColor, storedFace] = k.split(':::');
-        if (storedFace === face && isColorEqual(storedColor, color) && facesData.current[k]) {
+        if (storedFace === effectiveFace && isColorEqual(storedColor, color) && facesData.current[k]) {
           return facesData.current[k];
         }
       }
     }
 
     // Fallback for legacy designs with only 'front', 'back', etc.
-    if (facesData.current[face] && (!initialColor || isColorEqual(color, initialColor))) {
+    if (!isPano && facesData.current[face] && (!initialColor || isColorEqual(color, initialColor))) {
       return facesData.current[face];
     }
 
@@ -1233,7 +1266,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     for (const k of Object.keys(facesData.current)) {
       if (k.includes(':::')) {
         const [, storedFace] = k.split(':::');
-        if (storedFace === face && facesData.current[k]) {
+        if (storedFace === effectiveFace && facesData.current[k]) {
           try {
             const parsed = typeof facesData.current[k] === 'string' ? JSON.parse(facesData.current[k]!) : facesData.current[k];
             if (parsed?.objects && Array.isArray(parsed.objects) && parsed.objects.length > 0) {
@@ -1241,13 +1274,13 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             }
           } catch {}
         }
-      } else if (k === face && facesData.current[k]) {
+      } else if (!isPano && k === face && facesData.current[k]) {
         return facesData.current[k];
       }
     }
 
     return null;
-  }, [getFaceStateKey, initialColor]);
+  }, [getFaceStateKey, initialColor, studioProfile.family, isFreeMode]);
 
   const [designAssets, setDesignAssets] = useState<any[]>([]);
   const [assetCategories, setAssetCategories] = useState<{ id: string; name: string; order?: number }[]>([]);
@@ -2604,7 +2637,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       let spec: PlacementSpec | undefined;
       const assignedId = (obj as any).assignedPlacementId;
       if (assignedId) {
-        spec = getPlacementById(assignedId, gType);
+        const found = getPlacementById(assignedId, gType);
+        if (found && isFaceMatching(found.targetFace, currentFace)) {
+          spec = found;
+        }
       }
       if (!spec && activeFaceSelectedPlacementsRef.current.length > 0) {
         const centerPt = obj.getCenterPoint ? obj.getCenterPoint() : { x: obj.left || 0, y: obj.top || 0 };
@@ -2648,13 +2684,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         top: boundary.top,
         width: boundary.width,
         height: boundary.height,
-        rx: boundary.rx || 12,
-        ry: boundary.ry || 12,
+        rx: boundary.rx || 16,
+        ry: boundary.ry || 16,
         absolutePositioned: true,
       });
       obj.clipPath = clipRect;
+      obj.dirty = true;
     } else {
       delete (obj as any).clipPath;
+      obj.dirty = true;
     }
   }, [productData, activeFace, freePrintZone, getPlacementFabricBounds]);
 
@@ -2662,6 +2700,23 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   useEffect(() => {
     applyPrintBoundaryClipRef.current = applyPrintBoundaryClip;
   }, [applyPrintBoundaryClip]);
+
+  const applyAllPrintBoundaryClips = useCallback((targetCanvas?: fabric.Canvas | null) => {
+    const c = targetCanvas || canvas;
+    if (!c) return;
+    c.getObjects().forEach((o: any) => {
+      const n = (o?.name || '').toLowerCase();
+      if (n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline') {
+        applyPrintBoundaryClip(o);
+      }
+    });
+    c.requestRenderAll();
+  }, [canvas, applyPrintBoundaryClip]);
+
+  const applyAllPrintBoundaryClipsRef = useRef(applyAllPrintBoundaryClips);
+  useEffect(() => {
+    applyAllPrintBoundaryClipsRef.current = applyAllPrintBoundaryClips;
+  }, [applyAllPrintBoundaryClips]);
 
   // Dynamically resolves the exact print placement boundary (white dashed attention zone) for the active object
   const getActiveObjectPrintZone = useCallback((obj: fabric.Object | null | undefined): { left: number; top: number; width: number; height: number } | null => {
@@ -3025,6 +3080,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       (obj as any).createdInMode = 'approved';
       setFocusedPlacementId(targetPlacement.id);
 
+      applyPrintBoundaryClip(obj);
       c.add(obj);
       c.setActiveObject(obj);
       obj.setCoords();
@@ -3072,6 +3128,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     (obj as any).originMode = 'free';
     (obj as any).createdInMode = 'free';
 
+    applyPrintBoundaryClip(obj);
     c.add(obj);
     c.setActiveObject(obj);
     obj.setCoords();
@@ -3483,6 +3540,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         });
       }
 
+      applyPrintBoundaryClip(activeObj);
       validateAndSnap();
     };
 
@@ -3664,6 +3722,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         setIsObjectDragging(false);
       }
 
+      if (activeObj) {
+        applyPrintBoundaryClip(activeObj);
+      }
       validateAndSnap();
       if (!isRestoring.current) {
         saveHistoryStateCanvas(initCanvas);
@@ -3689,6 +3750,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           } : undefined,
           printZone: activePrintZone || undefined,
         });
+      }
+      if (activeObj) {
+        applyPrintBoundaryClip(activeObj);
       }
       validateAndSnap();
     });
@@ -3819,7 +3883,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             if (!isDisposed && initCanvas && initCanvas.getContext() && initCanvas.getElement()) {
               applyModernObjectStyles(initCanvas);
 
-              // Restore locked state on objects
+              // Restore locked state on objects and apply print boundary clipping
               initCanvas.getObjects().forEach((obj: any) => {
                 if (obj.isLocked === true || obj.lockMovementX === true) {
                   obj.set({
@@ -3835,43 +3899,13 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                   });
                   obj.isLocked = true;
                 }
+                const n = (obj?.name || '').toLowerCase();
+                if (n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline') {
+                  applyPrintBoundaryClip(obj);
+                }
               });
 
-              if (isMugPanoramicWorkspaceRef.current && !parsed?.mugPanoramaSheet && isFaceMatching('front', activeFace)) {
-                const savedNw = Number(parsed?.width) || (mockupNaturalSize.width > 0 ? mockupNaturalSize.width : 1000);
-                const savedNh = Number(parsed?.height) || (mockupNaturalSize.height > 0 ? mockupNaturalSize.height : 1000);
-                const frontSpec = getPlacementById('mug_front', 'mug');
-                const oldFrontBounds = frontSpec
-                  ? getPlacementFabricBounds(frontSpec, savedNw, savedNh, true)
-                  : { fabricLeft: 0, fabricTop: 0, fabricWidth: savedNw, fabricHeight: savedNh };
-                const panoTargetBox = { left: 580, top: 20, width: 680, height: 720 };
-                const userLoadedObjs = initCanvas.getObjects().filter((o: any) => {
-                  const n = (o?.name || '').toLowerCase();
-                  return n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline';
-                });
-                if (userLoadedObjs.length > 0) {
-                  const ratio = Math.min(
-                    panoTargetBox.width / Math.max(1, oldFrontBounds.fabricWidth),
-                    panoTargetBox.height / Math.max(1, oldFrontBounds.fabricHeight)
-                  );
-                  userLoadedObjs.forEach((obj: any) => {
-                    const center = obj.getCenterPoint();
-                    const relX = (center.x - oldFrontBounds.fabricLeft) / Math.max(1, oldFrontBounds.fabricWidth);
-                    const relY = (center.y - oldFrontBounds.fabricTop) / Math.max(1, oldFrontBounds.fabricHeight);
-                    const nextCx = panoTargetBox.left + Math.max(0.02, Math.min(0.98, relX)) * panoTargetBox.width;
-                    const nextCy = panoTargetBox.top + Math.max(0.02, Math.min(0.98, relY)) * panoTargetBox.height;
-                    obj.set({
-                      scaleX: (obj.scaleX || 1) * ratio,
-                      scaleY: (obj.scaleY || 1) * ratio,
-                      clipPath: undefined,
-                    });
-                    obj.setPositionByOrigin(new fabric.Point(nextCx, nextCy), 'center', 'center');
-                    obj.assignedPlacementId = 'mug_full_wrap';
-                    obj.originMode = 'approved';
-                    obj.setCoords();
-                  });
-                }
-              } else if (
+              if (
                 isMugPanoramicWorkspaceRef.current &&
                 parsed?.mugPanoramaSheet &&
                 isFaceMatching('front', activeFace)
@@ -4232,6 +4266,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     if (!wasSelected) {
       setFocusedPlacementId(placement.id);
       if (targetFace && !isFaceMatching(targetFace, activeFace)) {
+        if (canvas) canvas.discardActiveObject();
         switchFace(targetFace);
       }
     } else {
@@ -4304,25 +4339,14 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       recalculatePrice(canvas, undefined, updatedList);
     }
 
-    if (canvas && !wasSelected) {
-      const activeObj = canvas.getActiveObject();
-      if (activeObj) {
-        const pBounds = getPlacementFabricBounds(placement);
-        activeObj.set({
-          originX: 'center',
-          originY: 'center',
-          left: pBounds.fabricCenterX,
-          top: pBounds.fabricCenterY,
-        });
-        (activeObj as any).assignedPlacementId = placement.id;
-        activeObj.setCoords();
-        canvas.requestRenderAll();
-      }
+    // Re-apply boundary clips across objects for active placements
+    if (canvas) {
+      applyAllPrintBoundaryClips(canvas);
     }
 
     // Immediately persist change
     saveDraftImmediate();
-  }, [activeColorKey, activeFace, canvas, currentSelectedPlacementIds, switchFace, availableColors, uniqueSelectedColors, normalizeColorKey, productId, getPlacementFabricBounds, saveDraftImmediate, recalculatePrice]);
+  }, [activeColorKey, activeFace, canvas, currentSelectedPlacementIds, switchFace, availableColors, uniqueSelectedColors, normalizeColorKey, productId, getPlacementFabricBounds, saveDraftImmediate, recalculatePrice, applyAllPrintBoundaryClips]);
 
   const applyExplicitPlacementList = useCallback((updatedList: string[]) => {
     let nextMap: Record<string, string[]>;
@@ -4365,126 +4389,87 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     return false;
   }, [studioProfile.family, activeMugMode]);
 
-  const remapUserObjectsBetweenBoxes = useCallback((
-    targetCanvas: fabric.Canvas,
-    sourceBox: { left: number; top: number; width: number; height: number },
-    targetBox: { left: number; top: number; width: number; height: number },
-    targetPlacementId: string
-  ) => {
-    const userObjs = targetCanvas.getObjects().filter((o: any) => {
-      const n = (o?.name || '').toLowerCase();
-      return n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline';
-    });
-    if (userObjs.length === 0) return;
-
-    const ratio = Math.min(
-      targetBox.width / Math.max(1, sourceBox.width),
-      targetBox.height / Math.max(1, sourceBox.height)
-    );
-
-    userObjs.forEach((obj: any) => {
-      const center = obj.getCenterPoint();
-      const relX = (center.x - sourceBox.left) / Math.max(1, sourceBox.width);
-      const relY = (center.y - sourceBox.top) / Math.max(1, sourceBox.height);
-      const nextCx = targetBox.left + Math.max(0.02, Math.min(0.98, relX)) * targetBox.width;
-      const nextCy = targetBox.top + Math.max(0.02, Math.min(0.98, relY)) * targetBox.height;
-
-      obj.set({
-        scaleX: (obj.scaleX || 1) * ratio,
-        scaleY: (obj.scaleY || 1) * ratio,
-        clipPath: undefined,
-      });
-      obj.setPositionByOrigin(new fabric.Point(nextCx, nextCy), 'center', 'center');
-      obj.assignedPlacementId = targetPlacementId;
-      obj.originMode = 'approved';
-      obj.setCoords();
-    });
-  }, []);
-
   const handleSelectMugMode = useCallback((mode: MugPrintMode) => {
     const prevMode = activeMugMode;
     if (mode === prevMode) return;
 
-    const PANO_CENTER_PANEL = { left: 580, top: 20, width: 680, height: 720 };
-
-    if (mode === 'mug_full_wrap') {
-      const isCanvasAlive = Boolean(
-        canvas &&
-        !(canvas as any).disposed &&
-        (canvas as any).lowerCanvasEl &&
-        canvas.getContext?.()
-      );
-      if (isCanvasAlive && canvas && isFaceMatching('front', activeFace)) {
-        const prevSpec = getPlacementById(prevMode === 'mug_two_sided' ? 'mug_front' : 'mug_front', 'mug');
-        const oldBounds = prevSpec
-          ? getPlacementFabricBounds(prevSpec)
-          : { fabricLeft: 0, fabricTop: 0, fabricWidth: nativeWidthRef.current, fabricHeight: nativeHeightRef.current };
-        remapUserObjectsBetweenBoxes(
-          canvas,
-          { left: oldBounds.fabricLeft, top: oldBounds.fabricTop, width: oldBounds.fabricWidth, height: oldBounds.fabricHeight },
-          PANO_CENTER_PANEL,
-          'mug_full_wrap'
-        );
-        canvas.setWidth(MUG_PANORAMA_SHEET_WIDTH);
-        canvas.setHeight(MUG_PANORAMA_SHEET_HEIGHT);
-        canvas.requestRenderAll();
-      }
-
-      setMobilePanoramaView('2d');
-      applyExplicitPlacementList(['mug_full_wrap']);
-      setFocusedPlacementId('mug_full_wrap');
-      if (!isFaceMatching('front', activeFace)) {
-        switchFace('front');
-      } else if (isCanvasAlive && canvas) {
-        saveHistoryStateCanvas(canvas);
-        scheduleLiveMugTextureRefreshRef.current?.(canvas, 60);
-      }
-      return;
-    }
-
-    const leavingPanorama = prevMode === 'mug_full_wrap';
-    const nextPlacementId = mode === 'mug_two_sided' && isFaceMatching('back', activeFace) ? 'mug_back' : 'mug_front';
-    const isCanvasAliveForExit = Boolean(
+    const isCanvasAlive = Boolean(
       canvas &&
       !(canvas as any).disposed &&
       (canvas as any).lowerCanvasEl &&
       canvas.getContext?.()
     );
 
-    if (leavingPanorama && isCanvasAliveForExit && canvas && isFaceMatching('front', activeFace)) {
-      const nonPanoW = mockupNaturalSize.width > 0
-        ? mockupNaturalSize.width
-        : (Number(resolvedFaceConfig?.nativeWidth) || 1000);
-      const nonPanoH = mockupNaturalSize.height > 0
-        ? mockupNaturalSize.height
-        : (Number(resolvedFaceConfig?.nativeHeight) || 1000);
-      const frontSpec = getPlacementById('mug_front', 'mug');
-      const targetBounds = frontSpec
-        ? getPlacementFabricBounds(frontSpec, nonPanoW, nonPanoH, true)
-        : { fabricLeft: 0, fabricTop: 0, fabricWidth: nonPanoW, fabricHeight: nonPanoH };
-
-      const userObjs = canvas.getObjects().filter((o: any) => {
-        const n = (o?.name || '').toLowerCase();
-        return n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline';
-      });
-      const spansWidePanorama = userObjs.some((o: any) => {
-        const br = o.getBoundingRect(true, true);
-        return br.left < 480 || br.left + br.width > 1360;
-      });
-      const sourceBox = spansWidePanorama
-        ? { left: 0, top: 0, width: MUG_PANORAMA_SHEET_WIDTH, height: MUG_PANORAMA_SHEET_HEIGHT }
-        : PANO_CENTER_PANEL;
-
-      remapUserObjectsBetweenBoxes(
-        canvas,
-        sourceBox,
-        { left: targetBounds.fabricLeft, top: targetBounds.fabricTop, width: targetBounds.fabricWidth, height: targetBounds.fabricHeight },
-        nextPlacementId
-      );
-      canvas.setWidth(nonPanoW);
-      canvas.setHeight(nonPanoH);
-      canvas.requestRenderAll();
+    // 1. Save current mode canvas under its exact previous mode key
+    if (isCanvasAlive && canvas && !isRestoring.current) {
+      try {
+        const wasPano = prevMode === 'mug_full_wrap';
+        const prevKey = getFaceStateKey(activeFace, selectedColor, wasPano);
+        const json = JSON.stringify(buildSerializedFaceJson(canvas, wasPano, nativeWidthRef.current, nativeHeightRef.current));
+        facesData.current[prevKey] = json;
+      } catch (e) {}
     }
+
+    // 2. Discard active object and wipe canvas user objects
+    if (isCanvasAlive && canvas) {
+      canvas.discardActiveObject();
+      clearSmartGuidelinesFromCanvas(canvas);
+      const existingObjs = canvas.getObjects();
+      existingObjs.forEach((o: any) => {
+        const n = (o?.name || '').toLowerCase();
+        if (n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline') {
+          canvas.remove(o);
+        }
+      });
+    }
+
+    // 3. Switch to Panorama mode
+    if (mode === 'mug_full_wrap') {
+      setShowLive3DPanel(true);
+      setMobilePanoramaView('2d');
+      applyExplicitPlacementList(['mug_full_wrap']);
+      setFocusedPlacementId('mug_full_wrap');
+      if (!isFaceMatching('front', activeFace)) {
+        switchFace('front');
+      }
+
+      if (isCanvasAlive && canvas) {
+        canvas.setWidth(MUG_PANORAMA_SHEET_WIDTH);
+        canvas.setHeight(MUG_PANORAMA_SHEET_HEIGHT);
+        const panoKey = getFaceStateKey('front', selectedColor, true);
+        const savedPanoJson = facesData.current[panoKey];
+        if (savedPanoJson) {
+          try {
+            const parsed = typeof savedPanoJson === 'string' ? JSON.parse(savedPanoJson) : savedPanoJson;
+            canvas.loadFromJSON(parsed, () => {
+              applyCustomModernStyles(canvas);
+              applyAllPrintBoundaryClips(canvas);
+              canvas.requestRenderAll();
+              recalculatePrice(canvas);
+              scheduleLiveMugTextureRefreshRef.current?.(canvas, 60);
+            });
+          } catch {
+            canvas.requestRenderAll();
+            recalculatePrice(canvas);
+          }
+        } else {
+          canvas.requestRenderAll();
+          recalculatePrice(canvas);
+          setLiveMugTextureUrl(null);
+        }
+      }
+      return;
+    }
+
+    // 4. Switch to Single Face or Two Faces
+    const nonPanoW = mockupNaturalSize.width > 0
+      ? mockupNaturalSize.width
+      : (Number(resolvedFaceConfig?.nativeWidth) || 1000);
+    const nonPanoH = mockupNaturalSize.height > 0
+      ? mockupNaturalSize.height
+      : (Number(resolvedFaceConfig?.nativeHeight) || 1000);
+
+    const nextTargetFace = mode === 'mug_two_sided' && isFaceMatching('back', activeFace) ? 'back' : 'front';
 
     if (mode === 'mug_front') {
       const targetSingleFace = availableFaces.includes(activeFace)
@@ -4503,24 +4488,43 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       }
     }
 
-    if (canvas && !leavingPanorama) {
-      return;
-    }
-    if (isCanvasAliveForExit && canvas && isFaceMatching('front', activeFace)) {
-      saveHistoryStateCanvas(canvas);
+    if (isCanvasAlive && canvas) {
+      canvas.setWidth(nonPanoW);
+      canvas.setHeight(nonPanoH);
+      const targetKey = getFaceStateKey(nextTargetFace, selectedColor, false);
+      const savedTargetJson = facesData.current[targetKey];
+      if (savedTargetJson) {
+        try {
+          const parsed = typeof savedTargetJson === 'string' ? JSON.parse(savedTargetJson) : savedTargetJson;
+          canvas.loadFromJSON(parsed, () => {
+            applyCustomModernStyles(canvas);
+            applyAllPrintBoundaryClips(canvas);
+            canvas.requestRenderAll();
+            recalculatePrice(canvas);
+          });
+        } catch {
+          canvas.requestRenderAll();
+          recalculatePrice(canvas);
+        }
+      } else {
+        canvas.requestRenderAll();
+        recalculatePrice(canvas);
+      }
     }
   }, [
     activeMugMode,
     canvas,
     activeFace,
+    selectedColor,
     availableFaces,
     mockupNaturalSize,
     resolvedFaceConfig,
-    getPlacementFabricBounds,
-    remapUserObjectsBetweenBoxes,
     applyExplicitPlacementList,
     switchFace,
     updateMugSingleSideFace,
+    getFaceStateKey,
+    applyAllPrintBoundaryClips,
+    recalculatePrice,
   ]);
   handleSelectMugModeRef.current = handleSelectMugMode;
 
@@ -5359,6 +5363,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       (text as any).assignedPlacementId = null;
     }
 
+    applyPrintBoundaryClip(text);
     canvas.add(text);
     canvas.setActiveObject(text);
     text.setCoords();
@@ -7099,6 +7104,32 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           </span>
         </button>
 
+        {/* 1b. Horizontal & Vertical Centering */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            type="button"
+            {...createToolbarButtonHandler(handleCenterHorizontal)}
+            className={cn(
+              "hover:text-amber-400 hover:bg-slate-800 text-slate-200 transition-all cursor-pointer rounded-lg active:scale-90 touch-manipulation",
+              isDocked ? "p-1" : "p-1 sm:p-1.5"
+            )}
+            title={locale === 'tr' ? 'Yatay Ortala' : locale === 'en' ? 'Center Horizontally' : 'توسيط أفقي'}
+          >
+            <AlignCenter size={isDocked ? 11 : 13} />
+          </button>
+          <button
+            type="button"
+            {...createToolbarButtonHandler(handleCenterVertical)}
+            className={cn(
+              "hover:text-amber-400 hover:bg-slate-800 text-slate-200 transition-all cursor-pointer rounded-lg active:scale-90 touch-manipulation",
+              isDocked ? "p-1" : "p-1 sm:p-1.5"
+            )}
+            title={locale === 'tr' ? 'Dikey Ortala' : locale === 'en' ? 'Center Vertically' : 'توسيط عمودي'}
+          >
+            <ArrowUpDown size={isDocked ? 11 : 13} />
+          </button>
+        </div>
+
         <span className={cn("w-px bg-slate-700/80 shrink-0", isDocked ? "h-3" : "h-3.5 sm:h-4")} />
 
         {/* 2. Scale Controls (Zoom Out / Zoom In) */}
@@ -8095,39 +8126,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               </button>
             </div>
 
-            {/* Inline Typewriter Onboarding Hint Pill docked cleanly in empty top-bar space */}
-            {showTypewriterHint && !validationWarning && guidanceTips.length > 0 && (
-              <div className="hidden md:flex flex-1 min-w-0 justify-center px-2">
-                <div
-                  id="typewriterHintBanner"
-                  onClick={() => setTypewriterIndex(prev => (prev + 1) % guidanceTips.length)}
-                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white rounded-full shadow-xs border border-amber-300/60 cursor-pointer select-none whitespace-nowrap active:scale-95 transition-all max-w-full min-w-0 animate-in fade-in duration-300"
-                  title={locale === 'tr' ? 'Sonraki bilgiye geç' : locale === 'en' ? 'Click for next tip' : 'اضغط للانتقال للمعلومة التالية'}
-                >
-                  <span className="text-xs shrink-0 drop-shadow-xs">
-                    {guidanceTips[typewriterIndex % guidanceTips.length]?.icon || '✨'}
-                  </span>
-                  <span className="text-[9.5px] font-black uppercase tracking-wider bg-black/25 text-amber-200 px-1.5 py-0.5 rounded-md shrink-0 hidden lg:inline-block">
-                    {guidanceTips[typewriterIndex % guidanceTips.length]?.tag}
-                  </span>
-                  <span className="text-[11px] font-bold font-heading truncate min-w-0">
-                    {guidanceTips[typewriterIndex % guidanceTips.length]?.text}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowTypewriterHint(false);
-                    }}
-                    className="ms-1 p-0.5 rounded-full hover:bg-black/25 text-amber-100 hover:text-white transition cursor-pointer shrink-0"
-                    title={t('close', { fallback: 'إغلاق' })}
-                  >
-                    <X size={11} strokeWidth={2.5} />
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Canvas Guidelines & Grid toggles */}
             <div className="flex items-center gap-2.5 sm:gap-3 text-xs text-slate-600 font-medium shrink-0">
               <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-800">
@@ -8394,7 +8392,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
             {/* Live Synchronized Cylindrical 3D Mug Panel (Desktop / Tablet Dock above 2D Unwrapped Sheet) */}
             {isMugPanoramicWorkspace && showLive3DPanel && (
-              <div className="hidden lg:flex w-full justify-center mb-1 z-20 shrink-0">
+              <div className="flex w-full justify-center mb-1 z-20 shrink-0">
                 <MugLivePanoramaPanel
                   compact={true}
                   frontDesignUrl={liveMugTextureUrl}
@@ -8467,52 +8465,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             )}
 
             {/* Floating Transform Controls Toolbar for Active Selected Object */}
-            {activeObject && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md text-white rounded-xl px-3 py-1.5 shadow-2xl flex items-center gap-2 text-xs border border-slate-700/80 z-30 animate-in fade-in zoom-in-95 duration-150 whitespace-nowrap">
-                <button
-                  type="button"
-                  onClick={handleCenterHorizontal}
-                  className="hover:text-amber-400 transition cursor-pointer p-1"
-                  title={locale === 'tr' ? 'Yatay Ortala' : locale === 'en' ? 'Center Horizontally' : 'توسيط أفقي'}
-                >
-                  <AlignCenter size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCenterVertical}
-                  className="hover:text-amber-400 transition cursor-pointer p-1"
-                  title={locale === 'tr' ? 'Dikey Ortala' : locale === 'en' ? 'Center Vertically' : 'توسيط عمودي'}
-                >
-                  <ArrowUpDown size={14} />
-                </button>
-                <span className="w-px h-3.5 bg-slate-700" />
-                <button
-                  type="button"
-                  onClick={handleDuplicateActive}
-                  className="hover:text-amber-400 transition cursor-pointer p-1"
-                  title={locale === 'tr' ? 'Çoğalt' : locale === 'en' ? 'Duplicate' : 'تكرار العنصر'}
-                >
-                  <Copy size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleToggleLockActive}
-                  className="hover:text-amber-400 transition cursor-pointer p-1"
-                  title={locale === 'tr' ? 'Kilitle / Kilidi Aç' : locale === 'en' ? 'Lock / Unlock' : 'قفل / فك قفل'}
-                >
-                  {activeObject.lockMovementX ? <Lock size={14} className="text-amber-400" /> : <Unlock size={14} />}
-                </button>
-                <span className="w-px h-3.5 bg-slate-700" />
-                <button
-                  type="button"
-                  onClick={deleteSelected}
-                  className="hover:text-red-400 text-red-400 transition cursor-pointer p-1"
-                  title={t('delete', { fallback: 'حذف' })}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            )}
+            {activeObject && !isMugPanoramicWorkspace && renderActiveObjectToolbar('floating')}
 
             {/* Out-of-Bounds Notification Banner */}
             {isObjectOutOfBounds && !isWarningDismissed && (
@@ -9026,67 +8979,69 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             )}
           </div>
 
-          {/* Size Selection & Multi-Quantity Stepper Link */}
-          <div className="p-4 border-b border-slate-100 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-700">
-                {locale === 'tr' ? 'İstenen Beden:' : locale === 'en' ? 'Selected Size:' : 'المقاس المطلوب:'}
-              </label>
+          {/* Size Selection & Multi-Quantity Stepper Link (Apparel Products Only) */}
+          {studioProfile.hasApparelSizes && (
+            <div className="p-4 border-b border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">
+                  {locale === 'tr' ? 'İstenen Beden:' : locale === 'en' ? 'Selected Size:' : 'المقاس المطلوب:'}
+                </label>
+                <button
+                  type="button"
+                  id="openSizeGuideLink"
+                  onClick={() => setIsSizeGuideModalOpen(true)}
+                  className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Ruler size={12} />
+                  <span>{locale === 'tr' ? 'Beden Tablosu' : locale === 'en' ? 'Size Guide' : 'دليل القياسات الدقيقة'}</span>
+                </button>
+              </div>
+              <div className="grid grid-cols-6 gap-1.5">
+                {['S', 'M', 'L', 'XL', '2XL', '3XL'].map((s: string) => {
+                  const isSelected = (selectedSize || '').trim().toUpperCase() === s;
+                  const inStock = isSizeAvailable(s, selectedColor);
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={!inStock}
+                      onClick={() => {
+                        if (!inStock) return;
+                        setSelectedSize(s);
+                        if (variantMatrix && variantMatrix.length > 0) {
+                          setVariantMatrix([{ color: selectedColor, size: s, quantity: totalOrderQuantity || 1 }]);
+                        }
+                      }}
+                      className={cn(
+                        "size-btn py-2 rounded-xl text-xs font-bold transition cursor-pointer",
+                        !inStock
+                          ? "opacity-35 line-through cursor-not-allowed bg-transparent text-gray-400 border border-slate-200"
+                          : isSelected
+                            ? "bg-slate-900 text-white border border-slate-900 font-black shadow-xs scale-100"
+                            : "border border-slate-200 text-slate-600 hover:border-slate-400"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Multi-Size Matrix Trigger Link */}
               <button
                 type="button"
-                id="openSizeGuideLink"
-                onClick={() => setIsSizeGuideModalOpen(true)}
-                className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1 cursor-pointer"
+                onClick={() => setIsMatrixModalOpen(true)}
+                className="w-full mt-1 py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px] rounded-xl transition flex items-center justify-center gap-1.5 border border-amber-300/80 cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
               >
-                <Ruler size={12} />
-                <span>{locale === 'tr' ? 'Beden Tablosu' : locale === 'en' ? 'Size Guide' : 'دليل القياسات الدقيقة'}</span>
+                <Layers size={13} className="text-amber-600 shrink-0" />
+                <span>
+                  {variantMatrix && variantMatrix.length > 1
+                    ? (locale === 'tr' ? `${totalOrderQuantity} Adet (Çoklu Beden Seçildi)` : locale === 'en' ? `${totalOrderQuantity} Pcs (Multi-Size Selected)` : `${totalOrderQuantity} قطع (مقاسات متعددة)`)
+                    : (locale === 'tr' ? 'Çoklu Beden & Adet Matrisi Seç' : locale === 'en' ? 'Multi-Size & Quantity Matrix' : 'تعدد المقاسات والكميات')}
+                </span>
               </button>
             </div>
-            <div className="grid grid-cols-6 gap-1.5">
-              {['S', 'M', 'L', 'XL', '2XL', '3XL'].map((s: string) => {
-                const isSelected = (selectedSize || '').trim().toUpperCase() === s;
-                const inStock = isSizeAvailable(s, selectedColor);
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    disabled={!inStock}
-                    onClick={() => {
-                      if (!inStock) return;
-                      setSelectedSize(s);
-                      if (variantMatrix && variantMatrix.length > 0) {
-                        setVariantMatrix([{ color: selectedColor, size: s, quantity: totalOrderQuantity || 1 }]);
-                      }
-                    }}
-                    className={cn(
-                      "size-btn py-2 rounded-xl text-xs font-bold transition cursor-pointer",
-                      !inStock
-                        ? "opacity-35 line-through cursor-not-allowed bg-transparent text-gray-400 border border-slate-200"
-                        : isSelected
-                          ? "bg-slate-900 text-white border border-slate-900 font-black shadow-xs scale-100"
-                          : "border border-slate-200 text-slate-600 hover:border-slate-400"
-                    )}
-                  >
-                    {s}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Multi-Size Matrix Trigger Link */}
-            <button
-              type="button"
-              onClick={() => setIsMatrixModalOpen(true)}
-              className="w-full mt-1 py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px] rounded-xl transition flex items-center justify-center gap-1.5 border border-amber-300/80 cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
-            >
-              <Layers size={13} className="text-amber-600 shrink-0" />
-              <span>
-                {variantMatrix && variantMatrix.length > 1
-                  ? (locale === 'tr' ? `${totalOrderQuantity} Adet (Çoklu Beden Seçildi)` : locale === 'en' ? `${totalOrderQuantity} Pcs (Multi-Size Selected)` : `${totalOrderQuantity} قطع (مقاسات متعددة)`)
-                  : (locale === 'tr' ? 'Çoklu Beden & Adet Matrisi Seç' : locale === 'en' ? 'Multi-Size & Quantity Matrix' : 'تعدد المقاسات والكميات')}
-              </span>
-            </button>
-          </div>
+          )}
 
           {/* Print Technology Switcher (When product supports Customer Choice) */}
           {isCustomerChoiceAllowed && (

@@ -142,7 +142,7 @@ export function MugStudioControlsBar({
             type="button"
             onClick={onToggleLive3DPanel}
             aria-pressed={showLive3DPanel}
-            className={`hidden lg:inline-flex min-h-[36px] px-2.5 py-1 rounded-xl text-xs font-bold border items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer shrink-0 ${showLive3DPanel
+            className={`inline-flex min-h-[36px] px-2.5 py-1 rounded-xl text-xs font-bold border items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer shrink-0 ${showLive3DPanel
                 ? 'bg-slate-900 text-white border-slate-900'
                 : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
               }`}
