@@ -2663,6 +2663,76 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     applyPrintBoundaryClipRef.current = applyPrintBoundaryClip;
   }, [applyPrintBoundaryClip]);
 
+  // Dynamically resolves the exact print placement boundary (white dashed attention zone) for the active object
+  const getActiveObjectPrintZone = useCallback((obj: fabric.Object | null | undefined): { left: number; top: number; width: number; height: number } | null => {
+    if (isMugPanoramicWorkspaceRef.current) {
+      return null; // Handled by 3-zone panorama spec
+    }
+
+    if (!isFreeModeRef.current && activeFaceSelectedPlacementsRef.current.length > 0) {
+      const gType = productData?.config?.garmentType || productData?.category || 'tshirt';
+
+      // 1. If currently hovering a placement during drag
+      const hoveredId = hoveredPlacementIdRef.current;
+      if (hoveredId) {
+        const hoveredSpec = activeFaceSelectedPlacementsRef.current.find(p => p.id === hoveredId);
+        if (hoveredSpec) {
+          const pb = getPlacementFabricBounds(hoveredSpec);
+          return { left: pb.fabricLeft, top: pb.fabricTop, width: pb.fabricWidth, height: pb.fabricHeight };
+        }
+      }
+
+      // 2. If object is explicitly assigned to a placement
+      const assignedId = (obj as any)?.assignedPlacementId;
+      if (assignedId) {
+        const assignedSpec = activeFaceSelectedPlacementsRef.current.find(p => p.id === assignedId) || getPlacementById(assignedId, gType);
+        if (assignedSpec) {
+          const pb = getPlacementFabricBounds(assignedSpec);
+          return { left: pb.fabricLeft, top: pb.fabricTop, width: pb.fabricWidth, height: pb.fabricHeight };
+        }
+      }
+
+      // 3. Match candidate placements by center point of the object
+      if (obj) {
+        const centerPt = obj.getCenterPoint ? obj.getCenterPoint() : { x: obj.left || 0, y: obj.top || 0 };
+        const candidates = activeFaceSelectedPlacementsRef.current.map(spec => {
+          const pb = getPlacementFabricBounds(spec);
+          const isDirectlyInside =
+            centerPt.x >= pb.fabricLeft &&
+            centerPt.x <= pb.fabricLeft + pb.fabricWidth &&
+            centerPt.y >= pb.fabricTop &&
+            centerPt.y <= pb.fabricTop + pb.fabricHeight;
+          const dist = Math.hypot(centerPt.x - pb.fabricCenterX, centerPt.y - pb.fabricCenterY);
+          return { spec, pb, isDirectlyInside, dist };
+        });
+
+        const inside = candidates.filter(c => c.isDirectlyInside);
+        if (inside.length > 0) {
+          inside.sort((a, b) => (a.pb.fabricWidth * a.pb.fabricHeight) - (b.pb.fabricWidth * b.pb.fabricHeight));
+          const best = inside[0];
+          return { left: best.pb.fabricLeft, top: best.pb.fabricTop, width: best.pb.fabricWidth, height: best.pb.fabricHeight };
+        }
+
+        candidates.sort((a, b) => a.dist - b.dist);
+        if (candidates.length > 0 && candidates[0].dist < 200) {
+          const best = candidates[0];
+          return { left: best.pb.fabricLeft, top: best.pb.fabricTop, width: best.pb.fabricWidth, height: best.pb.fabricHeight };
+        }
+      }
+    }
+
+    if (freePrintZoneRef.current) {
+      return freePrintZoneRef.current;
+    }
+
+    return null;
+  }, [productData, getPlacementFabricBounds]);
+
+  const getActiveObjectPrintZoneRef = useRef(getActiveObjectPrintZone);
+  useEffect(() => {
+    getActiveObjectPrintZoneRef.current = getActiveObjectPrintZone;
+  }, [getActiveObjectPrintZone]);
+
   // Universal Live Object Placement & Physical Metrics Calculator
   const computeLiveMetrics = useCallback((obj: fabric.Object | null | undefined, isScaling: boolean = false) => {
     if (scaleHudTimerRef.current) {
@@ -3249,14 +3319,17 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       }
     });
     initCanvas.on('selection:updated', (e) => {
+      clearSmartGuidelinesFromCanvas(initCanvas);
       updateActiveObj();
       if (e.selected && e.selected[0]) {
         validateAndSnap();
       }
     });
     initCanvas.on('selection:cleared', () => {
+      clearSmartGuidelinesFromCanvas(initCanvas);
       updateActiveObj();
       setIsObjectOutOfBounds(false);
+      setLiveDimensions(null);
     });
 
     // Boundary Clamping & Snapping & Validation
@@ -3390,6 +3463,24 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           hoveredPlacementIdRef.current = matchedPlacementId;
           setHoveredPlacementId(matchedPlacementId);
         }
+      }
+
+      // 2. Interactive Smart Alignment Guides & Magnetic Snapping (Crosshairs & Multi-Element Alignment)
+      if (smartAlignmentEnabledRef.current && isObjectDraggingRef.current) {
+        const isPano = isMugPanoramicWorkspaceRef.current;
+        const activePrintZone = isPano ? undefined : (getActiveObjectPrintZoneRef.current?.(activeObj) || freePrintZoneRef.current);
+        applySmartSnappingToCanvas(initCanvas, activeObj, {
+          enabled: true,
+          snapThreshold: 5,
+          isMugPanorama: isPano,
+          panoramaZones: isPano ? {
+            leftCenter: MUG_PANORAMA_SHEET_WIDTH * 0.185,
+            centerCenter: MUG_PANORAMA_SHEET_WIDTH * 0.50,
+            rightCenter: MUG_PANORAMA_SHEET_WIDTH * 0.815,
+            dividers: [MUG_PANORAMA_SHEET_WIDTH * 0.35, MUG_PANORAMA_SHEET_WIDTH * 0.65],
+          } : undefined,
+          printZone: activePrintZone || undefined,
+        });
       }
 
       validateAndSnap();
@@ -3580,17 +3671,43 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     };
 
     initCanvas.on('object:moving', handleObjectMoving);
-    initCanvas.on('object:scaling', validateAndSnap);
-    initCanvas.on('object:modified', handleObjectModified);
+    initCanvas.on('object:scaling', (e) => {
+      isObjectScalingRef.current = true;
+      const activeObj = e.target || initCanvas.getActiveObject();
+      if (activeObj && smartAlignmentEnabledRef.current) {
+        const isPano = isMugPanoramicWorkspaceRef.current;
+        const activePrintZone = isPano ? undefined : (getActiveObjectPrintZoneRef.current?.(activeObj) || freePrintZoneRef.current);
+        applySmartScalingGuidesToCanvas(initCanvas, activeObj, {
+          enabled: true,
+          snapThreshold: 5,
+          isMugPanorama: isPano,
+          panoramaZones: isPano ? {
+            leftCenter: MUG_PANORAMA_SHEET_WIDTH * 0.185,
+            centerCenter: MUG_PANORAMA_SHEET_WIDTH * 0.50,
+            rightCenter: MUG_PANORAMA_SHEET_WIDTH * 0.815,
+            dividers: [MUG_PANORAMA_SHEET_WIDTH * 0.35, MUG_PANORAMA_SHEET_WIDTH * 0.65],
+          } : undefined,
+          printZone: activePrintZone || undefined,
+        });
+      }
+      validateAndSnap();
+    });
+    initCanvas.on('object:modified', (e) => {
+      handleObjectModified(e);
+      clearSmartGuidelinesFromCanvas(initCanvas);
+    });
 
     initCanvas.on('mouse:up', () => {
       if (isObjectDraggingRef.current) {
         isObjectDraggingRef.current = false;
         setIsObjectDragging(false);
       }
+      isObjectScalingRef.current = false;
+      clearSmartGuidelinesFromCanvas(initCanvas);
     });
 
     const handleSelectionFocus = (e: fabric.IEvent) => {
+      clearSmartGuidelinesFromCanvas(initCanvas);
       const selected = (e as any).selected?.[0] || e.target;
       if (selected && (selected as any).assignedPlacementId) {
         setFocusedPlacementId((selected as any).assignedPlacementId);
@@ -4060,7 +4177,11 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         facesData.current[currentKey] = json;
       } catch (e) {}
     }
+    if (canvas) {
+      clearSmartGuidelinesFromCanvas(canvas);
+    }
     setActiveFace(resolvedFace);
+    setLiveDimensions(null);
   }, [canvas, activeFace, selectedColor, getFaceStateKey, resolveTargetFace]);
 
   const handleSelectMugModeRef = useRef<((mode: MugPrintMode) => void) | null>(null);
