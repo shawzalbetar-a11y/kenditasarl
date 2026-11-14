@@ -521,7 +521,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       } catch {}
     }
     if (studioProfile.family === 'mug') {
-      return { default: ['mug_full_wrap'] };
+      const initialKey = (resolvedInitialColor || 'default').trim().toLowerCase();
+      return { [initialKey]: ['mug_full_wrap'], default: ['mug_full_wrap'] };
     }
     return {};
   });
@@ -1272,22 +1273,22 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const normColor = (color || 'default').trim().toLowerCase();
     const isPano = forcePano !== undefined
       ? forcePano
-      : (studioProfile.family === 'mug' && !isFreeMode && (isMugPanoramicWorkspaceRef.current || currentSelectedPlacementIdsRef.current.includes('mug_full_wrap') || activeMugMode === 'mug_full_wrap'));
-    const effectiveFace = (isPano && isFaceMatching('front', face)) ? 'mug_full_wrap' : face;
+      : (studioProfile.family === 'mug' && !isFreeMode && (activeMugMode === 'mug_full_wrap' || isMugPanoramicWorkspaceRef.current || face === 'mug_full_wrap'));
+    const effectiveFace = (isPano && (isFaceMatching('front', face) || face === 'mug_full_wrap')) ? 'mug_full_wrap' : face;
     return `${normColor}:::${effectiveFace}`;
   }, [studioProfile.family, isFreeMode, activeMugMode]);
 
   const getFaceJson = useCallback((face: string, color: string, forcePano?: boolean): string | null => {
     const isPano = forcePano !== undefined
       ? forcePano
-      : (studioProfile.family === 'mug' && !isFreeMode && (isMugPanoramicWorkspaceRef.current || currentSelectedPlacementIdsRef.current.includes('mug_full_wrap') || activeMugMode === 'mug_full_wrap'));
+      : (studioProfile.family === 'mug' && !isFreeMode && (activeMugMode === 'mug_full_wrap' || isMugPanoramicWorkspaceRef.current || face === 'mug_full_wrap'));
     const exactKey = getFaceStateKey(face, color, isPano);
     if (facesData.current[exactKey] !== undefined && facesData.current[exactKey] !== null) {
       return facesData.current[exactKey];
     }
     
     // Check color aliases with isColorEqual
-    const effectiveFace = (isPano && isFaceMatching('front', face)) ? 'mug_full_wrap' : face;
+    const effectiveFace = (isPano && (isFaceMatching('front', face) || face === 'mug_full_wrap')) ? 'mug_full_wrap' : face;
     for (const k of Object.keys(facesData.current)) {
       if (k.includes(':::')) {
         const [storedColor, storedFace] = k.split(':::');
@@ -1302,7 +1303,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       return facesData.current[face];
     }
 
-    // Fallback: If new color has not been designed yet, inherit existing active face design so canvas is not wiped
+    // Fallback: If new color has not been designed yet, inherit existing active face design for the exact same face so canvas is not wiped
     for (const k of Object.keys(facesData.current)) {
       if (k.includes(':::')) {
         const [, storedFace] = k.split(':::');
@@ -1686,8 +1687,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
     try {
       if (c && !(c as any).disposed && c.getElement && c.getElement()) {
-        const json = buildSerializedFaceJson(c, isMugPanoramicWorkspaceRef.current, nativeWidthRef.current, nativeHeightRef.current);
-        const currentKey = getFaceStateKey(activeFaceRef.current, selectedColorRef.current);
+        const isPanoNow = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFaceRef.current);
+        const json = buildSerializedFaceJson(c, isPanoNow, nativeWidthRef.current, nativeHeightRef.current);
+        const currentKey = getFaceStateKey(activeFaceRef.current, selectedColorRef.current, isPanoNow);
         facesData.current[currentKey] = JSON.stringify(json);
       }
 
@@ -1761,8 +1763,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     // 1. Save current active face to memory
     if (targetCanvas && !isRestoring.current) {
       try {
-        const json = JSON.stringify(buildSerializedFaceJson(targetCanvas, isMugPanoramicWorkspaceRef.current, nativeWidthRef.current, nativeHeightRef.current));
-        const currentKey = getFaceStateKey(activeFaceRef.current, selectedColorRef.current);
+        const isPanoNow = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFaceRef.current);
+        const json = JSON.stringify(buildSerializedFaceJson(targetCanvas, isPanoNow, nativeWidthRef.current, nativeHeightRef.current));
+        const currentKey = getFaceStateKey(activeFaceRef.current, selectedColorRef.current, isPanoNow);
         facesData.current[currentKey] = json;
       } catch (e) {}
     }
@@ -1784,7 +1787,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     uniqueSelectedColors.forEach((otherColor: string) => {
       if (!isColorEqual(otherColor, selectedColorRef.current)) {
         Object.entries(activeFacesForColor).forEach(([fKey, fJson]) => {
-          const targetKey = getFaceStateKey(fKey, otherColor);
+          const isPanoFace = studioProfile.family === 'mug' && fKey === 'mug_full_wrap';
+          const targetKey = getFaceStateKey(fKey, otherColor, isPanoFace);
           facesData.current[targetKey] = fJson;
         });
       }
@@ -3951,7 +3955,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       (initCanvas as any).printAreaWidth = MUG_PANORAMA_SHEET_WIDTH;
       (initCanvas as any).printAreaHeight = MUG_PANORAMA_SHEET_HEIGHT;
     }
-    const currentTargetJson = getFaceJson(activeFace, selectedColor, isMugPanoRestored ? true : undefined);
+    const currentTargetJson = getFaceJson(activeFace, selectedColor, isMugPanoRestored ? true : (studioProfile.family === 'mug' ? false : undefined));
     if (currentTargetJson) {
       isRestoring.current = true;
       restoreTimer = setTimeout(() => {
@@ -4016,7 +4020,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               setCanUndo(false);
               setCanRedo(false);
               recalculatePrice(initCanvas);
-              const currentKey = getFaceStateKey(activeFace, selectedColor);
+              const isPanoActive = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace);
+              const currentKey = getFaceStateKey(activeFace, selectedColor, isPanoActive);
               facesData.current[currentKey] = initialJson;
 
               // Smart Placement Auto-Reconciliation
@@ -4061,15 +4066,16 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       // حفظ سريع للوجه واللون الحالي قبل إغلاقه
       if (!isDisposed && initCanvas && !isRestoring.current) {
         try {
+          const isPanoActive = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace);
           const json = JSON.stringify(
             buildSerializedFaceJson(
               initCanvas,
-              isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace),
+              isPanoActive,
               nativeWidthRef.current,
               nativeHeightRef.current
             )
           );
-          const currentKey = getFaceStateKey(activeFace, selectedColor);
+          const currentKey = getFaceStateKey(activeFace, selectedColor, isPanoActive);
           facesData.current[currentKey] = json;
         } catch (e) {}
       }
@@ -4099,7 +4105,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const saveHistoryStateCanvas = (c: fabric.Canvas) => {
     if (!c || isRestoring.current) return;
-    const json = JSON.stringify(buildSerializedFaceJson(c, isMugPanoramicWorkspaceRef.current, nativeWidthRef.current, nativeHeightRef.current));
+    const isPanoNow = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFaceRef.current);
+    const json = JSON.stringify(buildSerializedFaceJson(c, isPanoNow, nativeWidthRef.current, nativeHeightRef.current));
     
     const currentIdx = historyStepRef.current;
     if (currentIdx >= 0 && historyRef.current[currentIdx] === json) {
@@ -4119,13 +4126,13 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     setCanUndo(historyStepRef.current > 0);
     setCanRedo(false);
 
-    const currentKey = getFaceStateKey(activeFaceRef.current, selectedColorRef.current);
+    const currentKey = getFaceStateKey(activeFaceRef.current, selectedColorRef.current, isPanoNow);
     facesData.current[currentKey] = json;
 
     if (syncAllColorsRef.current && uniqueSelectedColors.length > 1) {
       uniqueSelectedColors.forEach((otherColor: string) => {
         if (!isColorEqual(otherColor, selectedColorRef.current)) {
-          const mirrorKey = getFaceStateKey(activeFaceRef.current, otherColor);
+          const mirrorKey = getFaceStateKey(activeFaceRef.current, otherColor, isPanoNow);
           facesData.current[mirrorKey] = json;
         }
       });
@@ -4295,8 +4302,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     if (resolvedFace === activeFace) return;
     if (canvas && !isRestoring.current) {
       try {
-        const json = JSON.stringify(buildSerializedFaceJson(canvas, isMugPanoramicWorkspaceRef.current, nativeWidthRef.current, nativeHeightRef.current));
-        const currentKey = getFaceStateKey(activeFace, selectedColor);
+        const isPanoNow = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace);
+        const json = JSON.stringify(buildSerializedFaceJson(canvas, isPanoNow, nativeWidthRef.current, nativeHeightRef.current));
+        const currentKey = getFaceStateKey(activeFace, selectedColor, isPanoNow);
         facesData.current[currentKey] = json;
       } catch (e) {}
     }
@@ -4305,7 +4313,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     }
     setActiveFace(resolvedFace);
     setLiveDimensions(null);
-  }, [canvas, activeFace, selectedColor, getFaceStateKey, resolveTargetFace]);
+  }, [canvas, activeFace, selectedColor, getFaceStateKey, resolveTargetFace, studioProfile.family]);
 
   const handleSelectMugModeRef = useRef<((mode: MugPrintMode) => void) | null>(null);
 
@@ -4577,15 +4585,22 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       ? mockupNaturalSize.height
       : (Number(resolvedFaceConfig?.nativeHeight) || 1000);
 
-    const nextTargetFace = mode === 'mug_two_sided' && isFaceMatching('back', activeFace) ? 'back' : 'front';
+    const targetSingleFace = availableFaces.includes(activeFace)
+      ? activeFace
+      : (availableFaces[0] || 'front');
+
+    const nextTargetFace = mode === 'mug_two_sided'
+      ? (isFaceMatching('back', activeFace) ? 'back' : 'front')
+      : targetSingleFace;
 
     if (mode === 'mug_front') {
-      const targetSingleFace = availableFaces.includes(activeFace)
-        ? activeFace
-        : (availableFaces[0] || 'front');
-      updateMugSingleSideFace(targetSingleFace);
+      updateMugSingleSideFace(nextTargetFace);
       applyExplicitPlacementList(['mug_front']);
       setFocusedPlacementId('mug_front');
+      if (activeFace !== nextTargetFace) {
+        setActiveFace(nextTargetFace);
+        activeFaceRef.current = nextTargetFace;
+      }
     } else {
       applyExplicitPlacementList(['mug_front', 'mug_back']);
       if (!isFaceMatching('front', activeFace) && !isFaceMatching('back', activeFace)) {
@@ -4776,7 +4791,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const targetFace = isCurrentlyBack ? 'front' : 'back';
     const targetPlacementId = targetFace === 'back' ? 'mug_back' : 'mug_front';
 
-    const currentKey = getFaceStateKey(sourceFace, selectedColor);
+    const currentKey = getFaceStateKey(sourceFace, selectedColor, false);
     const serialized = canvas.toJSON(SERIALIZE_PROPERTIES);
     facesData.current[currentKey] = JSON.stringify(serialized);
 
@@ -4799,7 +4814,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       return;
     }
 
-    const oppKey = getFaceStateKey(targetFace, selectedColor);
+    const oppKey = getFaceStateKey(targetFace, selectedColor, false);
     let baseOppJson: any = { version: serialized.version, objects: [] };
     try {
       const existingRaw = facesData.current[oppKey];
@@ -5369,8 +5384,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
     if (canvas && !isRestoring.current) {
       try {
-        const json = JSON.stringify(buildSerializedFaceJson(canvas, isMugPanoramicWorkspaceRef.current, nativeWidthRef.current, nativeHeightRef.current));
-        const currentKey = getFaceStateKey(activeFace, selectedColor);
+        const isPanoNow = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace);
+        const json = JSON.stringify(buildSerializedFaceJson(canvas, isPanoNow, nativeWidthRef.current, nativeHeightRef.current));
+        const currentKey = getFaceStateKey(activeFace, selectedColor, isPanoNow);
         facesData.current[currentKey] = json;
       } catch (e) {}
     }
@@ -6069,8 +6085,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
     // 1. Commit active canvas state to facesData.current immediately
     try {
-      const currentKey = getFaceStateKey(activeFace, selectedColor);
-      facesData.current[currentKey] = JSON.stringify(buildSerializedFaceJson(canvas, isMugPanoramicWorkspaceRef.current, nativeWidthRef.current, nativeHeightRef.current));
+      const isPanoNow = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace);
+      const currentKey = getFaceStateKey(activeFace, selectedColor, isPanoNow);
+      facesData.current[currentKey] = JSON.stringify(buildSerializedFaceJson(canvas, isPanoNow, nativeWidthRef.current, nativeHeightRef.current));
     } catch (e) {
       console.warn("Could not serialize active canvas face:", e);
     }
@@ -6467,8 +6484,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     
     try {
       // Save current face & color state
-      const currentSaveKey = getFaceStateKey(activeFace, selectedColor);
-      facesData.current[currentSaveKey] = JSON.stringify(buildSerializedFaceJson(canvas, isMugPanoramicWorkspaceRef.current, nativeWidthRef.current, nativeHeightRef.current));
+      const isPanoNow = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace);
+      const currentSaveKey = getFaceStateKey(activeFace, selectedColor, isPanoNow);
+      facesData.current[currentSaveKey] = JSON.stringify(buildSerializedFaceJson(canvas, isPanoNow, nativeWidthRef.current, nativeHeightRef.current));
       
       // Filter out empty faces from payload
       const filteredFacesData: Record<string, string> = {};
