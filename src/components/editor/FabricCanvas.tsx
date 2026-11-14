@@ -499,7 +499,32 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   syncAllColorsRef.current = syncAllColors;
 
   // Per-color placements management with unification toggle
-  const [placementsByColor, setPlacementsByColor] = useState<Record<string, string[]>>({});
+  const [placementsByColor, setPlacementsByColor] = useState<Record<string, string[]>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const dedicatedRaw = localStorage.getItem(`studio_saved_placements_${productId}`);
+        if (dedicatedRaw) {
+          const parsed = JSON.parse(dedicatedRaw);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) return parsed;
+        }
+        const savedRaw = localStorage.getItem(`draft_design_${productId}`);
+        if (savedRaw) {
+          const parsed = JSON.parse(savedRaw);
+          if (parsed?.placementsByColor && typeof parsed.placementsByColor === 'object') {
+            return parsed.placementsByColor;
+          }
+          if (Array.isArray(parsed?.selectedPlacementIds) && parsed.selectedPlacementIds.length > 0) {
+            const initialKey = (parsed.selectedColor || 'default').trim().toLowerCase();
+            return { [initialKey]: parsed.selectedPlacementIds };
+          }
+        }
+      } catch {}
+    }
+    if (studioProfile.family === 'mug') {
+      return { default: ['mug_full_wrap'] };
+    }
+    return {};
+  });
   const placementsByColorRef = useRef<Record<string, string[]>>(placementsByColor);
   placementsByColorRef.current = placementsByColor;
   const [syncPlacementsAcrossColors, setSyncPlacementsAcrossColors] = useState<boolean>(false);
@@ -1247,13 +1272,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const normColor = (color || 'default').trim().toLowerCase();
     const isPano = forcePano !== undefined
       ? forcePano
-      : (studioProfile.family === 'mug' && !isFreeMode && (isMugPanoramicWorkspaceRef.current || face === 'mug_full_wrap'));
+      : (studioProfile.family === 'mug' && !isFreeMode && (isMugPanoramicWorkspaceRef.current || currentSelectedPlacementIdsRef.current.includes('mug_full_wrap') || activeMugMode === 'mug_full_wrap'));
     const effectiveFace = (isPano && isFaceMatching('front', face)) ? 'mug_full_wrap' : face;
     return `${normColor}:::${effectiveFace}`;
-  }, [studioProfile.family, isFreeMode]);
+  }, [studioProfile.family, isFreeMode, activeMugMode]);
 
-  const getFaceJson = useCallback((face: string, color: string): string | null => {
-    const isPano = studioProfile.family === 'mug' && !isFreeMode && isMugPanoramicWorkspaceRef.current;
+  const getFaceJson = useCallback((face: string, color: string, forcePano?: boolean): string | null => {
+    const isPano = forcePano !== undefined
+      ? forcePano
+      : (studioProfile.family === 'mug' && !isFreeMode && (isMugPanoramicWorkspaceRef.current || currentSelectedPlacementIdsRef.current.includes('mug_full_wrap') || activeMugMode === 'mug_full_wrap'));
     const exactKey = getFaceStateKey(face, color, isPano);
     if (facesData.current[exactKey] !== undefined && facesData.current[exactKey] !== null) {
       return facesData.current[exactKey];
@@ -1293,7 +1320,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     }
 
     return null;
-  }, [getFaceStateKey, initialColor, studioProfile.family, isFreeMode]);
+  }, [getFaceStateKey, initialColor, studioProfile.family, isFreeMode, activeMugMode]);
 
   const [designAssets, setDesignAssets] = useState<any[]>([]);
   const [assetCategories, setAssetCategories] = useState<{ id: string; name: string; order?: number }[]>([]);
@@ -2608,6 +2635,25 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const applyPrintBoundaryClip = useCallback((obj: fabric.Object | null | undefined) => {
     if (!obj || obj.name === 'background' || obj.name === 'mockup' || obj.name === 'print_area_guide') return;
 
+    // 0. Panorama 360° Wrap Workspace on Mugs:
+    // The entire 1840x760 canvas IS the printable unwrapped sublimation sheet.
+    // Clip strictly to the 1840x760 sheet bounds so artwork never gets truncated by small single-face boxes!
+    if (isMugPanoramicWorkspaceRef.current || (studioProfile.family === 'mug' && activeMugMode === 'mug_full_wrap')) {
+      (obj as any).assignedPlacementId = 'mug_full_wrap';
+      const clipRect = new fabric.Rect({
+        left: 0,
+        top: 0,
+        width: MUG_PANORAMA_SHEET_WIDTH,
+        height: MUG_PANORAMA_SHEET_HEIGHT,
+        rx: 8,
+        ry: 8,
+        absolutePositioned: true,
+      });
+      obj.clipPath = clipRect;
+      obj.dirty = true;
+      return;
+    }
+
     const gType = productData?.config?.garmentType || productData?.category || 'tshirt';
     const currentFace = activeFaceRef.current || activeFace;
 
@@ -3882,13 +3928,30 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           const activePlacementsList = restoredPlacements['__synced__'] || restoredPlacements[activeColorKeyResolved] || [];
           currentSelectedPlacementIdsRef.current = activePlacementsList;
           recalculatePrice(undefined, undefined, activePlacementsList);
+
+          const isMugPanoRestored = studioProfile.family === 'mug' && activePlacementsList.includes('mug_full_wrap');
+          if (isMugPanoRestored) {
+            isMugPanoramicWorkspaceRef.current = true;
+            initCanvas.setWidth(MUG_PANORAMA_SHEET_WIDTH);
+            initCanvas.setHeight(MUG_PANORAMA_SHEET_HEIGHT);
+            (initCanvas as any).printAreaWidth = MUG_PANORAMA_SHEET_WIDTH;
+            (initCanvas as any).printAreaHeight = MUG_PANORAMA_SHEET_HEIGHT;
+          }
         }
       } catch (err) { console.warn("Memory read error:", err); }
       hasRestoredDraftRef.current = true; // إغلاق قفل القراءة من الـ localStorage
     }
 
     // 2. تحميل الوجه الحالي للون المحدد
-    const currentTargetJson = getFaceJson(activeFace, selectedColor);
+    const isMugPanoRestored = studioProfile.family === 'mug' && currentSelectedPlacementIdsRef.current.includes('mug_full_wrap');
+    if (isMugPanoRestored && (initCanvas.getWidth() !== MUG_PANORAMA_SHEET_WIDTH || initCanvas.getHeight() !== MUG_PANORAMA_SHEET_HEIGHT)) {
+      isMugPanoramicWorkspaceRef.current = true;
+      initCanvas.setWidth(MUG_PANORAMA_SHEET_WIDTH);
+      initCanvas.setHeight(MUG_PANORAMA_SHEET_HEIGHT);
+      (initCanvas as any).printAreaWidth = MUG_PANORAMA_SHEET_WIDTH;
+      (initCanvas as any).printAreaHeight = MUG_PANORAMA_SHEET_HEIGHT;
+    }
+    const currentTargetJson = getFaceJson(activeFace, selectedColor, isMugPanoRestored ? true : undefined);
     if (currentTargetJson) {
       isRestoring.current = true;
       restoreTimer = setTimeout(() => {
@@ -4401,7 +4464,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     try {
       localStorage.setItem(`studio_saved_placements_${productId}`, JSON.stringify(nextMap));
     } catch {}
-    saveDraftImmediate();
+    if (!isRestoring.current) {
+      saveDraftImmediate();
+    }
   }, [activeColorKey, canvas, uniqueSelectedColors, normalizeColorKey, productId, saveDraftImmediate, recalculatePrice]);
 
   const isMugFaceLocked = useCallback((face: string): boolean => {
@@ -4426,8 +4491,11 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       canvas.getContext?.()
     );
 
+    // Lock restoring to prevent background saves from wiping face state during transition
+    isRestoring.current = true;
+
     // 1. Save current mode canvas under its exact previous mode key
-    if (isCanvasAlive && canvas && !isRestoring.current) {
+    if (isCanvasAlive && canvas) {
       try {
         const wasPano = prevMode === 'mug_full_wrap';
         const prevKey = getFaceStateKey(activeFace, selectedColor, wasPano);
@@ -4436,32 +4504,37 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       } catch (e) {}
     }
 
-    // 2. Discard active object and wipe canvas user objects
+    // 2. Discard active object and wipe canvas user objects using a clone copy to prevent array mutation bug
     if (isCanvasAlive && canvas) {
       canvas.discardActiveObject();
       clearSmartGuidelinesFromCanvas(canvas);
-      const existingObjs = canvas.getObjects();
-      existingObjs.forEach((o: any) => {
+      const userObjs = [...canvas.getObjects()].filter((o: any) => {
         const n = (o?.name || '').toLowerCase();
-        if (n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline') {
-          canvas.remove(o);
-        }
+        return n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline';
       });
+      userObjs.forEach((o: any) => {
+        canvas.remove(o);
+      });
+      canvas.renderAll();
     }
 
     // 3. Switch to Panorama mode
     if (mode === 'mug_full_wrap') {
       setShowLive3DPanel(true);
       setMobilePanoramaView('2d');
+      isMugPanoramicWorkspaceRef.current = true;
       applyExplicitPlacementList(['mug_full_wrap']);
       setFocusedPlacementId('mug_full_wrap');
       if (!isFaceMatching('front', activeFace)) {
-        switchFace('front');
+        setActiveFace('front');
+        activeFaceRef.current = 'front';
       }
 
       if (isCanvasAlive && canvas) {
         canvas.setWidth(MUG_PANORAMA_SHEET_WIDTH);
         canvas.setHeight(MUG_PANORAMA_SHEET_HEIGHT);
+        (canvas as any).printAreaWidth = MUG_PANORAMA_SHEET_WIDTH;
+        (canvas as any).printAreaHeight = MUG_PANORAMA_SHEET_HEIGHT;
         const panoKey = getFaceStateKey('front', selectedColor, true);
         const savedPanoJson = facesData.current[panoKey];
         if (savedPanoJson) {
@@ -4473,21 +4546,30 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               canvas.requestRenderAll();
               recalculatePrice(canvas);
               scheduleLiveMugTextureRefreshRef.current?.(canvas, 60);
+              isRestoring.current = false;
+              saveDraftImmediate(canvas);
             });
           } catch {
             canvas.requestRenderAll();
             recalculatePrice(canvas);
+            isRestoring.current = false;
           }
         } else {
           canvas.requestRenderAll();
           recalculatePrice(canvas);
           setLiveMugTextureUrl(null);
+          isRestoring.current = false;
+          saveDraftImmediate(canvas);
         }
+      } else {
+        isRestoring.current = false;
       }
       return;
     }
 
     // 4. Switch to Single Face or Two Faces
+    isMugPanoramicWorkspaceRef.current = false;
+
     const nonPanoW = mockupNaturalSize.width > 0
       ? mockupNaturalSize.width
       : (Number(resolvedFaceConfig?.nativeWidth) || 1000);
@@ -4507,7 +4589,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     } else {
       applyExplicitPlacementList(['mug_front', 'mug_back']);
       if (!isFaceMatching('front', activeFace) && !isFaceMatching('back', activeFace)) {
-        switchFace('front');
+        setActiveFace('front');
+        activeFaceRef.current = 'front';
         setFocusedPlacementId('mug_front');
       } else {
         setFocusedPlacementId(isFaceMatching('back', activeFace) ? 'mug_back' : 'mug_front');
@@ -4517,6 +4600,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     if (isCanvasAlive && canvas) {
       canvas.setWidth(nonPanoW);
       canvas.setHeight(nonPanoH);
+      (canvas as any).printAreaWidth = nonPanoW;
+      (canvas as any).printAreaHeight = nonPanoH;
       const targetKey = getFaceStateKey(nextTargetFace, selectedColor, false);
       const savedTargetJson = facesData.current[targetKey];
       if (savedTargetJson) {
@@ -4527,15 +4612,22 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             applyAllPrintBoundaryClips(canvas);
             canvas.requestRenderAll();
             recalculatePrice(canvas);
+            isRestoring.current = false;
+            saveDraftImmediate(canvas);
           });
         } catch {
           canvas.requestRenderAll();
           recalculatePrice(canvas);
+          isRestoring.current = false;
         }
       } else {
         canvas.requestRenderAll();
         recalculatePrice(canvas);
+        isRestoring.current = false;
+        saveDraftImmediate(canvas);
       }
+    } else {
+      isRestoring.current = false;
     }
   }, [
     activeMugMode,
