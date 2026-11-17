@@ -67,8 +67,8 @@ export default function AccountPage() {
         updates.email = email;
       }
       
-      // Only allow updating phone if not a Phone user
-      if (!isPhoneUser) {
+      // Only allow updating phone if not a Phone user and not already verified
+      if (!isPhoneUser && !isPhoneVerified) {
         updates.phone = phone;
       }
 
@@ -142,12 +142,18 @@ export default function AccountPage() {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            disabled={isPhoneUser}
+            disabled={isPhoneUser || isPhoneVerified}
             dir="ltr"
-            className={`w-full p-3 text-left rounded-lg border border-gray-200 outline-none transition-shadow ${isPhoneUser ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-[var(--color-primary)]'}`}
+            className={`w-full p-3 text-left rounded-lg border border-gray-200 outline-none transition-shadow ${(isPhoneUser || isPhoneVerified) ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-[var(--color-primary)]'}`}
             placeholder={t('phonePlaceholder')}
           />
-          {isPhoneUser && <p className="text-xs text-gray-400">{t('phoneLocked', { fallback: 'Phone number cannot be changed for phone-registered accounts.' })}</p>}
+          {(isPhoneUser || isPhoneVerified) && (
+            <p className="text-xs text-gray-400">
+              {isPhoneUser 
+                ? t('phoneLocked', { fallback: 'Phone number cannot be changed for phone-registered accounts.' })
+                : t('phoneVerifiedLocked', { fallback: 'Verified phone numbers cannot be changed directly.' })}
+            </p>
+          )}
         </div>
 
         {/* Preferred Language - Read Only */}

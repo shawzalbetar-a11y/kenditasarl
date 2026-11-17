@@ -1,5 +1,7 @@
 "use client";
 
+import { templateConfig, publishedTemplateSchema } from "@/lib/printTemplate";
+import { canUpdateSavedDesign, templateRevision } from "@/lib/faceCoordinates";
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
@@ -51,6 +53,7 @@ export default function DesignStudioPage() {
   const [loading, setLoading] = useState(!!initialProductId);
   const [error, setError] = useState<string | null>(null);
   const t = useTranslations('Editor');
+  const [reconfigure,setReconfigure] = useState("");
   const tStudio = useTranslations('DesignStudio');
 
   const handleTopFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,12 +94,48 @@ export default function DesignStudioPage() {
 
       setLoading(true);
       setError(null);
+      setProductData(null);
+      setReconfigure("");
 
       try {
         const pDoc = await getDoc(doc(db, 'products', activeProductId));
         if (pDoc.exists()) {
           const data = pDoc.data();
 
+          if (data.print_template_revision) {
+            const revision = data.print_template_revision;
+            const revisionDoc = await getDoc(doc(pDoc.ref,"print_template_revisions",revision));
+            const published = publishedTemplateSchema.parse(revisionDoc.data());
+            const template = published.definition;
+            if (published.revision!==revision || template.productId !== activeProductId || await templateRevision(template)!==revision) throw Error("revision");
+            const config=templateConfig(template,revision), coordinateRevision=await templateRevision(config);
+            const variants=(await getDocs(collection(pDoc.ref,"variants"))).docs
+              .filter(v=>template.variantIds.includes(v.id)).map(v=>({...v.data(),id:v.id} as Record<string,any>));
+            const matches=(v:Record<string,any>)=>[v.hex,v.color,v.colorName_ar,v.colorName_tr,v.colorName_en].some(c=>c && c.toLowerCase()===selectedColor?.toLowerCase());
+            const variant=selectedColor ? variants.find(matches) : variants[0];
+            if(!variant){setError(t("templateUnavailable"));return;}
+            const faces=Object.fromEntries(template.faces.map(f=>[f.id,f.mockup]));
+            await Promise.all(template.faces.map(async f=>{
+              const image=new Image(); image.src=f.mockup; await image.decode();
+              if(f.space==="FULL_MOCKUP_NATIVE" && (image.naturalWidth!==f.nativeWidth || image.naturalHeight!==f.nativeHeight))throw Error("mockup");
+            }));
+            const revisionKey="draft_design_"+activeProductId+"@"+revision;
+            const designId=searchParams.get("designId");
+            let needsReview=false;
+            if(designId){
+              const design=await getDoc(doc(db,"designs",designId));
+              const raw=design.get("canvas_json");
+              needsReview=design.get("product_id")!==activeProductId || !canUpdateSavedDesign(typeof raw==="string"?JSON.parse(raw):raw||{},coordinateRevision);
+            } else if(!localStorage.getItem(revisionKey)&&sessionStorage.getItem("template-start:"+activeProductId)!==revision){
+              needsReview=Object.keys(localStorage).some(k=>k==="draft_design_"+activeProductId || k.startsWith("draft_design_"+activeProductId+"@"));
+            }
+            if(needsReview){setReconfigure(revision);return;}
+            const sizes=Array.from(new Set(variants.flatMap(v=>Object.keys(v.sizes||{}).concat(v.size?[v.size]:[]))));
+            setProductData({...data,...(template.mugMeta?{mug_meta:template.mugMeta}:{}),id:activeProductId,config,customization_config:config,coordinateRevision,variant,variants,
+              basePrice:data.base_price,faces,raw_images:[],colors:Array.from(new Set(variants.map(v=>v.hex||v.color))),
+              sizes,selectedColor:variant.hex||variant.color,selectedSize:selectedSize||sizes[0],initialQuantity});
+            return;
+          }
           // Get customization config from product document or fallback to category defaults
           const config = data.customization_config || getCustomizationConfig(data.category_id);
 
@@ -284,6 +323,7 @@ export default function DesignStudioPage() {
           setProductData({
             ...data,
             id: activeProductId,
+            coordinateRevision: globalThis.crypto?.subtle ? await templateRevision(config) : "",
             basePrice: data.base_price || 250,
             category_id: data.category_id,
             config: finalizedConfig,
@@ -312,7 +352,7 @@ export default function DesignStudioPage() {
     }
 
     loadProduct();
-  }, [activeProductId, t]);
+  }, [activeProductId, selectedColor, selectedSize, initialQuantity, searchParams, t]);
 
   const handleSelectProduct = (id: string) => {
     setError(null);
@@ -392,6 +432,12 @@ export default function DesignStudioPage() {
             <Loader2 className="w-12 h-12 animate-spin text-[var(--color-primary)] mb-4" />
             <p className="font-bold text-gray-500">{t('initializingCanvas')}</p>
           </div>
+        ) : reconfigure ? (
+          <section className="m-auto space-y-4 p-6"><p>{t("templateChanged")}</p>
+            <button type="button" className="min-h-11 rounded border px-4" onClick={()=>{
+              sessionStorage.setItem("template-start:"+activeProductId,reconfigure);
+              const url=new URL(location.href);url.searchParams.delete("designId");url.searchParams.delete("mode");location.assign(url);
+            }}>{t("templateRestart")}</button></section>
         ) : !activeProductId || !productData ? (
           <div className="p-4 md:p-0 flex-1 overflow-y-auto custom-scrollbar">
             <ProductSelector onSelectProduct={handleSelectProduct} />

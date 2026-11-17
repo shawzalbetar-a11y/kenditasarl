@@ -1,0 +1,678 @@
+{
+  "dpr": [
+    1,
+    2
+  ],
+  "browser": "157.0.8103.51",
+  "measurements": [
+    {
+      "fixture": "origins",
+      "output": "native",
+      "width": 200,
+      "height": 200,
+      "dpi": 100,
+      "mirror": "NONE",
+      "expectedRevision": "d714dfed48d831115fa0e96c942a142461e1034289d16e3767cf9101204ec467",
+      "pngSha256": "395ee3961e206538157ed9b9c792e68d46889bddeead06b2f3e5caad3f3747e4",
+      "probes": [
+        {
+          "x": 40,
+          "y": 40,
+          "rgba": [
+            208,
+            32,
+            64,
+            255
+          ]
+        },
+        {
+          "x": 140,
+          "y": 160,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 0,
+          "y": 58,
+          "rgba": [
+            20,
+            86,
+            217,
+            255
+          ]
+        },
+        {
+          "x": 199,
+          "y": 52,
+          "rgba": [
+            17,
+            153,
+            76,
+            255
+          ]
+        },
+        {
+          "x": 75,
+          "y": 105,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 0,
+      "mean": 0,
+      "text": null
+    },
+    {
+      "fixture": "origins",
+      "output": "local",
+      "width": 200,
+      "height": 200,
+      "dpi": 100,
+      "mirror": "NONE",
+      "expectedRevision": "d714dfed48d831115fa0e96c942a142461e1034289d16e3767cf9101204ec467",
+      "pngSha256": "9c6dd1a75dc9571b7aeddf7787dee32ee0aca87c076d126871f0d6d5805fecdf",
+      "probes": [
+        {
+          "x": 40,
+          "y": 40,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 140,
+          "y": 160,
+          "rgba": [
+            208,
+            32,
+            64,
+            255
+          ]
+        },
+        {
+          "x": 0,
+          "y": 58,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 199,
+          "y": 52,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 75,
+          "y": 105,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 0,
+      "mean": 0,
+      "text": null
+    },
+    {
+      "fixture": "garment",
+      "output": "front~left_chest",
+      "width": 100,
+      "height": 100,
+      "dpi": 100,
+      "mirror": "NONE",
+      "expectedRevision": "5035e3f5499f47f5a2071fa00b588b0bf7d45e2c8fc8af6b23d7090dca4a68ee",
+      "pngSha256": "0a6c68282e641eae9206a3d1bee7987c156887cdd76267e00d3c5de3e9127b24",
+      "probes": [
+        {
+          "x": 14,
+          "y": 14,
+          "rgba": [
+            208,
+            32,
+            64,
+            255
+          ]
+        },
+        {
+          "x": 85,
+          "y": 40,
+          "rgba": [
+            17,
+            153,
+            76,
+            255
+          ]
+        },
+        {
+          "x": 1,
+          "y": 1,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 0,
+      "mean": 0,
+      "text": null
+    },
+    {
+      "fixture": "garment",
+      "output": "front~right_chest",
+      "width": 100,
+      "height": 100,
+      "dpi": 100,
+      "mirror": "NONE",
+      "expectedRevision": "5035e3f5499f47f5a2071fa00b588b0bf7d45e2c8fc8af6b23d7090dca4a68ee",
+      "pngSha256": "588244d70fe9d3a9c747c40e229c29a04789efe422b7d2677693d87f2bd64846",
+      "probes": [
+        {
+          "x": 10,
+          "y": 26,
+          "rgba": [
+            20,
+            86,
+            217,
+            255
+          ]
+        },
+        {
+          "x": 14,
+          "y": 45,
+          "rgba": [
+            20,
+            86,
+            217,
+            255
+          ]
+        },
+        {
+          "x": 80,
+          "y": 70,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 0,
+      "mean": 0,
+      "text": null
+    },
+    {
+      "fixture": "garment",
+      "output": "back",
+      "width": 120,
+      "height": 80,
+      "dpi": 100,
+      "mirror": "NONE",
+      "expectedRevision": "5035e3f5499f47f5a2071fa00b588b0bf7d45e2c8fc8af6b23d7090dca4a68ee",
+      "pngSha256": "caf96a5d48a2b4ba4b580d64c5936976831f34af0b89485cc8987481c486e238",
+      "probes": [
+        {
+          "x": 30,
+          "y": 34,
+          "rgba": [
+            243,
+            171,
+            25,
+            255
+          ]
+        },
+        {
+          "x": 1,
+          "y": 1,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 0,
+      "mean": 0,
+      "text": null
+    },
+    {
+      "fixture": "garment",
+      "output": "left_sleeve",
+      "width": 64,
+      "height": 64,
+      "dpi": 100,
+      "mirror": "NONE",
+      "expectedRevision": "5035e3f5499f47f5a2071fa00b588b0bf7d45e2c8fc8af6b23d7090dca4a68ee",
+      "pngSha256": "b35bafda681875d8f09078d25289d46b7105d40e2c431b569811723eaa63c23a",
+      "probes": [
+        {
+          "x": 10,
+          "y": 12,
+          "rgba": [
+            17,
+            153,
+            76,
+            255
+          ]
+        },
+        {
+          "x": 1,
+          "y": 1,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 0,
+      "mean": 0,
+      "text": null
+    },
+    {
+      "fixture": "shirt-proof",
+      "output": "front~front_register",
+      "width": 1181,
+      "height": 945,
+      "dpi": 300,
+      "mirror": "NONE",
+      "expectedRevision": "3c4b51b989caf91fbb16b04ef4b04071e071f83ab09259124c29c566ef06adb8",
+      "pngSha256": "fafabad7694eac395f585d0df40e37609516497f38f13d0ddae25159a265eca7",
+      "probes": [
+        {
+          "x": 378,
+          "y": 189,
+          "rgba": [
+            208,
+            32,
+            64,
+            255
+          ]
+        },
+        {
+          "x": 850,
+          "y": 189,
+          "rgba": [
+            208,
+            32,
+            64,
+            255
+          ]
+        },
+        {
+          "x": 12,
+          "y": 448,
+          "rgba": [
+            20,
+            86,
+            217,
+            255
+          ]
+        },
+        {
+          "x": 500,
+          "y": 390,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 999,
+          "y": 760,
+          "rgba": [
+            17,
+            153,
+            76,
+            255
+          ]
+        }
+      ],
+      "pixelsOver24": 4204,
+      "mean": 0.22018336283614962,
+      "text": null
+    },
+    {
+      "fixture": "mug",
+      "output": "mug_full_wrap~mug_full_wrap",
+      "width": 2717,
+      "height": 1122,
+      "dpi": 300,
+      "mirror": "NONE",
+      "expectedRevision": "e190704037e7eeb1f176f14683f0cba10a2b2a7f390096d9005edfe4c56f8ce9",
+      "pngSha256": "c883f11c24449fc34924634a9404d2d3c091821e63a8095628a2c2b3613f511a",
+      "probes": [
+        {
+          "x": 0,
+          "y": 100,
+          "rgba": [
+            20,
+            86,
+            217,
+            255
+          ]
+        },
+        {
+          "x": 2716,
+          "y": 100,
+          "rgba": [
+            20,
+            86,
+            217,
+            255
+          ]
+        },
+        {
+          "x": 230,
+          "y": 330,
+          "rgba": [
+            208,
+            32,
+            64,
+            255
+          ]
+        },
+        {
+          "x": 2470,
+          "y": 410,
+          "rgba": [
+            17,
+            153,
+            76,
+            255
+          ]
+        },
+        {
+          "x": 5,
+          "y": 350,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 2712,
+          "y": 350,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 3510,
+      "mean": 0.05516496990644684,
+      "text": null
+    },
+    {
+      "fixture": "mug-mirror",
+      "output": "mug_full_wrap~mug_full_wrap",
+      "width": 2717,
+      "height": 1122,
+      "dpi": 300,
+      "mirror": "OUTPUT_HORIZONTAL",
+      "expectedRevision": "f5836d1a1ca4e27ab867467700383a3cf77337c921f40fff4ec68783d83fad83",
+      "pngSha256": "afdd97ecc5311151e890662176828ae0723397a03f7208e053aac53aca2847dd",
+      "probes": [
+        {
+          "x": 0,
+          "y": 100,
+          "rgba": [
+            20,
+            86,
+            217,
+            255
+          ]
+        },
+        {
+          "x": 2716,
+          "y": 100,
+          "rgba": [
+            20,
+            86,
+            217,
+            255
+          ]
+        },
+        {
+          "x": 230,
+          "y": 330,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 2470,
+          "y": 410,
+          "rgba": [
+            208,
+            32,
+            64,
+            255
+          ]
+        },
+        {
+          "x": 5,
+          "y": 350,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 2712,
+          "y": 350,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 3510,
+      "mean": 0.05516496990644683,
+      "text": null
+    },
+    {
+      "fixture": "handle",
+      "output": "mug_full_wrap~mug_full_wrap",
+      "width": 2717,
+      "height": 1122,
+      "dpi": 300,
+      "mirror": "NONE",
+      "expectedRevision": "48e4da95152ff30204022abbb8d232ef97cd4c4080caefbc3b6c11c8c3fc63b5",
+      "pngSha256": "3dd536189c0ccf498a628c01f08f40ae22c88a27df8a4f9f363b0b005b9a9b12",
+      "probes": [
+        {
+          "x": 0,
+          "y": 100,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 2716,
+          "y": 100,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 230,
+          "y": 330,
+          "rgba": [
+            208,
+            32,
+            64,
+            255
+          ]
+        },
+        {
+          "x": 2470,
+          "y": 410,
+          "rgba": [
+            17,
+            153,
+            76,
+            255
+          ]
+        },
+        {
+          "x": 5,
+          "y": 350,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 2712,
+          "y": 350,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 793,
+      "mean": 0.016734594577676665,
+      "text": null
+    },
+    {
+      "fixture": "type",
+      "output": "front",
+      "width": 420,
+      "height": 160,
+      "dpi": 200,
+      "mirror": "NONE",
+      "expectedRevision": "f4d1cb8b1abb7da8e276c97c72f86207d83adba22db3ef3c8f3d2c2272f77fc4",
+      "pngSha256": "ed3faad116ecb999bf8e8ccc1edf2b14022cbe68209532f26a797165c6e6d379",
+      "probes": [
+        {
+          "x": 0,
+          "y": 0,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 419,
+          "y": 159,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 0,
+      "mean": 0,
+      "text": [
+        {
+          "value": "ğ ş ı İ ö ü ç",
+          "width": 143,
+          "height": 39,
+          "referenceWidth": 143,
+          "referenceHeight": 39,
+          "alphaError": 0,
+          "unjoined": null
+        },
+        {
+          "value": "سلام عليكم",
+          "width": 162,
+          "height": 37,
+          "referenceWidth": 162,
+          "referenceHeight": 37,
+          "alphaError": 3.6760093426760094,
+          "unjoined": 49.33967300633967
+        }
+      ]
+    },
+    {
+      "fixture": "type-mirror",
+      "output": "front",
+      "width": 420,
+      "height": 160,
+      "dpi": 200,
+      "mirror": "OUTPUT_HORIZONTAL",
+      "expectedRevision": "38b4e4fae0f17acf2fbbb15215cd515a001244fc634833a5e507c5ed33174df1",
+      "pngSha256": "3fc0004b666073f44ed8cd8b6b036fb1c470109b8ed82775aa4de94442407ea7",
+      "probes": [
+        {
+          "x": 0,
+          "y": 0,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 419,
+          "y": 159,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "pixelsOver24": 0,
+      "mean": 0,
+      "text": null
+    }
+  ]
+}

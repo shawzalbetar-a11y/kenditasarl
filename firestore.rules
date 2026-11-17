@@ -1,95 +1,346 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAdmin() {
-      return request.auth != null && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == "huhu@huhu.com" ||
-        request.auth.uid == "fR4rjb0EzDT2U2Ti3wPKEdwP4x42"
-      );
+
+    function signedIn() {
+      return request.auth != null;
     }
 
-    match /products/{document=**} {
-      allow read: if true;
-      allow write: if request.auth != null && isAdmin();
+    // Anonymous Firebase Auth is used for guest image uploads, not shopping data.
+    function isCustomer() {
+      return signedIn() &&
+        request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
-    
-    match /products/{productId}/variants/{variantId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+
+    // Store user alias for backwards compatibility
+    function isStoreUser() {
+      return isCustomer();
     }
-    
+
+    // Standard ownership by snake_case user_id
+    function isOwner(data) {
+      return isCustomer() && data.get('user_id', '') == request.auth.uid;
+    }
+
+    // Derived strictly from canonical admins/{uid} record
+    function isAdmin() {
+      return isCustomer() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid))
+          .data.get('role', '') in ['admin', 'superadmin'];
+    }
+
+    // =========================================================================
+    // 1. ADMIN MEMBERSHIP
+    // Clients can check their own role, but CANNOT list, create, promote or delete.
+    // =========================================================================
+    match /admins/{adminId} {
+      allow get: if isCustomer() && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+
+    // =========================================================================
+    // 2. PRODUCT CATALOG & VARIANTS
+    // Public read. Admin writes. Direct client modification of variants/stock is DENIED.
+    // print_template_revision is protected from client tampering (server transaction only).
+    // =========================================================================
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAdmin() && !request.resource.data.keys().hasAny(['print_template_revision']);
+      allow update: if isAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['print_template_revision']);
+      allow delete: if isAdmin() && !resource.data.keys().hasAny(['print_template_revision']);
+
+      match /print_template_revisions/{revision} {
+        allow get: if revision == get(/databases/$(database)/documents/products/$(productId)).data.get('print_template_revision', '');
+      }
+
+      // Variants / Stock: Client SDK direct writes strictly forbidden; updated via server transactions.
+      match /variants/{variantId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      // Legacy product media
+      match /media/{mediaId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    // Categories and Asset metadata
     match /categories/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null && isAdmin();
+      allow write: if isCustomer() && isAdmin();
     }
-    
+
     match /design_assets/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null && isAdmin();
+      allow write: if isCustomer() && isAdmin();
     }
 
     match /asset_categories/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null && isAdmin();
+      allow write: if isCustomer() && isAdmin();
     }
-    
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow update, delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow create: if request.auth != null;
-    }
-    
-    match /addresses/{addressId} {
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.user_id;
-      allow read, update, delete: if request.auth != null && (request.auth.uid == resource.data.user_id || isAdmin());
-    }
-    
-    match /designs/{designId} {
+
+    match /delivery_zones/{document=**} {
       allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (isAdmin() || request.auth.uid == resource.data.user_id);
+      allow write: if isCustomer() && isAdmin();
     }
-    
+
+    // =========================================================================
+    // 3. ACCOUNT PROFILES (Privacy & Identity Protection)
+    // Read: Owner only (request.auth.uid == userId) or authorized Admin.
+    // Prevents cross-account data leakage and collection enumeration.
+    // Create: Owner only, forbidden to set role/admin privilege fields.
+    // Update: Owner (cannot modify role/admin fields) or Admin.
+    // Delete: Owner or Admin.
+    // =========================================================================
+    match /users/{userId} {
+      allow read: if isCustomer() && (request.auth.uid == userId || isAdmin());
+      // Explicit positive allowlist: Client can only provide personal profile fields.
+      // Verification (phone_verified, email_verified), permissions (role, isAdmin), and financial status are server Admin SDK only.
+      allow create: if isCustomer() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['full_name', 'email', 'phone', 'preferred_language', 'created_at'])
+        && (!('phone_number' in request.auth.token) || !('phone' in request.resource.data) || request.resource.data.phone == request.auth.token.phone_number)
+        && (request.auth.token.firebase.sign_in_provider != 'google.com' || !('email' in request.resource.data) || request.resource.data.email == request.auth.token.email);
+
+      allow update: if isCustomer() && (
+        (request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['full_name', 'email', 'phone', 'preferred_language'])
+          // CRITICAL SECURITY GATE: Client CANNOT modify phone once verified
+          && (!resource.data.get('phone_verified', false) || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['phone']))
+          // Client CANNOT modify email once verified
+          && (!resource.data.get('email_verified', false) || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']))
+          // If authenticated with phone, phone is locked to token phone_number
+          && (!('phone_number' in request.auth.token) || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['phone']) || request.resource.data.phone == request.auth.token.phone_number)
+          // If authenticated with Google, email is locked to token email
+          && (request.auth.token.firebase.sign_in_provider != 'google.com' || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']) || request.resource.data.email == request.auth.token.email)
+        )
+        || isAdmin()
+      );
+      allow delete: if isCustomer() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // =========================================================================
+    // 4. USER ADDRESSES & SERVER VERIFICATIONS
+    // Addresses are owner-bound (user_id cannot be reassigned).
+    // Address verifications are strictly server-only (Phase 06B-R Trust Boundary).
+    // Client cannot forge delivery eligibility, verification records, or location source.
+    // =========================================================================
+    match /addresses/{addressId} {
+      allow create: if isCustomer() && request.auth.uid == request.resource.data.user_id
+        && !request.resource.data.keys().hasAny(['is_fast_delivery_eligible', 'location_source', 'verified_by', 'verification_id', 'verified_at', 'verification_source', 'status']);
+      allow read, delete: if isCustomer() && (request.auth.uid == resource.data.user_id || isAdmin());
+      allow update: if isCustomer() && (request.auth.uid == resource.data.user_id || isAdmin())
+        && request.resource.data.user_id == resource.data.user_id
+        && (isAdmin() || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['is_fast_delivery_eligible', 'location_source', 'verified_by', 'verification_id', 'verified_at', 'verification_source', 'status']));
+    }
+
+    match /address_verifications/{addressId} {
+      allow read, write: if false;
+    }
+
+    match /rate_limits/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /phone_numbers/{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // 5. PERSONAL & CUSTOM DESIGNS
+    // Private by default; customers cannot publish or promote to templates directly.
+    // product_id cannot be tampered with on existing custom designs.
+    // Pricing, approval, and royalty fields are strictly protected against client tampering.
+    // =========================================================================
+    match /designs/{designId} {
+      allow read: if resource.data.get('is_template', false) == true || isAdmin()
+        || (isCustomer() && resource.data.get('user_id', '') == request.auth.uid);
+      allow create: if isCustomer() && request.resource.data.user_id == request.auth.uid
+        && !request.resource.data.get('is_template', false)
+        && !request.resource.data.keys().hasAny(['is_approved', 'approved_by', 'approved_at', 'status', 'royalty_rate', 'market_price', 'designer_payout']);
+      allow update: if isAdmin() || (isCustomer() && resource.data.user_id == request.auth.uid
+        && request.resource.data.user_id == resource.data.user_id
+        && !resource.data.get('is_template', false)
+        && !request.resource.data.get('is_template', false)
+        && (!resource.data.keys().hasAny(['product_id']) || request.resource.data.product_id == resource.data.product_id)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['is_approved', 'approved_by', 'approved_at', 'status', 'royalty_rate', 'market_price', 'designer_payout']));
+      allow delete: if isAdmin() || (isCustomer() && resource.data.user_id == request.auth.uid && !resource.data.get('is_template', false));
+    }
+
+    // =========================================================================
+    // 6. WISHLISTS & USER UPLOADS
+    // Strictly owner-isolated.
+    // user_uploads protected by positive metadata allowlist.
+    // =========================================================================
     match /wishlists/{wishlistId} {
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.user_id;
-      allow read, delete: if request.auth != null && (request.auth.uid == resource.data.user_id || isAdmin());
-    }
-    
-    match /cart_items/{cartItemId} {
-      allow read, write: if request.auth != null;
+      allow create: if isCustomer() && request.auth.uid == request.resource.data.user_id;
+      allow read, delete: if isCustomer() && (request.auth.uid == resource.data.user_id || isAdmin());
+      allow update: if isCustomer() && request.auth.uid == resource.data.user_id
+        && request.resource.data.user_id == resource.data.user_id;
     }
 
     match /user_uploads/{uploadId} {
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.user_id;
-      allow read, delete: if request.auth != null && (request.auth.uid == resource.data.user_id || isAdmin());
+      allow create: if isCustomer() && request.auth.uid == request.resource.data.user_id
+        && request.resource.data.keys().hasOnly(['user_id', 'url', 'name', 'size', 'created_at', 'width', 'height', 'format']);
+      allow read, delete: if isCustomer() && (request.auth.uid == resource.data.user_id || isAdmin());
+      allow update: if false;
     }
 
-    match /delivery_zones/{zoneId} {
-      allow read: if true;
-      allow write: if request.auth != null && isAdmin();
+    // =========================================================================
+    // 7. SHOPPING CART (Checkout 03B Protected)
+    // Direct create is forbidden: cart items are validated and created ONLY via /api/cart/add.
+    // Owner can read, delete, or update ONLY quantity within [1, 999].
+    // =========================================================================
+    match /cart_items/{cartItemId} {
+      allow read, delete: if isCustomer() && resource.data.user_id == request.auth.uid;
+      allow update: if isCustomer() && resource.data.user_id == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity'])
+        && request.resource.data.quantity is int && request.resource.data.quantity >= 1 && request.resource.data.quantity <= 999;
+      allow create: if false;
     }
 
+    // =========================================================================
+    // 8. ORDERS & ORDER ITEMS
+    // Immutable from clients: created & updated ONLY via trusted server transactions.
+    // =========================================================================
     match /orders/{orderId} {
-      allow read, write: if request.auth != null;
+      allow read: if isAdmin() || (isCustomer() && resource.data.user_id == request.auth.uid);
+      allow create, update, delete: if false;
 
       match /items/{itemId} {
-        allow read, write: if request.auth != null;
+        allow read: if isAdmin() || (isCustomer() &&
+          get(/databases/$(database)/documents/orders/$(orderId)).data.user_id == request.auth.uid);
+        allow create, update, delete: if false;
       }
     }
 
-    match /counters/orders {
-      allow read, write: if request.auth != null;
+    // =========================================================================
+    // 9. FINANCIAL, QUOTE, COUNTER & INTERNAL RECORDS (Server IAM Only)
+    // =========================================================================
+    match /counters/{counterId} {
+      allow read, write: if false;
     }
 
-    match /admins/{adminId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && (isAdmin() || request.auth.uid == adminId || request.auth.token.email == "huhu@huhu.com");
+    match /checkout_quotes/{quoteId} {
+      allow read, write: if false;
     }
 
-    match /settings/{document=**} {
+    match /checkout_attempts/{attemptId} {
+      allow read, write: if false;
+    }
+
+    match /checkout_art/{artId} {
+      allow read, write: if false;
+    }
+
+    match /upload_receipts/{receiptId=**} {
+      allow read, write: if false;
+    }
+
+    match /order_notifications/{notificationId} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // 10. SETTINGS & STORAGE SECURITY (Explicit Allowlist)
+    // settings/storage tree is COMPLETELY CLOSED to ALL clients (including admins).
+    // Public read is strictly restricted to explicit allowlist: ['pricing'].
+    // Internal/admin settings require isAdmin(). All client writes require isAdmin().
+    // =========================================================================
+    match /settings/storage/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /settings/{setting} {
+      allow read: if setting in ['pricing'] || (setting != 'storage' && isAdmin());
+      allow write: if setting != 'storage' && isAdmin();
+    }
+
+    // =========================================================================
+    // 11. VERSIONED PRICING POLICIES (Phase 05B)
+    // Published revisions are public read; drafts/audits and all writes are server-only.
+    // Public get is strictly restricted to the active published revision hash.
+    // =========================================================================
+    match /pricing_policies/{policyId} {
       allow read: if true;
-      allow write: if request.auth != null && isAdmin();
+      allow write: if false;
+
+      match /revisions/{hash} {
+        allow get: if hash == get(/databases/$(database)/documents/pricing_policies/$(policyId)).data.get('activeRevisionId', '')
+          || isAdmin();
+        allow list: if isAdmin();
+        allow write: if false;
+      }
+      match /drafts/{document=**} {
+        allow read, write: if false;
+      }
+      match /audit/{document=**} {
+        allow read, write: if false;
+      }
     }
+
+    // =========================================================================
+    // 12. VERSIONED EXPRESS SHIPPING ZONE POLICIES (Phase 06B)
+    // Published revisions are public read; drafts/audits and all writes are server-only.
+    // Public get is strictly restricted to the active published revision hash.
+    // =========================================================================
+    match /shipping_zone_policies/{policyId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /revisions/{hash} {
+        allow get: if hash == get(/databases/$(database)/documents/shipping_zone_policies/$(policyId)).data.get('activeRevisionId', '')
+          || isAdmin();
+        allow list: if isAdmin();
+        allow write: if false;
+      }
+      match /drafts/{document=**} {
+        allow read, write: if false;
+      }
+      match /audit/{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // =========================================================================
+    // 13. MATCHING COLLECTIONS & BUNDLES (Phase 06A)
+    // Templates: active public read, all read admin only, mutations server API only.
+    // Master Designs & Bundles: isolated by owner userId (camelCase).
+    // =========================================================================
+    match /matching_collection_templates/{templateId} {
+      allow read: if resource.data.get('isActive', false) == true || isAdmin();
+      allow write: if false;
+    }
+
+    match /master_designs/{designId} {
+      allow read, delete: if isCustomer() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isCustomer() && request.resource.data.userId == request.auth.uid;
+      allow update: if isCustomer() && (
+        (resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid) || isAdmin()
+      );
+    }
+
+    match /matching_bundle_drafts/{bundleId} {
+      allow read, delete: if isCustomer() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isCustomer() && request.resource.data.userId == request.auth.uid;
+      allow update: if isCustomer() && (
+        (resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid) || isAdmin()
+      );
+
+      match /items/{itemId} {
+        allow read, delete: if isCustomer() && (
+          exists(/databases/$(database)/documents/matching_bundle_drafts/$(bundleId)) &&
+          (get(/databases/$(database)/documents/matching_bundle_drafts/$(bundleId)).data.userId == request.auth.uid || isAdmin())
+        );
+        allow create, update: if isCustomer() && (
+          exists(/databases/$(database)/documents/matching_bundle_drafts/$(bundleId)) &&
+          (get(/databases/$(database)/documents/matching_bundle_drafts/$(bundleId)).data.userId == request.auth.uid || isAdmin())
+        );
+      }
+    }
+
   }
 }

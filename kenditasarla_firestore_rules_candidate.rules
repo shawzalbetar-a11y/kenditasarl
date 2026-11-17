@@ -1,0 +1,205 @@
+// Kendin Tasarla - Security-first Firestore Rules candidate
+// Project: kanditasarl
+// IMPORTANT: Test against the actual Store/Admin source and Firebase Emulators before publishing.
+// This candidate is NOT a verified drop-in production release.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Anonymous Firebase Auth is used for guest image uploads, not shopping data.
+    function isCustomer() {
+      return signedIn() &&
+        request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // The reviewed Store reports use user_id as the owner field.
+    // Do not accept fallback ownership fields without reviewing actual schemas.
+    function isOwner(data) {
+      return isCustomer() && data.get('user_id', '') == request.auth.uid;
+    }
+
+    function isAdmin() {
+      return isCustomer() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid))
+          .data.get('role', '') in ['admin', 'superadmin'];
+    }
+
+    // ADMIN MEMBERSHIP: clients cannot create, promote, or delete admins.
+    match /admins/{adminId} {
+      allow get: if signedIn() && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+
+    // PRODUCT CATALOG - avoid recursive product wildcard: it would also match variants.
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+
+      match /variants/{variantId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+      }
+
+      // Legacy product media (Phase 0 audit)
+      match /media/{mediaId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /design_assets/{assetId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /asset_categories/{categoryId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /delivery_zones/{zoneId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ACCOUNT PROFILE: only the matching Firebase UID can write profile fields.
+    // Roles are derived exclusively from admins/{uid}, never from user profiles.
+    match /users/{userId} {
+      allow get, list: if isAdmin() || (isCustomer() && request.auth.uid == userId);
+      allow create: if isCustomer() && request.auth.uid == userId &&
+        !request.resource.data.keys().hasAny(['role', 'isAdmin', 'is_admin', 'permissions']);
+      allow update: if isAdmin() ||
+        (isCustomer() && request.auth.uid == userId &&
+         !request.resource.data.diff(resource.data).affectedKeys()
+           .hasAny(['role', 'isAdmin', 'is_admin', 'permissions']));
+      allow delete: if false;
+    }
+
+    // USER ADDRESSES: the owner cannot reassign an address to a different UID.
+    match /addresses/{addressId} {
+      allow get, list: if isAdmin() || isOwner(resource.data);
+      allow create: if isCustomer() &&
+        request.resource.data.get('user_id', '') == request.auth.uid;
+      allow update: if isAdmin() ||
+        (isOwner(resource.data) &&
+         request.resource.data.get('user_id', '') == resource.data.get('user_id', ''));
+      allow delete: if isAdmin() || isOwner(resource.data);
+    }
+
+    // PERSONAL DESIGNS: private by default; never let customer promote to a public template.
+    match /designs/{designId} {
+      allow get, list: if isAdmin() || isOwner(resource.data);
+      allow create: if isAdmin() ||
+        (isCustomer() &&
+         request.resource.data.get('user_id', '') == request.auth.uid &&
+         request.resource.data.get('is_template', false) == false &&
+         request.resource.data.get('is_published', false) == false &&
+         request.resource.data.get('status', '') != 'published');
+      allow update: if isAdmin() ||
+        (isOwner(resource.data) &&
+         request.resource.data.get('user_id', '') == resource.data.get('user_id', '') &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+           ['is_template', 'is_published', 'published', 'status',
+            'approved_by', 'approved_at', 'is_immutable_snapshot']));
+      allow delete: if isAdmin() || isOwner(resource.data);
+    }
+
+    // WISHLISTS: owner only.
+    match /wishlists/{wishlistId} {
+      allow get, list: if isAdmin() || isOwner(resource.data);
+      allow create: if isCustomer() &&
+        request.resource.data.get('user_id', '') == request.auth.uid;
+      allow update: if isOwner(resource.data) &&
+        request.resource.data.get('user_id', '') == resource.data.get('user_id', '');
+      allow delete: if isAdmin() || isOwner(resource.data);
+    }
+
+    // CART: only the owner may read/write their own items.
+    // Prices and checkout totals MUST be recalculated and validated on the server.
+    match /cart_items/{cartItemId} {
+      allow get, list: if isAdmin() || isOwner(resource.data);
+      allow create: if isCustomer() &&
+        request.resource.data.get('user_id', '') == request.auth.uid;
+      allow update: if isOwner(resource.data) &&
+        request.resource.data.get('user_id', '') == resource.data.get('user_id', '');
+      allow delete: if isAdmin() || isOwner(resource.data);
+    }
+
+    // ORDERS: created and updated ONLY through trusted checkout/order APIs.
+    match /orders/{orderId} {
+      allow get, list: if isAdmin() || isOwner(resource.data);
+      allow create, update, delete: if false;
+
+      match /items/{itemId} {
+        allow get, list: if isAdmin() ||
+          (isCustomer() &&
+           exists(/databases/$(database)/documents/orders/$(orderId)) &&
+           isOwner(get(/databases/$(database)/documents/orders/$(orderId)).data));
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /counters/{counterId} {
+      allow read, write: if false;
+    }
+
+    // Server-only receipts; client-provided upload records are not proof of ownership.
+    match /user_uploads/{uploadId} {
+      allow read, write: if false;
+    }
+
+    match /upload_receipts/{receiptId} {
+      allow read, write: if false;
+    }
+
+    match /checkout_quotes/{quoteId} {
+      allow read, write: if false;
+    }
+
+    // SETTINGS: public pricing for storefront; all other settings admin-only.
+    // STORAGE IS NEVER READABLE FROM CLIENTS, EVEN FOR ADMINS.
+    match /settings/{settingId} {
+      allow get: if settingId == 'pricing' ||
+        (settingId != 'storage' && isAdmin());
+      allow list: if false;
+      allow create, update, delete: if settingId != 'storage' && isAdmin();
+    }
+
+    match /settings/storage/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 05B: public published pricing metadata, immutable client-side revisions.
+    match /pricing_policies/{policyId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /revisions/{revisionId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      match /drafts/{document=**} {
+        allow read, write: if false;
+      }
+
+      match /audit/{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // Everything else is denied by default. Add new collection rules only
+    // after validating paths, fields, ownership and emulator tests.
+  }
+}

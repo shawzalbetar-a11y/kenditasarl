@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
-import { X, Truck, Zap, Loader2 } from 'lucide-react';
+import { useTranslations, useLocale } from 'next-intl';
+import { X, Truck, Zap, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DeliveryMethodModalProps {
@@ -13,6 +13,7 @@ interface DeliveryMethodModalProps {
 
 export default function DeliveryMethodModal({ isOpen, onClose, address, subtotal = 0, onConfirm }: DeliveryMethodModalProps) {
   const t = useTranslations('Checkout');
+  const locale = useLocale();
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -103,11 +104,17 @@ export default function DeliveryMethodModal({ isOpen, onClose, address, subtotal
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-lg">{t('expressDelivery')}</span>
+                      <span className="font-bold text-lg">
+                        {deliveryData.zoneTitle?.[locale] || deliveryData.zoneTitle?.tr || t('expressDelivery')}
+                      </span>
                       <span className="font-black text-lg text-[var(--color-primary)]">{deliveryData.expressFee} ₺</span>
                     </div>
-                    <p className="text-gray-500 text-sm">{t('expressTime')}</p>
-                    <p className="text-gray-400 text-xs mt-1">{t('distance')}: {deliveryData.distance} km</p>
+                    <p className="text-gray-500 text-sm">
+                      {deliveryData.etaDescription?.[locale] || deliveryData.etaDescription?.tr || t('expressTime')}
+                    </p>
+                    {deliveryData.distance != null && (
+                      <p className="text-gray-400 text-xs mt-1">{t('distance')}: {deliveryData.distance} km</p>
+                    )}
                   </div>
                 </div>
                 <input 
@@ -119,6 +126,17 @@ export default function DeliveryMethodModal({ isOpen, onClose, address, subtotal
                   onChange={() => setSelectedMethod('express')}
                 />
               </label>
+            )}
+
+            {/* Notice if express unavailable */}
+            {!deliveryData.isExpressAvailable && deliveryData.expressReasonMessage && (
+              <div className="p-3 bg-amber-50/70 border border-amber-200/60 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+                <Info size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="font-semibold">{t('expressUnavailable')}: </span>
+                  <span>{deliveryData.expressReasonMessage}</span>
+                </div>
+              </div>
             )}
 
             {/* Standard Shipping */}
@@ -141,14 +159,14 @@ export default function DeliveryMethodModal({ isOpen, onClose, address, subtotal
                   <div className="flex justify-between items-center mb-1">
                     <span className="font-bold text-lg">{t('standardShipping')}</span>
                     {deliveryData.fixedShippingFee === 0 || deliveryData.isFreeShipping ? (
-                      <span className="font-black text-lg text-emerald-600">0 ₺ (مجاناً 🎉)</span>
+                      <span className="font-black text-lg text-emerald-600">0 ₺ ({t('freeBadge')})</span>
                     ) : (
                       <span className="font-black text-lg text-[var(--color-primary)]">{deliveryData.fixedShippingFee} ₺</span>
                     )}
                   </div>
                   <p className="text-gray-500 text-sm">{t('standardTime')}</p>
                   {(deliveryData.fixedShippingFee === 0 || deliveryData.isFreeShipping) && (
-                    <p className="text-emerald-600 text-xs font-bold mt-1">✓ مؤهل للشحن المجاني</p>
+                    <p className="text-emerald-600 text-xs font-bold mt-1">{t('freeShippingEligible')}</p>
                   )}
                 </div>
               </div>

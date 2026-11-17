@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "productId": "sample-tee",
+  "garmentType": "tshirt",
+  "variantIds": [
+    "navy"
+  ],
+  "method": "DTF",
+  "allowFreeMode": false,
+  "policy": {
+    "allowCustomerUpload": true,
+    "allowStickers": true,
+    "allowLayers": true,
+    "allowText": true,
+    "maxUploads": 3,
+    "maxElements": 12
+  },
+  "faces": [
+    {
+      "id": "front",
+      "space": "FULL_MOCKUP_NATIVE",
+      "mockup": "https://assets.invalid/sample-tee-front.png",
+      "nativeWidth": 500,
+      "nativeHeight": 600,
+      "dpi": 300,
+      "mirror": "NONE",
+      "placements": [
+        {
+          "id": "full_front",
+          "rect": {
+            "left": 130,
+            "top": 125,
+            "width": 240,
+            "height": 320
+          },
+          "widthCm": 24,
+          "heightCm": 32,
+          "policy": {
+            "allowCustomerUpload": true,
+            "allowStickers": true,
+            "allowLayers": true,
+            "allowText": true,
+            "maxUploads": 3,
+            "maxElements": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "back",
+      "space": "FULL_MOCKUP_NATIVE",
+      "mockup": "https://assets.invalid/sample-tee-back.png",
+      "nativeWidth": 500,
+      "nativeHeight": 600,
+      "dpi": 300,
+      "mirror": "NONE",
+      "placements": [
+        {
+          "id": "full_back",
+          "rect": {
+            "left": 120,
+            "top": 115,
+            "width": 260,
+            "height": 330
+          },
+          "widthCm": 26,
+          "heightCm": 33,
+          "policy": {
+            "allowCustomerUpload": true,
+            "allowStickers": true,
+            "allowLayers": true,
+            "allowText": true,
+            "maxUploads": 3,
+            "maxElements": 12
+          }
+        }
+      ]
+    }
+  ]
+}

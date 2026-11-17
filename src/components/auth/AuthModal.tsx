@@ -14,7 +14,7 @@ import {
   linkWithPhoneNumber,
   RecaptchaVerifier
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useTranslations, useLocale } from 'next-intl';
 
 interface AuthModalProps {
@@ -170,20 +170,28 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       const userCredential = await confirmationResult.confirm(otpCode);
       const user = userCredential.user;
       
-      // FIREWALL: Check if this phone number is already registered to a different user
-      const usersRef = collection(db, 'users');
+      // FIREWALL: Check if this phone number is already registered to a different user (via secure server API)
       const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-      const q = query(usersRef, where('phone', '==', formattedPhone));
-      const querySnapshot = await getDocs(q);
-      
-      let isConflict = false;
-      querySnapshot.forEach((docSnap) => {
-        if (docSnap.id !== user.uid) {
-          isConflict = true;
-        }
+      const token = await user.getIdToken();
+      const conflictRes = await fetch('/api/auth/check-conflict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ phone: formattedPhone })
       });
+      if (!conflictRes.ok) {
+        if (conflictRes.status === 429) {
+          throw new Error(t('tooManyRequests'));
+        }
+        if (conflictRes.status === 503) {
+          throw new Error(t('serviceUnavailable'));
+        }
+      }
+      const conflictData = await conflictRes.json().catch(() => ({}));
 
-      if (isConflict) {
+      if (conflictData.conflict) {
         // This phone number belongs to another account (likely Google)
         await user.delete(); // Clean up the newly created phone auth user
         await auth.signOut();
@@ -218,23 +226,32 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
     setLoading(true);
     
     try {
-      // FIREWALL: Check for duplicates before saving
-      const usersRef = collection(db, 'users');
-      
+      // FIREWALL: Check for duplicates before saving via secure server API
       if (onboardingProvider === 'google') {
         if (!onboardingPhoneLinked) {
           throw new Error(t('verifyPhoneFirst', { fallback: 'Please verify your phone number first.' }));
         }
       } else {
-        const qEmail = query(usersRef, where('email', '==', onboardingEmail));
-        const snapEmail = await getDocs(qEmail);
-        
-        let isEmailConflict = false;
-        snapEmail.forEach(docSnap => {
-          if (docSnap.id !== currentUser.uid) isEmailConflict = true;
+        const token = await currentUser.getIdToken();
+        const conflictRes = await fetch('/api/auth/check-conflict', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ email: onboardingEmail })
         });
+        if (!conflictRes.ok) {
+          if (conflictRes.status === 429) {
+            throw new Error(t('tooManyRequests'));
+          }
+          if (conflictRes.status === 503) {
+            throw new Error(t('serviceUnavailable'));
+          }
+        }
+        const conflictData = await conflictRes.json().catch(() => ({}));
         
-        if (isEmailConflict) {
+        if (conflictData.conflict) {
           throw new Error(t('emailInUse', { fallback: 'This email is already in use by another account.' }));
         }
       }
@@ -248,8 +265,38 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
         phone: onboardingProvider === 'google' ? (onboardingPhone.startsWith('+') ? onboardingPhone : `+${onboardingPhone}`) : currentUser.phoneNumber,
         preferred_language: locale,
         created_at: new Date().toISOString(),
-        phone_verified: true // All users must verify phone during onboarding now
       });
+
+      // Secure server-side phone verification confirmation via Admin SDK
+      try {
+        const idToken = await currentUser.getIdToken(true);
+        const verifyRes = await fetch('/api/auth/verify-phone', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+          },
+        });
+        if (!verifyRes.ok) {
+          const errData = await verifyRes.json().catch(() => ({}));
+          let localizedMsg = errData.message;
+          if (errData.error === 'PHONE_ALREADY_IN_USE' || verifyRes.status === 409) {
+            localizedMsg = t('phoneInUse');
+          } else if (errData.error === 'PHONE_NOT_VERIFIED_IN_AUTH') {
+            localizedMsg = t('phoneNotVerified');
+          } else if (errData.error === 'PHONE_MISMATCH') {
+            localizedMsg = t('phoneMismatch');
+          } else if (verifyRes.status === 429) {
+            localizedMsg = t('tooManyRequests');
+          } else if (verifyRes.status === 503) {
+            localizedMsg = t('serviceUnavailable');
+          }
+          throw new Error(localizedMsg || t('authError'));
+        }
+      } catch (err: any) {
+        console.warn("Could not confirm phone verification on server:", err);
+        throw err;
+      }
       
       onSuccess();
       onClose();

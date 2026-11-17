@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "productId": "sample-cap",
+  "garmentType": "hat",
+  "variantIds": [
+    "navy"
+  ],
+  "method": "DTF",
+  "allowFreeMode": false,
+  "policy": {
+    "allowCustomerUpload": true,
+    "allowStickers": true,
+    "allowLayers": true,
+    "allowText": true,
+    "maxUploads": 3,
+    "maxElements": 12
+  },
+  "faces": [
+    {
+      "id": "front",
+      "space": "FULL_MOCKUP_NATIVE",
+      "mockup": "https://assets.invalid/sample-cap-front.png",
+      "nativeWidth": 500,
+      "nativeHeight": 600,
+      "dpi": 300,
+      "mirror": "NONE",
+      "placements": [
+        {
+          "id": "hat_front_crown",
+          "rect": {
+            "left": 200,
+            "top": 260,
+            "width": 100,
+            "height": 50
+          },
+          "widthCm": 10,
+          "heightCm": 5,
+          "policy": {
+            "allowCustomerUpload": false,
+            "allowStickers": true,
+            "allowLayers": true,
+            "allowText": false,
+            "maxUploads": 3,
+            "maxElements": 12
+          }
+        }
+      ]
+    }
+  ]
+}

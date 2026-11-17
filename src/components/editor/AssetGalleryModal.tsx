@@ -22,6 +22,7 @@ export interface GalleryAsset {
   category?: string;
   type?: "sticker" | "print";
   price?: number;
+  version?: number | string;
 }
 
 export interface GalleryCategory {

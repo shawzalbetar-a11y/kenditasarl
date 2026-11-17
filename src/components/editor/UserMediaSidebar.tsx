@@ -28,6 +28,8 @@ export interface RecentAssetItem {
   name?: string;
   price?: number;
   category?: string;
+  type?: string;
+  version?: number | string;
   usedAt: string;
 }
 

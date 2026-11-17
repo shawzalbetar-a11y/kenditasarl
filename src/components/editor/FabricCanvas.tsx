@@ -1,11 +1,17 @@
 "use client";
 
+import { effectivePolicy, type PrintTemplate } from "@/lib/printTemplate";
+import { editorFrame, faceCoordinates, readSavedFrame, canUpdateSavedDesign, serializeEditorFace, type EditorFrame, SERIALIZE_PROPERTIES } from "@/lib/faceCoordinates";
+export { SERIALIZE_PROPERTIES };
+import { freePlacementBounds, placementBounds } from "@/lib/placementBounds";
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { fabric } from 'fabric';
 import { Ruler, Type, Upload, Sticker, Undo, Redo, AlignCenter, AlignLeft, AlignRight, Save, ShoppingCart, Trash2, LayoutTemplate, X, Layers, Settings, Plus, Minus, ZoomIn, ZoomOut, Hand, Zap, Eye, CheckCircle2, AlertTriangle, Sparkles, Tag, RotateCcw, RotateCw, Bookmark, Box, Shirt, ChevronDown, ArrowUp, ArrowDown, EyeOff, ChevronLeft, ChevronRight, Loader2, Search, Wand2, Target, Truck, ShieldCheck, Check, Crosshair, Copy, ArrowUpDown, FolderOpen, Lock, Unlock, AlertCircle, ArrowLeft, ArrowRight, Cloud, Coffee } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import AuthModal from '@/components/auth/AuthModal';
 import { auth, db } from '@/lib/firebase';
+import { checkoutCall, CheckoutProblem } from "@/lib/checkoutClient";
+import { uploadCustomerImage } from '@/lib/uploadCustomerImage';
 import { collection, addDoc, getDocs, doc, getDoc, updateDoc, query, orderBy, where, deleteDoc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { useTranslations, useLocale } from 'next-intl';
@@ -56,7 +62,7 @@ import {
   renderMugWrapThumbnailDataUrl,
 } from './Mug3DStage';
 import Mug3DPreviewModal from './Mug3DPreviewModal';
-import { PlacementSpec, getPlacementById, isFaceMatching, getPlacementsForGarment } from '@/lib/printPlacementConfig';
+import { PlacementSpec, getPlacementById, isFaceMatching, getPlacementsForGarment as catalogPlacements } from '@/lib/printPlacementConfig';
 
 export interface PreviewSlideItem {
   face: string;
@@ -67,26 +73,14 @@ export interface PreviewSlideItem {
 export const MUG_PANORAMA_SHEET_WIDTH = 1840; // 23 cm @ 80 px/cm (<= 1 cm ceramic clearance beside handle)
 export const MUG_PANORAMA_SHEET_HEIGHT = 760; // Exact 23 : 9.5 cm aspect ratio (80 px/cm)
 
-function buildSerializedFaceJson(
-  c: fabric.Canvas,
-  isPanoramicSheet: boolean,
-  nativeW: number,
-  nativeH: number
-) {
-  const json = c.toJSON(SERIALIZE_PROPERTIES) as any;
-  if (isPanoramicSheet) {
-    json.width = MUG_PANORAMA_SHEET_WIDTH;
-    json.height = MUG_PANORAMA_SHEET_HEIGHT;
-    json.mugPanoramaSheet = true;
-  } else {
-    json.width = nativeW;
-    json.height = nativeH;
-  }
-  return json;
+// A new Fabric instance has a known writer. Loading JSON replaces its provenance,
+// including for history, colour changes and remix. An absent frame stays unknown.
+const canvasFrames = new WeakMap<fabric.Canvas, EditorFrame | null>();
+function restoreFrame(canvas: fabric.Canvas, json: any) {
+  canvasFrames.set(canvas, readSavedFrame(json));
 }
-
 /** Re-centers legacy panoramic mug drafts (e.g. 1600x760) onto the current 1840x760 wrap sheet without stretching artwork. */
-function migrateLegacyMugPanoramaObjects(targetCanvas: fabric.StaticCanvas, parsed: any): boolean {
+function previewLegacyMugPanoramaObjects(targetCanvas: fabric.StaticCanvas, parsed: any): boolean {
   if (
     !parsed?.mugPanoramaSheet ||
     !(Number(parsed?.width) > 0) ||
@@ -131,17 +125,104 @@ const COLOR_MAP: Record<string, string> = {
   red: '#EF4444'
 };
 
-export const SERIALIZE_PROPERTIES = [
-  'id', 'name', 'selectable', 'evented', 'src', 'originalAssetId', 'crossOrigin',
-  'isCustomUpload', 'assetName', 'assetPrice', 'fontSize', 'fontFamily',
-  'fontWeight', 'fontStyle', 'underline', 'fill', 'stroke', 'strokeWidth',
-  'textAlign', 'lineHeight', 'charSpacing', 'opacity', 'scaleX', 'scaleY',
-  'angle', 'left', 'top', 'width', 'height', 'flipX', 'flipY',
-  'assignedPlacementId', 'placementId', 'targetFace',
-  'originMode', 'createdInMode',
-  'isLocked', 'lockMovementX', 'lockMovementY', 'lockRotation', 'lockScalingX', 'lockScalingY',
-  'hasControls', 'hasBorders'
-];
+function canonicalizeColorKey(color?: string | null): string {
+  if (!color) return 'default';
+  const s = color.trim().toLowerCase();
+  if (!s) return 'default';
+  return COLOR_MAP[s]?.toLowerCase() || s;
+}
+
+function countUserObjectsInFaceJson(raw: unknown): number {
+  if (!raw) return 0;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!parsed || !Array.isArray(parsed.objects)) return 0;
+    return parsed.objects.filter((o: any) => {
+      if (!o || !o.type) return false;
+      const n = (o.name || '').toLowerCase();
+      return n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline';
+    }).length;
+  } catch {
+    return 0;
+  }
+}
+
+function normalizePlacementsMap(rawMap: Record<string, string[]> | null | undefined): Record<string, string[]> {
+  if (!rawMap || typeof rawMap !== 'object') return {};
+  const result: Record<string, string[]> = {};
+  const canonicalKeysSeen = new Set<string>();
+  for (const [k, v] of Object.entries(rawMap)) {
+    if (!Array.isArray(v)) continue;
+    if (k === '__synced__' || k === 'synced_all') {
+      result[k] = v;
+      continue;
+    }
+    const norm = canonicalizeColorKey(k);
+    const isExactCanonical = k.trim().toLowerCase() === norm;
+    if (!(norm in result)) {
+      result[norm] = v;
+      if (isExactCanonical) canonicalKeysSeen.add(norm);
+    } else if (isExactCanonical && v.length > 0 && !canonicalKeysSeen.has(norm)) {
+      result[norm] = v;
+      canonicalKeysSeen.add(norm);
+    } else if (result[norm].length === 0 && v.length > 0) {
+      result[norm] = v;
+    }
+  }
+  return result;
+}
+
+function normalizeFacesMap(rawFaces: Record<string, string | null> | null | undefined): Record<string, string | null> {
+  if (!rawFaces || typeof rawFaces !== 'object') return {};
+  const result: Record<string, string | null> = {};
+  const canonicalKeysSeen = new Set<string>();
+  for (const [k, v] of Object.entries(rawFaces)) {
+    if (v === undefined || v === null) continue;
+    if (!k.includes(':::')) {
+      if (!(k in result)) result[k] = v;
+      continue;
+    }
+    const sepIdx = k.indexOf(':::');
+    const rawColor = k.slice(0, sepIdx);
+    const face = k.slice(sepIdx + 3);
+    const normColor = canonicalizeColorKey(rawColor);
+    const normKey = `${normColor}:::${face}`;
+    const isExactCanonical = rawColor.trim().toLowerCase() === normColor;
+    if (!(normKey in result)) {
+      result[normKey] = v;
+      if (isExactCanonical) canonicalKeysSeen.add(normKey);
+    } else {
+      const existingCount = countUserObjectsInFaceJson(result[normKey]);
+      const incomingCount = countUserObjectsInFaceJson(v);
+      // Prefer canonical key when it has user content, or prefer non-empty over empty (never wipe user artwork)
+      if ((isExactCanonical && incomingCount > 0 && !canonicalKeysSeen.has(normKey)) || (existingCount === 0 && incomingCount > 0)) {
+        result[normKey] = v;
+        if (isExactCanonical) canonicalKeysSeen.add(normKey);
+      }
+    }
+  }
+  return result;
+}
+
+function applyObjectLockState(obj: any, locked: boolean) {
+  if (!obj || typeof obj.set !== 'function') return;
+  const props: Record<string, any> = {
+    selectable: true,
+    evented: true,
+    lockMovementX: locked,
+    lockMovementY: locked,
+    lockRotation: locked,
+    lockScalingX: locked,
+    lockScalingY: locked,
+    hasControls: !locked,
+    hasBorders: true,
+  };
+  if (obj.type === 'i-text' || obj.type === 'textbox') {
+    props.editable = !locked;
+  }
+  obj.set(props);
+  obj.isLocked = locked;
+}
 
 const isColorEqual = (c1?: string | null, c2?: string | null): boolean => {
   if (!c1 || !c2) return false;
@@ -352,6 +433,14 @@ const PRICING = {
 
 export default function FabricCanvas({ productId, basePrice, productFaces, productData, initialColor, initialSize, initialQuantity, onChangeProduct }: FabricCanvasProps) {
   const t = useTranslations('Editor');
+  const versioned: PrintTemplate | undefined = productData?.config?.builderTemplate;
+  const getPlacementsForGarment=useCallback((garment?:string,face?:string)=>{
+    const specs=catalogPlacements(garment,face);
+    if(!versioned)return specs;
+    const ids=versioned.faces.flatMap(f=>f.placements.map(p=>p.id));
+    return ids.map(id=>specs.find(s=>s.id===id)).filter((s):s is PlacementSpec=>!!s);
+  },[versioned]);
+  const draftNamespace = versioned ? productId+"@"+productData.config.builderRevision : productId;
   const tPreview = useTranslations('Preview');
   const tMug = useTranslations('MugStudio');
   const locale = useLocale();
@@ -412,7 +501,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   
   const [activeFace, setActiveFace] = useState<string>(availableFaces[0] || 'front');
 
-  const mugSingleFaceStorageKey = `studio_mug_single_face_${productId}`;
+  const mugSingleFaceStorageKey = `studio_mug_single_face_${draftNamespace}`;
   const [mugSingleSideFace, setMugSingleSideFace] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -446,6 +535,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<'save' | 'cart' | 'buy_now' | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [failedUploads, setFailedUploads] = useState<Record<string, { file: File; name: string; error: string }>>({});
+  const failedUploadsRef = useRef<Record<string, { file: File; name: string; error: string }>>({});
+  failedUploadsRef.current = failedUploads;
   const [isSaving, setIsSaving] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [previewSlides, setPreviewSlides] = useState<{ face: string; label: string; imageUrl: string; hasDesign: boolean }[]>([]);
@@ -502,27 +594,39 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const [placementsByColor, setPlacementsByColor] = useState<Record<string, string[]>>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const dedicatedRaw = localStorage.getItem(`studio_saved_placements_${productId}`);
+        const dedicatedRaw = localStorage.getItem(`studio_saved_placements_${draftNamespace}`);
         if (dedicatedRaw) {
           const parsed = JSON.parse(dedicatedRaw);
-          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) return parsed;
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            return normalizePlacementsMap(parsed);
+          }
         }
-        const savedRaw = localStorage.getItem(`draft_design_${productId}`);
+        const savedRaw = localStorage.getItem(`draft_design_${draftNamespace}`);
         if (savedRaw) {
           const parsed = JSON.parse(savedRaw);
-          if (parsed?.placementsByColor && typeof parsed.placementsByColor === 'object') {
-            return parsed.placementsByColor;
+          if (parsed?.placementsByColor && typeof parsed.placementsByColor === 'object' && Object.keys(parsed.placementsByColor).length > 0) {
+            return normalizePlacementsMap(parsed.placementsByColor);
           }
           if (Array.isArray(parsed?.selectedPlacementIds) && parsed.selectedPlacementIds.length > 0) {
-            const initialKey = (parsed.selectedColor || 'default').trim().toLowerCase();
+            const initialKey = canonicalizeColorKey(parsed.selectedColor || resolvedInitialColor || 'default');
             return { [initialKey]: parsed.selectedPlacementIds };
           }
         }
       } catch {}
     }
     if (studioProfile.family === 'mug') {
-      const initialKey = (resolvedInitialColor || 'default').trim().toLowerCase();
-      return { [initialKey]: ['mug_full_wrap'], default: ['mug_full_wrap'] };
+      const allowedList: string[] | undefined = Array.isArray(productData?.config?.allowedPlacements)
+        ? productData.config.allowedPlacements
+        : undefined;
+      const defaultMugPlacement: string | null | undefined = versioned
+        ? productData?.config?.defaultPlacementId
+        : (allowedList
+            ? (allowedList.includes('mug_full_wrap') ? 'mug_full_wrap' : allowedList[0])
+            : 'mug_full_wrap');
+      if (defaultMugPlacement && (!allowedList || allowedList.includes(defaultMugPlacement))) {
+        const initialKey = canonicalizeColorKey(resolvedInitialColor || 'default');
+        return { [initialKey]: [defaultMugPlacement], default: [defaultMugPlacement] };
+      }
     }
     return {};
   });
@@ -541,6 +645,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const handleToggleFreeModeRef = useRef<((enabled: boolean) => void) | null>(null);
 
   const handleToggleFreeMode = useCallback((enabled: boolean) => {
+    if(enabled && versioned && !versioned.allowFreeMode) return;
     setIsFreeMode(enabled);
     isFreeModeRef.current = enabled;
     if (handleToggleFreeModeRef.current) {
@@ -552,7 +657,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         }, 50);
       }
     }
-  }, [canvas]);
+  }, [canvas,versioned]);
 
   // Hovered placement during drag & drop snapping
   const [hoveredPlacementId, setHoveredPlacementId] = useState<string | null>(null);
@@ -913,9 +1018,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   }, [showTypewriterHint, guidanceTips.length]);
 
   const normalizeColorKey = useCallback((color?: string | null): string => {
-    if (!color) return 'default';
-    const s = color.trim().toLowerCase();
-    return COLOR_MAP[s]?.toLowerCase() || s;
+    return canonicalizeColorKey(color);
   }, []);
 
   const activeColorKey = normalizeColorKey(selectedColor);
@@ -1091,6 +1194,20 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     return activeFaceSelectedPlacements.find((p) => p.id === activeGuidelinePlacementId) || activeFaceSelectedPlacements[0] || null;
   }, [isFreeMode, activeFaceSelectedPlacements, activeGuidelinePlacementId]);
 
+  const templateSurface=versioned?.faces.find(f=>f.id===activeFace);
+  const templatePlacement=templateSurface?.placements.find(p=>p.id===currentActivePlacementSpec?.id) ?? templateSurface?.placements[0];
+  const toolPolicy=versioned && effectivePolicy(versioned.policy,templatePlacement?.policy);
+  const canUseTool=(key:"allowText"|"allowCustomerUpload"|"allowStickers")=>{
+    if(!toolPolicy)return true;
+    const objects=canvas?.getObjects().filter((o:any)=>!["mockup","background","guideline","print_area_guide"].includes(o.name))||[];
+    const local=objects.filter((o:any)=>!o.assignedPlacementId || o.assignedPlacementId===templatePlacement?.id);
+    const allowed=toolPolicy[key] && local.length<toolPolicy.maxElements && (toolPolicy.allowLayers || !local.length)
+      && (key!=="allowCustomerUpload" || local.filter((o:any)=>o.isCustomUpload).length<toolPolicy.maxUploads);
+    if(!allowed)showToast(t("templateUnavailable"),"info");
+    return allowed;
+  };
+  const disabledTools = (["allowText","allowCustomerUpload","allowStickers","allowLayers"] as const)
+    .filter(k=>toolPolicy?.[k]===false).map(k=>t("templateTools."+k));
   // Placements available for the current garment face
   const availablePlacementsForActiveFace = useMemo(() => {
     const gType = productData?.config?.garmentType || productData?.category || 'tshirt';
@@ -1255,9 +1372,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     return getStockForVariant(color) > 0;
   }, [getStockForVariant]);
 
-  const grandTotalPrice = (Number(totalPrice) || basePrice) * Math.max(1, totalOrderQuantity);
 
-  const storageKey = `draft_design_${productId}`;
+
+  const storageKey = `draft_design_${draftNamespace}`;
   const hasRestoredDraftRef = useRef(false);
   const isRestoring = useRef(false);
   const saveDraftTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1269,14 +1386,32 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const selectedColorRef = useRef(selectedColor);
   selectedColorRef.current = selectedColor;
 
+  const coordinateContext = useRef({productData, studioProfile, selectedPrintMethod});
+  coordinateContext.current = {productData, studioProfile, selectedPrintMethod};
+  function buildSerializedFaceJson(c: fabric.Canvas, pano: boolean, w: number, h: number) {
+    const context = coordinateContext.current;
+    const json = serializeEditorFace(c.toJSON(SERIALIZE_PROPERTIES), {
+      face: (c as any).coordinateFace || activeFaceRef.current, panorama: pano, nativeWidth: w, nativeHeight: h,
+      canvasWidth: c.getWidth(), canvasHeight: c.getHeight(), loaded: canvasFrames.get(c),
+    }, {
+      revision: context.productData?.coordinateRevision || '', config: context.productData?.config,
+      family: context.studioProfile.family, garment: context.productData?.category,
+      selected: currentSelectedPlacementIdsRef.current, free: isFreeModeRef.current, method: context.selectedPrintMethod,
+    });
+    if (json.coordinates && json.objects.some((o: any) => !['mockup','background','guideline','print_area_guide'].includes(o.name))) {
+      canvasFrames.set(c, json.coordinates.frame);
+    }
+    return json;
+  }
+
   const getFaceStateKey = useCallback((face: string, color: string, forcePano?: boolean): string => {
-    const normColor = (color || 'default').trim().toLowerCase();
+    const normColor = normalizeColorKey(color);
     const isPano = forcePano !== undefined
       ? forcePano
       : (studioProfile.family === 'mug' && !isFreeMode && (activeMugMode === 'mug_full_wrap' || isMugPanoramicWorkspaceRef.current || face === 'mug_full_wrap'));
     const effectiveFace = (isPano && (isFaceMatching('front', face) || face === 'mug_full_wrap')) ? 'mug_full_wrap' : face;
     return `${normColor}:::${effectiveFace}`;
-  }, [studioProfile.family, isFreeMode, activeMugMode]);
+  }, [normalizeColorKey, studioProfile.family, isFreeMode, activeMugMode]);
 
   const getFaceJson = useCallback((face: string, color: string, forcePano?: boolean): string | null => {
     const isPano = forcePano !== undefined
@@ -1324,6 +1459,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   }, [getFaceStateKey, initialColor, studioProfile.family, isFreeMode, activeMugMode]);
 
   const [designAssets, setDesignAssets] = useState<any[]>([]);
+  const designAssetsRef = useRef<any[]>(designAssets);
+  designAssetsRef.current = designAssets;
   const [assetCategories, setAssetCategories] = useState<{ id: string; name: string; order?: number }[]>([]);
   const [selectedStickerCategory, setSelectedStickerCategory] = useState<string>('all');
   const [userUploads, setUserUploads] = useState<UserUploadItem[]>([]);
@@ -1454,7 +1591,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const calcResult = calculateCustomProductPrice({
       basePrice,
       facesData: parsedFacesMap,
-      assetsList: designAssets,
+      assetsList: designAssetsRef.current,
       pricingConfig: activeCfg,
       selectedPlacementIds: activePlacements,
       isFreeMode: activeFreeMode,
@@ -1466,6 +1603,23 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     setPriceBreakdown(prev => (JSON.stringify(prev) !== JSON.stringify(calcResult) ? calcResult : prev));
   }, [canvas, activeFace, selectedColor, basePrice, designAssets, pricingConfig, currentSelectedPlacementIds, isFreeMode, locale]);
 
+  const estimateUnit = (color: string) => {
+    if (isColorEqual(color, selectedColor)) return totalPrice;
+    const faces: Record<string, any> = {};
+    const map=facesData.current;
+    const sources=Array.from(new Set(Object.keys(map).filter(k=>k.includes(':::')).map(k=>k.split(':::')[0])));
+    const source=sources.find(c=>isColorEqual(c,color)) ?? (sources.length===1 ? sources[0] : undefined);
+    for(const [key,raw] of Object.entries(map)) {
+      const [prefix,face]=key.split(':::');
+      if(!raw || (face ? prefix!==source : !isColorEqual(initialColor || selectedColor,color))) continue;
+      try { faces[face || prefix]=typeof raw==="string" ? JSON.parse(raw) : raw; } catch {}
+    }
+    return calculateCustomProductPrice({basePrice, facesData:faces, assetsList:designAssets, pricingConfig,
+      selectedPlacementIds:(syncPlacementsAcrossColors ? placementsByColor.synced_all ?? placementsByColor.__synced__ : placementsByColor[normalizeColorKey(source ?? color)]) ?? [],
+      isFreeMode, garmentType:studioProfile.normalizedPlacementType, locale}).totalPrice;
+  };
+  const grandTotalPrice = variantMatrix.length ? variantMatrix.reduce((sum,item) => sum + estimateUnit(item.color)*item.quantity, 0)
+    : totalPrice * Math.max(1,totalOrderQuantity);
   recalculatePriceRef.current = recalculatePrice;
 
   // Real-time listener to centralized pricing settings (Live Firestore Sync)
@@ -1604,13 +1758,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     }, 120);
   };
 
-  const recordRecentAsset = (url: string, asset?: { id?: string; name?: string; price?: number; category?: string }) => {
+  const recordRecentAsset = (url: string, asset?: { id?: string; name?: string; price?: number; category?: string; type?: string; version?: number | string }) => {
     const newItem: RecentAssetItem = {
       id: asset?.id || `rec-${Date.now()}`,
       url,
       name: asset?.name || 'Sticker',
       price: asset?.price || 0,
       category: asset?.category || 'Stickers',
+      type: asset?.type || 'sticker',
+      version: asset?.version ?? 1,
       usedAt: new Date().toISOString()
     };
 
@@ -1625,12 +1781,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   };
 
   const handleSelectUpload = (item: UserUploadItem) => {
+    if(!canUseTool("allowCustomerUpload"))return;
     if (!canvas) return;
     if (!ensurePlacementSelected(() => handleSelectUpload(item))) return;
     loadFabricImage(item.url, (fabricImg) => {
       (fabricImg as any).set({ 
+        id: `upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         name: 'user_upload', 
         originalAssetId: item.url,
+        originalAssetUrl: item.url,
         crossOrigin: 'anonymous',
         isCustomUpload: true,
         assetName: item.name
@@ -1717,7 +1876,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
       try {
         localStorage.setItem(storageKey, JSON.stringify(draftPayload));
-        localStorage.setItem(`studio_saved_placements_${productId}`, JSON.stringify(currentPlacementsMap));
+        localStorage.setItem(`studio_saved_placements_${draftNamespace}`, JSON.stringify(currentPlacementsMap));
       } catch (storageErr) {
         console.warn("LocalStorage save issue:", storageErr);
       }
@@ -2047,6 +2206,16 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     fetchAssetsAndCategories();
   }, []);
 
+  // Re-evaluate displayed price once library assets load (ensures legacy drafts lacking cached assetPrice reflect real catalog pricing)
+  useEffect(() => {
+    if (designAssets.length === 0) return;
+    if (canvas && !(canvas as any).disposed && canvas.getElement?.()) {
+      recalculatePriceRef.current?.(canvas);
+    } else if (Object.keys(facesData.current || {}).length > 0) {
+      recalculatePriceRef.current?.(undefined, facesData.current);
+    }
+  }, [designAssets, canvas]);
+
   // Load design if designId exists
   useEffect(() => {
     async function fetchDesign() {
@@ -2065,7 +2234,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                 console.warn("Error parsing canvas_json string:", e);
               }
             }
-            facesData.current = parsedFaces || {};
+            if(versioned && !canUpdateSavedDesign(parsedFaces||{},coordinateContext.current.productData?.coordinateRevision)){
+              currentDesignIdRef.current=null;
+              window.location.reload();
+              return;
+            }
+            facesData.current = normalizeFacesMap(parsedFaces || {});
             const designColor = data.color || colorFromUrl || initialColor || selectedColor || 'white';
             Object.entries(facesData.current).forEach(([k, v]) => {
               if (!k.includes(':::') && v) {
@@ -2086,8 +2260,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               }
             }
             
-            if (mode === 'remix') {
-              // We loaded the design, but we act as if it's a new unsaved canvas
+            if (mode === 'remix' || !canUpdateSavedDesign(parsedFaces || {}, coordinateContext.current.productData?.coordinateRevision)) {
+              // Saving edits to an unverified historical document creates a separate design.
               currentDesignIdRef.current = null;
             } else {
               currentDesignIdRef.current = designIdFromUrl;
@@ -2098,19 +2272,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             if (canvas && canvas.getContext() && canvas.getElement() && targetJson) {
               isRestoring.current = true;
               try {
-                let parsedTargetJson: any = null;
-                try {
-                  parsedTargetJson = typeof targetJson === 'string' ? JSON.parse(targetJson) : targetJson;
-                } catch {}
+                restoreFrame(canvas, targetJson);
                 canvas.loadFromJSON(targetJson, () => {
+                  isRestoring.current = false;
                   if (canvas && canvas.getContext() && canvas.getElement()) {
-                    if (isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace)) {
-                      migrateLegacyMugPanoramaObjects(canvas, parsedTargetJson);
-                    }
+                    applyAllPrintBoundaryClipsRef.current?.(canvas);
+                    canvas.requestRenderAll();
                     canvas.renderAll();
                     saveHistoryState();
                   }
-                  isRestoring.current = false;
                 });
               } catch (e) {
                 isRestoring.current = false;
@@ -2127,6 +2297,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   // Dynamic Face Mockup Image Resolver based on selectedColor & activeFace
   const getFaceMockupForColor = useCallback((face: string, color: string): string => {
+    if(productData?.config?.builderRevision) return productFaces[face as keyof typeof productFaces] || "";
     const rawImages = productData?.raw_images || productData?.images || [];
     const variants = productData?.variants || [];
     const targetFace = face;
@@ -2221,15 +2392,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   // True Native Workspace Dimensions (Unwrapped 23x9.5 Panoramic Sheet when mug_full_wrap active, else Mockup Native Size)
   const nativeWidth = isMugPanoramicWorkspace
     ? MUG_PANORAMA_SHEET_WIDTH
-    : mockupNaturalSize.width > 0
+    : templateSurface?.nativeWidth || (mockupNaturalSize.width > 0
       ? mockupNaturalSize.width
-      : (Number(resolvedFaceConfig?.nativeWidth) || 1000);
+      : (Number(resolvedFaceConfig?.nativeWidth) || 1000));
 
   const nativeHeight = isMugPanoramicWorkspace
     ? MUG_PANORAMA_SHEET_HEIGHT
-    : mockupNaturalSize.height > 0
+    : templateSurface?.nativeHeight || (mockupNaturalSize.height > 0
       ? mockupNaturalSize.height
-      : (Number(resolvedFaceConfig?.nativeHeight) || 1000);
+      : (Number(resolvedFaceConfig?.nativeHeight) || 1000));
 
   const nativeWidthRef = useRef<number>(nativeWidth);
   nativeWidthRef.current = nativeWidth;
@@ -2271,101 +2442,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   // Free Mode Printable Area bounds (per product face)
   const freePrintZone = React.useMemo(() => {
-    const freeBounds = productData?.config?.freeModeBounds?.[activeFace];
-    const nw = nativeWidth;
-    const nh = nativeHeight;
-    if (freeBounds && freeBounds.width > 0 && freeBounds.height > 0) {
-      const fbNw = freeBounds.nativeWidth || nw;
-      const fbNh = freeBounds.nativeHeight || nh;
-      return {
-        left: (freeBounds.x / fbNw) * nw,
-        top: (freeBounds.y / fbNh) * nh,
-        width: (freeBounds.width / fbNw) * nw,
-        height: (freeBounds.height / fbNh) * nh,
-        nativeWidth: nw,
-        nativeHeight: nh,
-      };
-    }
-
-    const facePa = productData?.config?.faces?.[activeFace]?.printArea;
-    if (
-      studioProfile.family !== 'apparel' &&
-      facePa &&
-      facePa.width > 0 &&
-      facePa.height > 0 &&
-      (facePa.nativeWidth || nw) > 0 &&
-      (facePa.nativeHeight || nh) > 0
-    ) {
-      const fNw = facePa.nativeWidth || nw;
-      const fNh = facePa.nativeHeight || nh;
-      return {
-        left: (facePa.left / fNw) * nw,
-        top: (facePa.top / fNh) * nh,
-        width: (facePa.width / fNw) * nw,
-        height: (facePa.height / fNh) * nh,
-        nativeWidth: nw,
-        nativeHeight: nh,
-      };
-    }
-
-    if (studioProfile.family === 'mug') {
-      const fw = Math.round(nw * 0.56);
-      const fh = Math.round(nh * 0.48);
-      const fx = Math.round(nw * 0.22);
-      const fy = Math.round(nh * 0.27);
-      return {
-        left: fx,
-        top: fy,
-        width: fw,
-        height: fh,
-        nativeWidth: nw,
-        nativeHeight: nh,
-      };
-    }
-
-    if (studioProfile.family === 'hat') {
-      const fw = Math.round(nw * 0.38);
-      const fh = Math.round(nh * 0.24);
-      const fx = Math.round((nw - fw) / 2);
-      const fy = Math.round(nh * 0.30);
-      return {
-        left: fx,
-        top: fy,
-        width: fw,
-        height: fh,
-        nativeWidth: nw,
-        nativeHeight: nh,
-      };
-    }
-
-    if (studioProfile.family === 'phone_case') {
-      const fw = Math.round(nw * 0.40);
-      const fh = Math.round(nh * 0.68);
-      const fx = Math.round((nw - fw) / 2);
-      const fy = Math.round(nh * 0.16);
-      return {
-        left: fx,
-        top: fy,
-        width: fw,
-        height: fh,
-        nativeWidth: nw,
-        nativeHeight: nh,
-      };
-    }
-
-    const isSleeve = activeFace === 'left' || activeFace === 'right' || activeFace === 'left_shoulder' || activeFace === 'right_shoulder';
-    const fw = Math.round(nw * (isSleeve ? 0.48 : 0.62));
-    const fh = Math.round(nh * (isSleeve ? 0.68 : 0.76));
-    const fx = Math.round((nw - fw) / 2);
-    const fy = Math.round(nh * (isSleeve ? 0.16 : 0.13));
-    return {
-      left: fx,
-      top: fy,
-      width: fw,
-      height: fh,
-      nativeWidth: nw,
-      nativeHeight: nh,
-    };
+    return freePlacementBounds(productData?.config, studioProfile.family, activeFace, nativeWidth, nativeHeight);
   }, [productData?.config?.freeModeBounds, productData?.config?.faces, studioProfile.family, activeFace, nativeWidth, nativeHeight]);
 
   const freePrintZoneRef = useRef<any>(freePrintZone);
@@ -2401,15 +2478,21 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     ) {
       return;
     }
-    if (canvas.getWidth() !== totalCanvasWidth || canvas.getHeight() !== totalCanvasHeight) {
+    const sizeChanged = canvas.getWidth() !== totalCanvasWidth || canvas.getHeight() !== totalCanvasHeight;
+    if (sizeChanged) {
       canvas.setWidth(totalCanvasWidth);
       canvas.setHeight(totalCanvasHeight);
       (canvas as any).printAreaWidth = totalCanvasWidth;
       (canvas as any).printAreaHeight = totalCanvasHeight;
+    }
+    if (sizeChanged || mockupNaturalSize.width > 0) {
+      // Re-apply print boundary clips in the resolved native coordinate space so restored objects are never clipped off-screen
+      applyAllPrintBoundaryClipsRef.current?.(canvas);
+      canvas.requestRenderAll();
       canvas.renderAll();
       scheduleLiveMugTextureRefreshRef.current?.(canvas, 60);
     }
-  }, [canvas, totalCanvasWidth, totalCanvasHeight]);
+  }, [canvas, totalCanvasWidth, totalCanvasHeight, mockupNaturalSize.width, mockupNaturalSize.height]);
 
   // Helper to resolve precise placement coordinates in Fabric virtual canvas space (1:1 with mockup space)
   const getPlacementFabricBounds = useCallback((
@@ -2420,129 +2503,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     customFace?: string
   ) => {
     const resolvedFace = customFace || activeFace;
-    const box = spec.canvasBox;
     const nw = customNw ?? nativeWidth;
     const nh = customNh ?? nativeHeight;
 
-    const rawX = (box.leftPercent / 100) * nw;
-    const rawY = (box.topPercent / 100) * nh;
-    const rawW = (box.maxWidthPercent / 100) * nw;
-    const rawH = (box.maxHeightPercent / 100) * nh;
-
-    // Physical dimensions from spec (e.g. 30x40 cm for full front, 23x9.5 cm for mug wrap)
-    const recW = spec.dimensions?.recommended?.widthCm || 30;
-    const recH = spec.dimensions?.recommended?.heightCm || 40;
-
-    let fabricLeft: number;
-    let fabricTop: number;
-    let fabricWidth: number;
-    let fabricHeight: number;
-    let calibratedWidthCm: number | undefined;
-    let calibratedHeightCm: number | undefined;
-
-    // 0. Unwrapped 23x9.5 Panoramic Mug Sheet Workspace (1:1 coordinate fidelity = 80 px/cm)
-    if (!forceNonPanoramic && isMugPanoramicWorkspace && spec.id === 'mug_full_wrap') {
-      return {
-        spec,
-        id: spec.id,
-        nameAr: spec.nameAr,
-        nameEn: spec.nameEn,
-        nameTr: spec.nameTr,
-        mockupX: 0,
-        mockupY: 0,
-        mockupW: MUG_PANORAMA_SHEET_WIDTH,
-        mockupH: MUG_PANORAMA_SHEET_HEIGHT,
-        fabricLeft: 0,
-        fabricTop: 0,
-        fabricWidth: MUG_PANORAMA_SHEET_WIDTH,
-        fabricHeight: MUG_PANORAMA_SHEET_HEIGHT,
-        fabricCenterX: MUG_PANORAMA_SHEET_WIDTH / 2,
-        fabricCenterY: MUG_PANORAMA_SHEET_HEIGHT / 2,
-        calibratedWidthCm: spec.dimensions.recommended.widthCm || 23,
-        calibratedHeightCm: spec.dimensions.recommended.heightCm || 9.5,
-      };
-    }
-
-    // 1. Highest priority: Admin-calibrated placement rectangle (with face-aware Mug overrides)
-    const calibratedMap = productData?.config?.calibratedPlacements as Record<string, any> | undefined;
-    let calibrated = calibratedMap?.[spec.id];
-    if (studioProfile.family === 'mug' && calibratedMap) {
-      if (spec.id === 'mug_full_wrap' && resolvedFace === 'back' && calibratedMap['mug_full_wrap_back']) {
-        calibrated = calibratedMap['mug_full_wrap_back'];
-      } else if (spec.id === 'mug_full_wrap' && resolvedFace === 'other' && calibratedMap['mug_full_wrap_other']) {
-        calibrated = calibratedMap['mug_full_wrap_other'];
-      } else if (spec.id === 'mug_front' && resolvedFace === 'other' && calibratedMap['mug_front_other']) {
-        calibrated = calibratedMap['mug_front_other'];
-      } else if (spec.id === 'mug_front' && resolvedFace === 'back') {
-        calibrated = calibratedMap['mug_front_back'] || calibratedMap['mug_back'] || calibrated;
-      }
-    }
-
-    const facePa = productData?.config?.faces?.[resolvedFace]?.printArea;
-
-    if (calibrated && calibrated.width > 0 && calibrated.height > 0) {
-      const cNw = calibrated.nativeWidth || nw;
-      const cNh = calibrated.nativeHeight || nh;
-      fabricLeft = Math.round((calibrated.x / cNw) * nw);
-      fabricTop = Math.round((calibrated.y / cNh) * nh);
-      fabricWidth = Math.round((calibrated.width / cNw) * nw);
-      fabricHeight = Math.round((calibrated.height / cNh) * nh);
-      calibratedWidthCm = calibrated.physicalWidthCm;
-      calibratedHeightCm = calibrated.physicalHeightCm;
-    } else if (
-      studioProfile.family === 'mug' &&
-      facePa &&
-      facePa.width > 0 &&
-      facePa.height > 0 &&
-      (facePa.nativeWidth || nw) > 0 &&
-      (facePa.nativeHeight || nh) > 0
-    ) {
-      // Auto-detected or face-calibrated mug cylinder bounds from uploaded mockup
-      const fNw = facePa.nativeWidth || nw;
-      const fNh = facePa.nativeHeight || nh;
-      const baseLeft = Math.round((facePa.left / fNw) * nw);
-      const baseTop = Math.round((facePa.top / fNh) * nh);
-      const baseW = Math.round((facePa.width / fNw) * nw);
-      const baseH = Math.round((facePa.height / fNh) * nh);
-
-      if (spec.id === 'mug_full_wrap') {
-        fabricLeft = baseLeft;
-        fabricTop = baseTop;
-        fabricWidth = baseW;
-        fabricHeight = baseH;
-      } else {
-        // Single face centered cleanly inside the safe cylinder wall
-        fabricWidth = Math.round(baseW * 0.72);
-        fabricHeight = Math.round(baseH * 0.94);
-        fabricLeft = Math.round(baseLeft + (baseW - fabricWidth) / 2);
-        fabricTop = Math.round(baseTop + (baseH - fabricHeight) / 2);
-      }
-    } else if (studioProfile.family !== 'apparel') {
-      // Non-apparel (Mug, Hat, Phone Case, Generic): honor calibrated canvasBox percentages directly
-      fabricWidth = Math.max(40, Math.round(rawW));
-      fabricHeight = Math.max(40, Math.round(rawH));
-      fabricLeft = Math.round(rawX);
-      fabricTop = Math.round(rawY);
-    } else {
-      // Apparel pixel density: calibrated to standard ~55cm chest over ~65% of mockup width
-      const pxPerCm = (nw * 0.65) / 55;
-      fabricWidth = Math.round(recW * pxPerCm);
-      fabricHeight = Math.round(recH * pxPerCm);
-
-      // Safeguard: do not exceed garment printable zone bounds
-      const maxAllowedW = nw * 0.75;
-      const maxAllowedH = nh * 0.58;
-      if (fabricWidth > maxAllowedW || fabricHeight > maxAllowedH) {
-        const scaleFit = Math.min(maxAllowedW / fabricWidth, maxAllowedH / fabricHeight);
-        fabricWidth = Math.round(fabricWidth * scaleFit);
-        fabricHeight = Math.round(fabricHeight * scaleFit);
-      }
-
-      const isCentered = spec.id === 'full_front' || spec.id === 'center_chest' || spec.id === 'full_back' || spec.id === 'back_collar';
-      fabricLeft = isCentered ? Math.round((nw - fabricWidth) / 2) : Math.round(rawX);
-      fabricTop = Math.round(rawY);
-    }
-
+    const {fabricLeft,fabricTop,fabricWidth,fabricHeight,calibratedWidthCm,calibratedHeightCm} =
+      placementBounds(spec, productData?.config, studioProfile.family, resolvedFace, nw, nh,
+        !forceNonPanoramic && isMugPanoramicWorkspace);
     const fabricCenterX = fabricLeft + fabricWidth / 2;
     const fabricCenterY = fabricTop + fabricHeight / 2;
 
@@ -2636,7 +2602,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   isObjectInsidePrintBoundsRef.current = isObjectInsidePrintBounds;
 
   // Helper to apply strict boundary clipping to an object so that any portion outside the active placement (or freePrintZone) is clipped/hidden
-  const applyPrintBoundaryClip = useCallback((obj: fabric.Object | null | undefined) => {
+  const applyPrintBoundaryClip = useCallback((obj: fabric.Object | null | undefined, overrideNw?: number, overrideNh?: number) => {
     if (!obj || obj.name === 'background' || obj.name === 'mockup' || obj.name === 'print_area_guide') return;
 
     // 0. Panorama 360° Wrap Workspace on Mugs:
@@ -2660,15 +2626,20 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
     const gType = productData?.config?.garmentType || productData?.category || 'tshirt';
     const currentFace = activeFaceRef.current || activeFace;
+    const resolvedNw = (typeof overrideNw === 'number' && overrideNw > 0) ? overrideNw : nativeWidthRef.current;
+    const resolvedNh = (typeof overrideNh === 'number' && overrideNh > 0) ? overrideNh : nativeHeightRef.current;
 
     let boundary: { left: number; top: number; width: number; height: number; rx?: number; ry?: number } | null = null;
 
     if (isFreeModeRef.current) {
+      const zone = (resolvedNw !== nativeWidth || resolvedNh !== nativeHeight)
+        ? freePlacementBounds(productData?.config, studioProfile.family, currentFace, resolvedNw, resolvedNh)
+        : freePrintZone;
       boundary = {
-        left: freePrintZone.left,
-        top: freePrintZone.top,
-        width: freePrintZone.width,
-        height: freePrintZone.height,
+        left: zone.left,
+        top: zone.top,
+        width: zone.width,
+        height: zone.height,
         rx: 24,
         ry: 24,
       };
@@ -2702,7 +2673,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         const candidates = allFaceSpecs
           .filter(s => activeFaceSelectedPlacementsRef.current.some(ap => ap.id === s.id))
           .map(s => {
-            const p = getPlacementFabricBounds(s);
+            const p = getPlacementFabricBounds(s, resolvedNw, resolvedNh);
             const isInside =
               centerPt.x >= p.fabricLeft &&
               centerPt.x <= p.fabricLeft + p.fabricWidth &&
@@ -2719,7 +2690,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       }
 
       if (spec) {
-        const p = getPlacementFabricBounds(spec);
+        const p = getPlacementFabricBounds(spec, resolvedNw, resolvedNh);
         const radius = isMugPanoramicWorkspaceRef.current && spec.id === 'mug_full_wrap' ? 8 : 16;
         boundary = {
           left: p.fabricLeft,
@@ -2748,7 +2719,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       delete (obj as any).clipPath;
       obj.dirty = true;
     }
-  }, [productData, activeFace, freePrintZone, getPlacementFabricBounds]);
+  }, [productData, activeFace, freePrintZone, getPlacementFabricBounds, nativeWidth, nativeHeight, studioProfile.family, activeMugMode, isMugSingleMode]);
 
   const applyPrintBoundaryClipRef = useRef(applyPrintBoundaryClip);
   useEffect(() => {
@@ -2758,10 +2729,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const applyAllPrintBoundaryClips = useCallback((targetCanvas?: fabric.Canvas | null) => {
     const c = targetCanvas || canvas;
     if (!c) return;
+    const cw = c.getWidth();
+    const ch = c.getHeight();
     c.getObjects().forEach((o: any) => {
       const n = (o?.name || '').toLowerCase();
       if (n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline') {
-        applyPrintBoundaryClip(o);
+        applyPrintBoundaryClip(o, cw, ch);
       }
     });
     c.requestRenderAll();
@@ -3052,6 +3025,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     }
   }, [canvas, productData, selectedColor, activeFace, getPlacementFabricBounds, normalizeColorKey]);
 
+  const reconcilePlacementsForActiveStateRef = useRef(reconcilePlacementsForActiveState);
+  reconcilePlacementsForActiveStateRef.current = reconcilePlacementsForActiveState;
+
   // Periodic passive reconciliation to guarantee no placement is lost after language switch or mount
   useEffect(() => {
     if (!canvas || (canvas as any).disposed || !(canvas as any).lowerCanvasEl) return;
@@ -3332,6 +3308,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       recalculatePrice(initCanvas);
     };
 
+    (initCanvas as any).coordinateFace = activeFace;
     initCanvas.on('object:added', (e) => {
       if (isDisposed) return;
       const obj = e.target;
@@ -3384,7 +3361,19 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       scheduleLiveMugTextureRefreshRef.current?.(initCanvas, 50);
     };
 
-    initCanvas.on('object:removed', () => { updatePrice(); onCanvasModified(); });
+    initCanvas.on('object:removed', (ev: any) => {
+      const removedId = ev?.target?.id;
+      if (removedId && failedUploadsRef.current[removedId]) {
+        setFailedUploads(prev => {
+          if (!prev[removedId]) return prev;
+          const next = { ...prev };
+          delete next[removedId];
+          return next;
+        });
+      }
+      updatePrice();
+      onCanvasModified();
+    });
     initCanvas.on('object:modified', onCanvasModified);
     initCanvas.on('text:changed', onCanvasModified);
 
@@ -3602,6 +3591,15 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const handleObjectModified = (e: fabric.IEvent) => {
       const activeObj = e.target || initCanvas.getActiveObject();
       if (!activeObj || (activeObj as any).isLocked || activeObj.selectable === false) return;
+
+      // Explicit programmatic precision/centering transforms must never migrate an object to another placement zone
+      if ((e as any)?.skipPlacementSwitch) {
+        applyPrintBoundaryClipRef.current?.(activeObj, initCanvas.getWidth(), initCanvas.getHeight());
+        activeObj.setCoords();
+        initCanvas.requestRenderAll();
+        recalculatePriceRef.current?.(initCanvas);
+        return;
+      }
 
       if (!isFreeModeRef.current) {
         const centerPt = activeObj.getCenterPoint();
@@ -3870,7 +3868,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     if (typeof window !== 'undefined' && !hasRestoredDraftRef.current && !designIdFromUrl) {
       try {
         const savedRaw = localStorage.getItem(storageKey);
-        const dedicatedRaw = localStorage.getItem(`studio_saved_placements_${productId}`);
+        const dedicatedRaw = localStorage.getItem(`studio_saved_placements_${draftNamespace}`);
         let restoredPlacements: Record<string, string[]> = {};
         let hasDedicatedPlacements = false;
 
@@ -3878,7 +3876,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           try {
             const parsedDed = JSON.parse(dedicatedRaw);
             if (parsedDed && typeof parsedDed === 'object') {
-              restoredPlacements = parsedDed;
+              restoredPlacements = normalizePlacementsMap(parsedDed);
               hasDedicatedPlacements = true;
             }
           } catch {}
@@ -3887,7 +3885,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         if (savedRaw) {
           const parsed = JSON.parse(savedRaw);
           if (parsed?.faces) {
-            facesData.current = parsed.faces; // استعادة جميع الأوجه للذاكرة
+            facesData.current = normalizeFacesMap(parsed.faces); // استعادة جميع الأوجه بمفاتيح ألوان موحدة مع دعم المسودات القديمة
             if (parsed.selectedSize && !sizeFromUrl && !initialSize) setSelectedSize(parsed.selectedSize);
             if (parsed.selectedColor && !colorFromUrl && !initialColor) setSelectedColor(parsed.selectedColor);
             if (Array.isArray(parsed.variantMatrix) && parsed.variantMatrix.length > 0 && !quantityFromUrl && !initialQuantity) {
@@ -3899,7 +3897,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             // Only use savedRaw placements if dedicatedRaw did not provide placements
             if (!hasDedicatedPlacements) {
               if (parsed.placementsByColor && typeof parsed.placementsByColor === 'object') {
-                restoredPlacements = parsed.placementsByColor;
+                restoredPlacements = normalizePlacementsMap(parsed.placementsByColor);
               } else if (Array.isArray(parsed.selectedPlacementIds)) {
                 const initialKey = normalizeColorKey(parsed.selectedColor || resolvedInitialColor);
                 restoredPlacements[initialKey] = parsed.selectedPlacementIds;
@@ -3972,68 +3970,80 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               }
             });
           }
+          // Avoid clipping restored objects against a temporary 1000x1000 default frame before mockupNaturalSize resolves
+          if (
+            !isMugPanoRestored &&
+            Number(parsed?.width) > 0 &&
+            Number(parsed?.height) > 0 &&
+            !templateSurface?.nativeWidth &&
+            !Number(resolvedFaceConfig?.nativeWidth) &&
+            (initCanvas.getWidth() !== Number(parsed.width) || initCanvas.getHeight() !== Number(parsed.height))
+          ) {
+            const restoredSavedW = Number(parsed.width);
+            const restoredSavedH = Number(parsed.height);
+            initCanvas.setWidth(restoredSavedW);
+            initCanvas.setHeight(restoredSavedH);
+            (initCanvas as any).printAreaWidth = restoredSavedW;
+            (initCanvas as any).printAreaHeight = restoredSavedH;
+          }
+          restoreFrame(initCanvas, parsed);
           initCanvas.loadFromJSON(parsed, () => {
             if (!isDisposed && initCanvas && initCanvas.getContext() && initCanvas.getElement()) {
               applyModernObjectStyles(initCanvas);
+              const restoredW = initCanvas.getWidth();
+              const restoredH = initCanvas.getHeight();
 
-              // Restore locked state on objects and apply print boundary clipping
+              // Restore locked state on objects and apply print boundary clipping using the true canvas dimensions
               initCanvas.getObjects().forEach((obj: any) => {
-                if (obj.isLocked === true || obj.lockMovementX === true) {
-                  obj.set({
-                    selectable: false,
-                    evented: false,
-                    lockMovementX: true,
-                    lockMovementY: true,
-                    lockRotation: true,
-                    lockScalingX: true,
-                    lockScalingY: true,
-                    hasControls: false,
-                    hasBorders: false,
-                  });
-                  obj.isLocked = true;
+                if (obj.isLocked === true || obj.selectable === false || obj.lockMovementX === true) {
+                  applyObjectLockState(obj, true);
                 }
                 const n = (obj?.name || '').toLowerCase();
                 if (n !== 'background' && n !== 'mockup' && n !== 'print_area_guide' && n !== 'guideline') {
-                  applyPrintBoundaryClip(obj);
+                  applyPrintBoundaryClipRef.current?.(obj, restoredW, restoredH);
                 }
               });
+              initCanvas.discardActiveObject();
+              setActiveObject(null);
+              (initCanvas as any).fire('layers:refresh');
 
-              if (
-                isMugPanoramicWorkspaceRef.current &&
-                parsed?.mugPanoramaSheet &&
-                isFaceMatching('front', activeFace)
-              ) {
-                migrateLegacyMugPanoramaObjects(initCanvas, parsed);
-              }
-
+              initCanvas.requestRenderAll();
               initCanvas.renderAll();
+              const isPanoActive = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace);
               const initialJson = JSON.stringify(
                 buildSerializedFaceJson(
                   initCanvas,
-                  isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace),
-                  nativeWidthRef.current,
-                  nativeHeightRef.current
+                  isPanoActive,
+                  isPanoActive ? MUG_PANORAMA_SHEET_WIDTH : restoredW,
+                  isPanoActive ? MUG_PANORAMA_SHEET_HEIGHT : restoredH
                 )
               );
               historyRef.current = [initialJson];
               historyStepRef.current = 0;
               setCanUndo(false);
               setCanRedo(false);
-              recalculatePrice(initCanvas);
-              const isPanoActive = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFace);
+              recalculatePriceRef.current?.(initCanvas);
               const currentKey = getFaceStateKey(activeFace, selectedColor, isPanoActive);
               facesData.current[currentKey] = initialJson;
+              // Persist normalized keys back to localStorage cleanly after restoring legacy drafts
+              isRestoring.current = false;
+              saveDraft(initCanvas);
 
               // Smart Placement Auto-Reconciliation
               setTimeout(() => {
                 if (isDisposed || !(initCanvas as any).lowerCanvasEl) return;
-                reconcilePlacementsForActiveState(initCanvas);
+                reconcilePlacementsForActiveStateRef.current?.(initCanvas);
+                applyAllPrintBoundaryClipsRef.current?.(initCanvas);
+                recalculatePriceRef.current?.(initCanvas);
+                initCanvas.requestRenderAll();
+                initCanvas.renderAll();
                 scheduleLiveMugTextureRefreshRef.current?.(initCanvas, 60);
               }, 60);
 
               console.log(`✅ Face [${activeFace}] for Color [${selectedColor}] rendered with ${parsed?.objects?.length || 0} objects.`);
+            } else {
+              isRestoring.current = false;
             }
-            isRestoring.current = false; // فتح قفل الحفظ بعد اكتمال الرسم
           });
         } catch (err) {
           console.error("Render fail:", err);
@@ -4174,9 +4184,65 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   checkObjectBoundsRef.current = checkObjectBounds;
 
+  const applyRestoredHistorySnapshot = useCallback((targetJson: string) => {
+    if (!canvas || !canvas.getContext() || !canvas.getElement()) {
+      isRestoring.current = false;
+      return;
+    }
+    if (saveDraftTimerRef.current) {
+      clearTimeout(saveDraftTimerRef.current);
+      saveDraftTimerRef.current = null;
+    }
+    try {
+      restoreFrame(canvas, targetJson);
+      canvas.loadFromJSON(targetJson, () => {
+        if (canvas && !(canvas as any).disposed && canvas.getContext() && canvas.getElement()) {
+          applyModernObjectStyles(canvas);
+          canvas.getObjects().forEach((obj: any) => {
+            if (obj.isLocked === true || obj.selectable === false || obj.lockMovementX === true) {
+              applyObjectLockState(obj, true);
+            }
+          });
+          applyAllPrintBoundaryClipsRef.current?.(canvas);
+          canvas.discardActiveObject();
+          setActiveObject(null);
+          setLiveDimensions(null);
+          canvas.requestRenderAll();
+          canvas.renderAll();
+
+          const isPanoNow = studioProfile.family === 'mug' && isMugPanoramicWorkspaceRef.current && isFaceMatching('front', activeFaceRef.current);
+          const currentKey = getFaceStateKey(activeFaceRef.current, selectedColorRef.current, isPanoNow);
+          facesData.current[currentKey] = targetJson;
+
+          if (syncAllColorsRef.current && uniqueSelectedColors.length > 1) {
+            uniqueSelectedColors.forEach((otherColor: string) => {
+              if (!isColorEqual(otherColor, selectedColorRef.current)) {
+                const mirrorKey = getFaceStateKey(activeFaceRef.current, otherColor, isPanoNow);
+                facesData.current[mirrorKey] = targetJson;
+              }
+            });
+          }
+
+          recalculatePrice(canvas);
+          (canvas as any).fire('layers:refresh');
+          isRestoring.current = false;
+          // Flush synchronously after lifting isRestoring lock so localStorage matches visible Canvas immediately
+          saveDraftImmediate(canvas);
+          checkObjectBounds(canvas);
+          scheduleLiveMugTextureRefreshRef.current?.(canvas, 60);
+        } else {
+          isRestoring.current = false;
+        }
+      });
+    } catch (e) {
+      console.error("History restore error:", e);
+      isRestoring.current = false;
+    }
+  }, [canvas, getFaceStateKey, uniqueSelectedColors, recalculatePrice, saveDraftImmediate, checkObjectBounds, studioProfile.family]);
+
   const undo = useCallback(() => {
     if (!canvas || !canvas.getContext() || !canvas.getElement() || isRestoring.current || historyStepRef.current <= 0) return;
-    
+
     const prevIdx = historyStepRef.current - 1;
     const targetJson = historyRef.current[prevIdx];
     if (!targetJson) return;
@@ -4185,40 +4251,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     historyStepRef.current = prevIdx;
     setCanUndo(prevIdx > 0);
     setCanRedo(true);
-
-    try {
-      canvas.loadFromJSON(targetJson, () => {
-        if (canvas && canvas.getContext() && canvas.getElement()) {
-          applyModernObjectStyles(canvas);
-          canvas.renderAll();
-          recalculatePrice(canvas);
-          const currentKey = getFaceStateKey(activeFace, selectedColor);
-          facesData.current[currentKey] = targetJson;
-
-          if (syncAllColorsRef.current && uniqueSelectedColors.length > 1) {
-            uniqueSelectedColors.forEach((otherColor: string) => {
-              if (!isColorEqual(otherColor, selectedColor)) {
-                const mirrorKey = getFaceStateKey(activeFace, otherColor);
-                facesData.current[mirrorKey] = targetJson;
-              }
-            });
-          }
-
-          saveDraft(canvas);
-          checkObjectBounds(canvas);
-          scheduleLiveMugTextureRefreshRef.current?.(canvas, 60);
-        }
-        isRestoring.current = false;
-      });
-    } catch (e) {
-      console.error("Undo error:", e);
-      isRestoring.current = false;
-    }
-  }, [canvas, activeFace, selectedColor, getFaceStateKey, uniqueSelectedColors, recalculatePrice, saveDraft, checkObjectBounds]);
+    applyRestoredHistorySnapshot(targetJson);
+  }, [canvas, applyRestoredHistorySnapshot]);
 
   const redo = useCallback(() => {
     if (!canvas || !canvas.getContext() || !canvas.getElement() || isRestoring.current || historyStepRef.current >= historyRef.current.length - 1) return;
-    
+
     const nextIdx = historyStepRef.current + 1;
     const targetJson = historyRef.current[nextIdx];
     if (!targetJson) return;
@@ -4227,36 +4265,8 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     historyStepRef.current = nextIdx;
     setCanUndo(true);
     setCanRedo(nextIdx < historyRef.current.length - 1);
-
-    try {
-      canvas.loadFromJSON(targetJson, () => {
-        if (canvas && canvas.getContext() && canvas.getElement()) {
-          applyModernObjectStyles(canvas);
-          canvas.renderAll();
-          recalculatePrice(canvas);
-          const currentKey = getFaceStateKey(activeFace, selectedColor);
-          facesData.current[currentKey] = targetJson;
-
-          if (syncAllColorsRef.current && uniqueSelectedColors.length > 1) {
-            uniqueSelectedColors.forEach((otherColor: string) => {
-              if (!isColorEqual(otherColor, selectedColor)) {
-                const mirrorKey = getFaceStateKey(activeFace, otherColor);
-                facesData.current[mirrorKey] = targetJson;
-              }
-            });
-          }
-
-          saveDraft(canvas);
-          checkObjectBounds(canvas);
-          scheduleLiveMugTextureRefreshRef.current?.(canvas, 60);
-        }
-        isRestoring.current = false;
-      });
-    } catch (e) {
-      console.error("Redo error:", e);
-      isRestoring.current = false;
-    }
-  }, [canvas, activeFace, selectedColor, getFaceStateKey, uniqueSelectedColors, recalculatePrice, saveDraft, checkObjectBounds]);
+    applyRestoredHistorySnapshot(targetJson);
+  }, [canvas, applyRestoredHistorySnapshot]);
 
   // Global Keyboard Shortcuts for Undo/Redo (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z)
   useEffect(() => {
@@ -4299,6 +4309,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
   const switchFace = useCallback((face: string) => {
     const resolvedFace = resolveTargetFace(face);
+    if(versioned && !availableFaces.includes(resolvedFace))return;
     if (resolvedFace === activeFace) return;
     if (canvas && !isRestoring.current) {
       try {
@@ -4306,18 +4317,24 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         const json = JSON.stringify(buildSerializedFaceJson(canvas, isPanoNow, nativeWidthRef.current, nativeHeightRef.current));
         const currentKey = getFaceStateKey(activeFace, selectedColor, isPanoNow);
         facesData.current[currentKey] = json;
+        saveDraftImmediate(canvas);
       } catch (e) {}
     }
     if (canvas) {
       clearSmartGuidelinesFromCanvas(canvas);
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
     }
-    setActiveFace(resolvedFace);
+    setActiveObject(null);
     setLiveDimensions(null);
-  }, [canvas, activeFace, selectedColor, getFaceStateKey, resolveTargetFace, studioProfile.family]);
+    setIsObjectOutOfBounds(false);
+    setActiveFace(resolvedFace);
+  }, [canvas, activeFace, selectedColor, getFaceStateKey, resolveTargetFace, studioProfile.family, saveDraftImmediate, versioned, availableFaces]);
 
   const handleSelectMugModeRef = useRef<((mode: MugPrintMode) => void) | null>(null);
 
   const handleTogglePlacement = useCallback((placement: PlacementSpec) => {
+    if(versioned && !productData.config.allowedPlacements.includes(placement.id))return;
     const targetFace = placement.targetFace;
     const wasSelected = currentSelectedPlacementIds.includes(placement.id);
 
@@ -4357,7 +4374,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     recalculatePrice(canvas, undefined, updatedList);
 
     try {
-      localStorage.setItem(`studio_saved_placements_${productId}`, JSON.stringify(nextMap));
+      localStorage.setItem(`studio_saved_placements_${draftNamespace}`, JSON.stringify(nextMap));
     } catch {}
 
     if (!wasSelected) {
@@ -4470,7 +4487,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     recalculatePrice(canvas, undefined, updatedList);
 
     try {
-      localStorage.setItem(`studio_saved_placements_${productId}`, JSON.stringify(nextMap));
+      localStorage.setItem(`studio_saved_placements_${draftNamespace}`, JSON.stringify(nextMap));
     } catch {}
     if (!isRestoring.current) {
       saveDraftImmediate();
@@ -4489,6 +4506,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   }, [studioProfile.family, activeMugMode]);
 
   const handleSelectMugMode = useCallback((mode: MugPrintMode) => {
+    if(versioned && !(mode==="mug_two_sided"?["mug_front","mug_back"]:[mode]).every(id=>productData.config.allowedPlacements.includes(id)))return;
     const prevMode = activeMugMode;
     if (mode === prevMode) return;
 
@@ -4544,10 +4562,12 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         (canvas as any).printAreaWidth = MUG_PANORAMA_SHEET_WIDTH;
         (canvas as any).printAreaHeight = MUG_PANORAMA_SHEET_HEIGHT;
         const panoKey = getFaceStateKey('front', selectedColor, true);
+        canvasFrames.delete(canvas);
         const savedPanoJson = facesData.current[panoKey];
         if (savedPanoJson) {
           try {
             const parsed = typeof savedPanoJson === 'string' ? JSON.parse(savedPanoJson) : savedPanoJson;
+            restoreFrame(canvas, parsed);
             canvas.loadFromJSON(parsed, () => {
               applyCustomModernStyles(canvas);
               applyAllPrintBoundaryClips(canvas);
@@ -4618,10 +4638,13 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       (canvas as any).printAreaWidth = nonPanoW;
       (canvas as any).printAreaHeight = nonPanoH;
       const targetKey = getFaceStateKey(nextTargetFace, selectedColor, false);
+      canvasFrames.delete(canvas);
+      (canvas as any).coordinateFace = nextTargetFace;
       const savedTargetJson = facesData.current[targetKey];
       if (savedTargetJson) {
         try {
           const parsed = typeof savedTargetJson === 'string' ? JSON.parse(savedTargetJson) : savedTargetJson;
+          restoreFrame(canvas, parsed);
           canvas.loadFromJSON(parsed, () => {
             applyCustomModernStyles(canvas);
             applyAllPrintBoundaryClips(canvas);
@@ -4792,7 +4815,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const targetPlacementId = targetFace === 'back' ? 'mug_back' : 'mug_front';
 
     const currentKey = getFaceStateKey(sourceFace, selectedColor, false);
-    const serialized = canvas.toJSON(SERIALIZE_PROPERTIES);
+    const serialized = buildSerializedFaceJson(canvas, false, nativeWidthRef.current, nativeHeightRef.current);
     facesData.current[currentKey] = JSON.stringify(serialized);
 
     const clonedObjs = (serialized.objects || [])
@@ -4832,6 +4855,21 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       baseOppJson = { version: serialized.version, objects: clonedObjs };
     }
 
+    // The duplicate action keeps native positions. Both surfaces must share the
+    // same verified basis before the copied objects can carry a target frame.
+    delete baseOppJson.coordinates;
+    const sourceFrame = serialized.coordinates?.frame;
+    const targetArea = productData?.config?.faces?.[targetFace]?.printArea;
+    if (sourceFrame && sourceFrame.space === 'FULL_MOCKUP_NATIVE' &&
+        targetArea?.nativeWidth === sourceFrame.width && targetArea.nativeHeight === sourceFrame.height) {
+      const frame = editorFrame(targetFace, false, sourceFrame.width, sourceFrame.height, sourceFrame.templateRevision);
+      if (frame) {
+        baseOppJson.width = frame.width;
+        baseOppJson.height = frame.height;
+        baseOppJson.coordinates = faceCoordinates(frame, productData.config, 'mug', 'mug',
+          [targetPlacementId], false, coordinateContext.current.selectedPrintMethod);
+      }
+    }
     facesData.current[oppKey] = JSON.stringify(baseOppJson);
     applyExplicitPlacementList(['mug_front', 'mug_back']);
     switchFace(targetFace);
@@ -4895,7 +4933,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       const next = !prev;
       syncPlacementsAcrossColorsRef.current = next;
       try {
-        localStorage.setItem(`studio_sync_placements_${productId}`, String(next));
+        localStorage.setItem(`studio_sync_placements_${draftNamespace}`, String(next));
       } catch {}
       if (next) {
         // Propagate current color's placements to all colors
@@ -4913,7 +4951,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           });
           placementsByColorRef.current = newMap;
           try {
-            localStorage.setItem(`studio_saved_placements_${productId}`, JSON.stringify(newMap));
+            localStorage.setItem(`studio_saved_placements_${draftNamespace}`, JSON.stringify(newMap));
           } catch {}
           return newMap;
         });
@@ -4947,7 +4985,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     recalculatePrice(canvas, undefined, []);
 
     try {
-      localStorage.setItem(`studio_saved_placements_${productId}`, JSON.stringify(nextMap));
+      localStorage.setItem(`studio_saved_placements_${draftNamespace}`, JSON.stringify(nextMap));
     } catch {}
 
     setFocusedPlacementId(null);
@@ -5388,8 +5426,13 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         const json = JSON.stringify(buildSerializedFaceJson(canvas, isPanoNow, nativeWidthRef.current, nativeHeightRef.current));
         const currentKey = getFaceStateKey(activeFace, selectedColor, isPanoNow);
         facesData.current[currentKey] = json;
+        saveDraftImmediate(canvas);
       } catch (e) {}
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
     }
+    setActiveObject(null);
+    setLiveDimensions(null);
 
     if (syncAllColorsRef.current) {
       propagateDesignToAllColors();
@@ -5413,6 +5456,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   }, [canvas, activeFace, selectedColor, selectedSize, totalOrderQuantity, getFaceStateKey, propagateDesignToAllColors]);
 
   const addText = (customText?: string, options?: { fontFamily?: string; fontWeight?: string; fontStyle?: string }) => {
+    if(!canUseTool("allowText"))return;
     if (!canvas) return;
     if (!ensurePlacementSelected(() => addText(customText, options))) return;
     const fallbackText = locale === 'tr' ? 'Metniniz' : locale === 'en' ? 'Your Text' : 'نصك هنا';
@@ -5529,7 +5573,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   const handleAutoFitActiveObject = () => {
     if (!canvas) return;
     const obj = canvas.getActiveObject();
-    if (!obj) return;
+    if (!obj || (obj as any).isLocked || obj.selectable === false || (obj as any).lockMovementX) return;
 
     let targetLeft = freePrintZone.left;
     let targetTop = freePrintZone.top;
@@ -5633,19 +5677,79 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
 
 
-  const addSticker = (url: string, asset?: { id?: string; name?: string; price?: number; category?: string }) => {
+  const verifyImageUrlLoadable = useCallback((url: string, timeoutMs: number = 12000): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined' || !url || !/^https?:\/\//i.test(url)) {
+        resolve(false);
+        return;
+      }
+      let settled = false;
+      const done = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(ok);
+      };
+      const timer = setTimeout(() => done(false), timeoutMs);
+      const probe = new Image();
+      probe.crossOrigin = 'anonymous';
+      probe.onload = () => done(probe.naturalWidth > 0 && probe.naturalHeight > 0);
+      probe.onerror = () => done(false);
+      probe.src = url;
+    });
+  }, []);
+
+  const resolveTrustedImageUrl = useCallback((obj: any): string | null => {
+    if (!obj || typeof obj !== 'object') return null;
+    if (typeof obj.src === 'string' && /^https?:\/\//i.test(obj.src.trim())) {
+      return obj.src.trim();
+    }
+    if (typeof obj.originalAssetUrl === 'string' && /^https?:\/\//i.test(obj.originalAssetUrl.trim())) {
+      return obj.originalAssetUrl.trim();
+    }
+    if (typeof obj.originalAssetId === 'string' && obj.originalAssetId.trim()) {
+      const refId = obj.originalAssetId.trim();
+      if (/^https?:\/\//i.test(refId)) {
+        return refId;
+      }
+      const matched = designAssets.find((a) => a.id === refId);
+      if (matched && typeof matched.url === 'string' && /^https?:\/\//i.test(matched.url.trim())) {
+        return matched.url.trim();
+      }
+    }
+    return null;
+  }, [designAssets]);
+
+  const addSticker = (url: string, asset?: { id?: string; name?: string; price?: number; category?: string; type?: string; version?: number | string }) => {
+    if(!canUseTool("allowStickers"))return;
     if (!canvas) return;
     if (!ensurePlacementSelected(() => addSticker(url, asset))) return;
-    recordRecentAsset(url, asset);
+    const matchedAsset = designAssets.find((a) => (asset?.id && a.id === asset.id) || a.url === url);
+    const resolvedVersion = asset?.version ?? matchedAsset?.version ?? 1;
+    const resolvedAsset = {
+      ...asset,
+      id: asset?.id || matchedAsset?.id,
+      name: asset?.name || matchedAsset?.name,
+      price: typeof asset?.price === 'number' ? asset.price : (typeof matchedAsset?.price === 'number' ? matchedAsset.price : 0),
+      category: asset?.category || matchedAsset?.category || '',
+      type: asset?.type || matchedAsset?.type || 'sticker',
+      version: resolvedVersion,
+    };
+    recordRecentAsset(url, resolvedAsset);
     loadFabricImage(
       url,
       (img) => {
         (img as any).set({
+          id: `sticker_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           name: 'sticker',
-          originalAssetId: asset?.id || url,
+          originalAssetId: resolvedAsset.id || url,
+          originalAssetUrl: url,
           src: url,
-          assetName: asset?.name,
-          assetPrice: typeof asset?.price === 'number' ? asset.price : 0,
+          assetName: resolvedAsset.name,
+          assetPrice: resolvedAsset.price,
+          assetType: resolvedAsset.type,
+          assetCategory: resolvedAsset.category,
+          assetVersion: resolvedVersion,
         });
         prepareAndAddObject(img);
         saveHistoryState();
@@ -5657,6 +5761,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   };
 
   const processImageFile = async (file: File) => {
+    if(!canUseTool("allowCustomerUpload"))return;
     if (!canvas) return;
     if (!ensurePlacementSelected(() => processImageFile(file))) return;
 
@@ -5715,62 +5820,107 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         // Auto dismiss after 10 seconds
         setTimeout(() => setImageQualityReport(null), 10000);
 
-        // 4. Optimistic Canvas Rendering (Immediately show image on canvas)
-        let canvasObjectRef: fabric.Object | null = null;
-        loadFabricImage(dataUrl, (fabricImg) => {
-          (fabricImg as any).set({ 
-            name: 'user_upload', 
-            originalAssetId: dataUrl,
-            crossOrigin: 'anonymous',
-            isCustomUpload: true
-          });
-          prepareAndAddObject(fabricImg);
-          canvasObjectRef = fabricImg;
-          saveHistoryState();
-          if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-            setActiveMobileTab(null);
-          }
+        // 4. Optimistic Canvas Rendering (Immediately show local preview and wait for object reference)
+        const uploadObjectId = `upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const canvasObjectRef = await new Promise<fabric.Object | null>((resolve) => {
+          loadFabricImage(
+            dataUrl,
+            (fabricImg) => {
+              (fabricImg as any).set({
+                id: uploadObjectId,
+                name: 'user_upload',
+                originalAssetId: dataUrl,
+                crossOrigin: 'anonymous',
+                isCustomUpload: true,
+                assetName: fileToProcess.name,
+              });
+              prepareAndAddObject(fabricImg);
+              saveHistoryState();
+              if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                setActiveMobileTab(null);
+              }
+              resolve(fabricImg);
+            },
+            () => resolve(null)
+          );
         });
 
-        // 5. Background Cloud Upload
+        // 5. Background Cloud Upload with Loadability Verification
         setIsUploading(true);
         const formData = new FormData();
         formData.append('file', fileToProcess);
 
         try {
-          const response = await fetch('/api/upload', { method: 'POST', body: formData });
+          const response = await uploadCustomerImage(formData);
+          if (!response.ok) {
+            throw new Error(`Upload HTTP ${response.status}`);
+          }
           const data = await response.json();
-          if (data.url) {
-            const httpsUrl = (data.url as string).replace('http://', 'https://');
-            if (canvasObjectRef) {
-              const imgObj = canvasObjectRef as fabric.Image;
-              
-              // استبدال الـ Base64 بالرابط القصير السحابي
-              if (imgObj.setSrc) {
+          const rawUrl = typeof data?.url === 'string' ? data.url.trim() : '';
+          if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
+            throw new Error('Invalid upload response URL');
+          }
+          const httpsUrl = rawUrl.startsWith('http://localhost') || rawUrl.startsWith('http://127.0.0.1')
+            ? rawUrl
+            : rawUrl.replace(/^http:\/\//i, 'https://');
+
+          const isLoadable = await verifyImageUrlLoadable(httpsUrl);
+          if (!isLoadable) {
+            throw new Error(`Uploaded image URL is unreachable or blocked by CORS: ${httpsUrl}`);
+          }
+
+          if (canvasObjectRef) {
+            const imgObj = canvasObjectRef as fabric.Image;
+            if (imgObj.setSrc) {
+              await new Promise<void>((resolveSetSrc) => {
                 imgObj.setSrc(httpsUrl, () => {
                   (imgObj as any).set({
                     originalAssetId: httpsUrl,
+                    originalAssetUrl: httpsUrl,
                     crossOrigin: 'anonymous'
                   });
+                  canvas?.requestRenderAll();
                   canvas?.renderAll();
-                  saveDraft(canvas); // إجبار الحفظ التلقائي بالرابط الجديد لتخفيف حجم الذاكرة
+                  saveDraft(canvas);
+                  resolveSetSrc();
                 }, { crossOrigin: 'anonymous' });
-              } else {
-                (imgObj as any).set({
-                  src: httpsUrl,
-                  originalAssetId: httpsUrl,
-                  crossOrigin: 'anonymous'
-                });
-                canvas?.renderAll();
-                saveDraft(canvas);
-              }
+              });
+            } else {
+              (imgObj as any).set({
+                src: httpsUrl,
+                originalAssetId: httpsUrl,
+                originalAssetUrl: httpsUrl,
+                crossOrigin: 'anonymous'
+              });
+              canvas?.requestRenderAll();
+              canvas?.renderAll();
+              saveDraft(canvas);
             }
-
-            // Record in persistent user uploads
-            recordUserUpload(httpsUrl, fileToProcess.name, fileToProcess.size);
           }
-        } catch (error) {
-          console.warn("Background upload warning (local dataURL retained):", error);
+
+          setFailedUploads(prev => {
+            if (!prev[uploadObjectId]) return prev;
+            const next = { ...prev };
+            delete next[uploadObjectId];
+            return next;
+          });
+
+          // Record in persistent user uploads
+          recordUserUpload(httpsUrl, fileToProcess.name, fileToProcess.size);
+        } catch (error: any) {
+          const errMsg = error instanceof Error ? error.message : 'Upload failed';
+          console.warn("Background upload failed (local dataURL preview retained):", errMsg);
+          if (canvasObjectRef) {
+            setFailedUploads(prev => ({
+              ...prev,
+              [uploadObjectId]: {
+                file: fileToProcess,
+                name: fileToProcess.name,
+                error: errMsg,
+              }
+            }));
+          }
+          showToast(t('uploadUrlVerificationFailed'), 'error', 5000);
         } finally {
           setIsUploading(false);
         }
@@ -5779,6 +5929,115 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     };
     reader.readAsDataURL(fileToProcess);
   };
+
+  const retryFailedUpload = useCallback(async (objectId: string) => {
+    const failedEntry = failedUploadsRef.current[objectId];
+    if (!failedEntry || !canvas) return;
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', failedEntry.file);
+      const response = await uploadCustomerImage(formData);
+      if (!response.ok) {
+        throw new Error(`Upload HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      const rawUrl = typeof data?.url === 'string' ? data.url.trim() : '';
+      if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
+        throw new Error('Invalid upload response URL');
+      }
+      const httpsUrl = rawUrl.startsWith('http://localhost') || rawUrl.startsWith('http://127.0.0.1')
+        ? rawUrl
+        : rawUrl.replace(/^http:\/\//i, 'https://');
+
+      const isLoadable = await verifyImageUrlLoadable(httpsUrl);
+      if (!isLoadable) {
+        throw new Error(`Uploaded image URL is unreachable or blocked by CORS: ${httpsUrl}`);
+      }
+
+      const targetObj = canvas.getObjects().find((o: any) => o.id === objectId) as fabric.Image | undefined;
+      if (targetObj) {
+        if (targetObj.setSrc) {
+          await new Promise<void>((resolveSetSrc) => {
+            targetObj.setSrc(httpsUrl, () => {
+              (targetObj as any).set({
+                originalAssetId: httpsUrl,
+                originalAssetUrl: httpsUrl,
+                crossOrigin: 'anonymous',
+              });
+              canvas.requestRenderAll();
+              canvas.renderAll();
+              saveDraft(canvas);
+              resolveSetSrc();
+            }, { crossOrigin: 'anonymous' });
+          });
+        } else {
+          (targetObj as any).set({
+            src: httpsUrl,
+            originalAssetId: httpsUrl,
+            originalAssetUrl: httpsUrl,
+            crossOrigin: 'anonymous',
+          });
+          canvas.requestRenderAll();
+          canvas.renderAll();
+          saveDraft(canvas);
+        }
+      }
+
+      // Also update any serialized face referencing this objectId
+      Object.entries(facesData.current).forEach(([k, raw]) => {
+        if (!raw) return;
+        try {
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (Array.isArray(parsed?.objects)) {
+            let changed = false;
+            parsed.objects.forEach((o: any) => {
+              if (o.id === objectId) {
+                o.src = httpsUrl;
+                o.originalAssetId = httpsUrl;
+                o.originalAssetUrl = httpsUrl;
+                changed = true;
+              }
+            });
+            if (changed) facesData.current[k] = JSON.stringify(parsed);
+          }
+        } catch {}
+      });
+
+      setFailedUploads(prev => {
+        const next = { ...prev };
+        delete next[objectId];
+        return next;
+      });
+      recordUserUpload(httpsUrl, failedEntry.file.name, failedEntry.file.size);
+      showToast(t('uploadRetrySuccess'), 'success', 3000);
+    } catch (error: any) {
+      const errMsg = error instanceof Error ? error.message : 'Upload failed';
+      setFailedUploads(prev => prev[objectId] ? ({
+        ...prev,
+        [objectId]: { ...prev[objectId], error: errMsg }
+      }) : prev);
+      showToast(t('uploadUrlVerificationFailed'), 'error', 5000);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [canvas, verifyImageUrlLoadable, saveDraft, showToast, t]);
+
+  const removeFailedUpload = useCallback((objectId: string) => {
+    if (canvas) {
+      const targetObj = canvas.getObjects().find((o: any) => o.id === objectId);
+      if (targetObj) {
+        canvas.remove(targetObj);
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+      }
+    }
+    setFailedUploads(prev => {
+      const next = { ...prev };
+      delete next[objectId];
+      return next;
+    });
+  }, [canvas]);
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !canvas) return;
@@ -5981,7 +6240,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         }
       });
       if (isPanoramicFace) {
-        migrateLegacyMugPanoramaObjects(staticCanvas, parsed);
+        previewLegacyMugPanoramaObjects(staticCanvas, parsed);
       }
       staticCanvas.renderAll();
 
@@ -6480,6 +6739,10 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       showToast(t('waitUpload', { fallback: 'جاري رفع الصور، يرجى الانتظار...' }), 'info');
       return;
     }
+    if (Object.keys(failedUploadsRef.current).length > 0) {
+      showToast(t('failedUploadsBlockSave'), 'error', 5000);
+      return;
+    }
     setIsSaving(true);
     
     try {
@@ -6504,22 +6767,54 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         } catch {}
       });
 
-      // 1. إنشاء نسخة نظيفة من بيانات الأوجه وتطهير أي Base64 لتجنب خطأ 1MB في Firestore
+      // 1. Sanitize faces and resolve trusted remote URLs for all image objects (never silently wipe src to "")
       const cleanFacesData: Record<string, string> = {};
       const targetFaces = Object.keys(filteredFacesData).length > 0 ? filteredFacesData : facesData.current;
+      let hasInvalidImageSource = false;
+      const snapshotAssetsMap = new Map<string, { originalAssetId: string; assetVersion: number | string; assetType: string; assetName: string }>();
+
+      const sanitizeObjectTree = (obj: any): any => {
+        if (!obj || typeof obj !== 'object') return obj;
+        const name = (obj.name || '').toLowerCase();
+        if (name === 'background' || name === 'mockup' || name === 'print_area_guide' || name === 'guideline') {
+          return obj;
+        }
+        if (obj.type === 'image') {
+          const trustedUrl = resolveTrustedImageUrl(obj);
+          if (!trustedUrl) {
+            hasInvalidImageSource = true;
+            return obj;
+          }
+          if (!obj.src || typeof obj.src !== 'string' || obj.src.startsWith('data:image/') || !/^https?:\/\//i.test(obj.src)) {
+            obj.src = trustedUrl;
+          }
+          if (!obj.originalAssetUrl && /^https?:\/\//i.test(trustedUrl)) {
+            obj.originalAssetUrl = trustedUrl;
+          }
+          if (obj.originalAssetId && !obj.isCustomUpload) {
+            const matchedAsset = designAssets.find((a) => a.id === obj.originalAssetId || a.url === trustedUrl);
+            const resolvedVer = obj.assetVersion ?? matchedAsset?.version ?? 1;
+            obj.assetVersion = resolvedVer;
+            snapshotAssetsMap.set(`${obj.originalAssetId}@${resolvedVer}`, {
+              originalAssetId: String(obj.originalAssetId),
+              assetVersion: resolvedVer,
+              assetType: String(obj.assetType || matchedAsset?.type || 'sticker'),
+              assetName: String(obj.assetName || matchedAsset?.name || ''),
+            });
+          }
+        }
+        if (Array.isArray(obj.objects)) {
+          obj.objects = obj.objects.map(sanitizeObjectTree);
+        }
+        return obj;
+      };
 
       Object.entries(targetFaces).forEach(([stateKey, jsonStr]) => {
         try {
           let faceObj = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
           
           if (faceObj && faceObj.objects && Array.isArray(faceObj.objects)) {
-            faceObj.objects = faceObj.objects.map((obj: any) => {
-              if (obj.type === 'image' && obj.src && typeof obj.src === 'string' && obj.src.startsWith('data:image/')) {
-                // استبدال الـ Base64 الطويل بالرابط السحابي الأصلي لتخفيف حجم الوثيقة
-                obj.src = (obj.originalAssetId && obj.originalAssetId.startsWith('http')) ? obj.originalAssetId : "";
-              }
-              return obj;
-            });
+            faceObj.objects = faceObj.objects.map(sanitizeObjectTree);
           }
           cleanFacesData[stateKey] = JSON.stringify(faceObj);
         } catch (e) {
@@ -6527,11 +6822,18 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         }
       });
 
-      // 2. الفلتر النووي: مسح أي Base64 طويل (data:image/...;base64,...) من الـ JSON بالكامل دون إفساد علامات التنصيص
+      if (hasInvalidImageSource) {
+        showToast(t('invalidImageSourceError'), 'error', 5000);
+        return;
+      }
+
+      // 2. Final guard: reject any lingering large inline data:image payloads instead of silently corrupting JSON
       const rawCanvasJsonString = JSON.stringify(cleanFacesData);
-      const cleanCanvasJsonString = rawCanvasJsonString
-        .replace(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]{100,}/g, '')
-        .replace(/""""/g, '""');
+      if (/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]{100,}/.test(rawCanvasJsonString)) {
+        showToast(t('invalidImageSourceError'), 'error', 5000);
+        return;
+      }
+      const cleanCanvasJsonString = rawCanvasJsonString;
 
       // 3. Generate preview images for all designed faces & colors
       const previewImagesByFace: Record<string, string> = {};
@@ -6561,7 +6863,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               const blob = dataURLtoBlob(faceDataUrl);
               const formData = new FormData();
               formData.append('file', blob, `preview-${stateKey.replace(':::', '-')}.jpg`);
-              const response = await fetch('/api/upload', { method: 'POST', body: formData });
+              const response = await uploadCustomerImage(formData);
               const data = await response.json();
               if (data?.url && typeof data.url === 'string' && data.url.startsWith('http')) {
                 previewImagesByFace[stateKey] = data.url;
@@ -6611,6 +6913,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
 
       // NOTE: canvas_json & production_snapshot are stored as JSON strings to prevent Firestore nested entity & dot-notation key errors. Use JSON.parse() when retrieving.
       const docData = sanitizeForFirestore({
+        ...(versioned ? {print_template_revision:productData.config.builderRevision} : {}),
         user_id: auth.currentUser?.uid || 'guest_user',
         product_id: productId,
         variant_id: `${selectedColor}_${selectedSize}`,
@@ -6624,6 +6927,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           editorVersion: 1,
           customization_config: productData?.config || { faces: {} },
           ...(studioProfile.family === 'mug' ? { mug_meta: mugMeta } : {}),
+          ...(snapshotAssetsMap.size > 0 ? { assets: Array.from(snapshotAssetsMap.values()) } : {}),
           printAreas: Object.keys(configFaces).reduce((acc: any, face: string) => {
             acc[face] = configFaces[face]?.printArea || {};
             return acc;
@@ -6662,68 +6966,11 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       if (action === 'save') {
         showToast(t('saveSuccess'), 'success');
       } else if (action === 'cart' || action === 'buy_now') {
-        const userId = auth.currentUser?.uid || 'guest_user';
-        const itemsToCart = (variantMatrix && variantMatrix.length > 0)
-          ? variantMatrix
-          : [{ color: selectedColor, size: selectedSize, quantity: totalOrderQuantity || 1 }];
-
-        for (const item of itemsToCart) {
-          const itemVariantId = `${item.color}_${item.size}`;
-          const itemColorKey = normalizeColorKey(item.color);
-          const itemPlacementIds = syncPlacementsAcrossColors
-            ? (placementsByColor['__synced__'] || placementsByColor[activeColorKey] || [])
-            : (placementsByColor[itemColorKey] || placementsByColor[activeColorKey] || []);
-
-          const itemPlacements = itemPlacementIds
-            .map(id => getPlacementById(id, productData?.config?.garmentType))
-            .filter((p): p is PlacementSpec => !!p);
-
-          const itemPlacementsData = itemPlacements.map(p => ({
-            id: p.id,
-            targetFace: p.targetFace,
-            nameAr: p.nameAr,
-            nameEn: p.nameEn,
-            nameTr: p.nameTr,
-            descriptionAr: p.descriptionAr,
-            offsetFromCollarCm: p.offsetFromCollarCm,
-            dimensions: {
-              recommended: {
-                widthCm: p.dimensions.recommended.widthCm,
-                heightCm: p.dimensions.recommended.heightCm,
-              }
-            }
-          }));
-
-          const itemPlacementNames = itemPlacements.map(p =>
-            locale === 'tr' ? p.nameTr : locale === 'en' ? p.nameEn : p.nameAr
-          ).join(' + ');
-
-          const itemColorFrontKey = getFaceStateKey('front', item.color);
-          const itemColorActiveKey = getFaceStateKey(activeFace, item.color);
-          const itemPreview = previewImagesByFace[itemColorFrontKey] || previewImagesByFace[itemColorActiveKey] || primaryPreviewUrl;
-          const cartItem = sanitizeForFirestore({
-            user_id: userId,
-            product_id: productId,
-            variant_id: itemVariantId,
-            design_id: currentDesignIdRef.current || 'unknown_design',
-            design_type: 'custom',
-            selected_placement_ids: itemPlacementIds,
-            selected_placements: itemPlacementsData,
-            placement_id: itemPlacementIds.join(','),
-            placement_name: itemPlacementNames || null,
-            placement_offset_collar_cm: itemPlacements[0]?.offsetFromCollarCm ?? null,
-            placement_mode: isFreeMode ? 'free' : 'standard',
-            free_mode_disclaimer_accepted: isFreeMode,
-            print_method: selectedPrintMethod,
-            print_type: selectedPrintMethod,
-            print_strategy: printStrategy,
-            quantity: item.quantity,
-            unit_price: Number(totalPrice) || basePrice,
-            preview_image_url: itemPreview,
-            created_at: new Date().toISOString()
-          });
-          await addDoc(collection(db, 'cart_items'), cartItem);
-        }
+        const itemsToCart = variantMatrix?.length ? variantMatrix : [{ color:selectedColor,size:selectedSize,quantity:totalOrderQuantity || 1 }];
+        await checkoutCall("cart/add", {lines:itemsToCart.map(item => ({
+          product_id:productId, variant_id:`${item.color}_${item.size}`, color:item.color, size:item.size,
+          design_id:currentDesignIdRef.current, design_type:"custom", quantity:item.quantity
+        }))});
 
         // Clear local draft to prevent ghost designs in future orders
         if (typeof window !== 'undefined') {
@@ -6748,7 +6995,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     } catch (err: any) {
       console.error("Design Save Error Details:", err);
       const rawErrorMsg = err instanceof Error ? err.message : (typeof err === 'string' ? err : JSON.stringify(err));
-      showToast(rawErrorMsg || t('saveError'), 'error');
+      showToast(err instanceof CheckoutProblem ? t('checkoutReview') : rawErrorMsg || t('saveError'), 'error');
     } finally {
       // MANDATORY: Always restore button loading state under all circumstances
       setIsSaving(false);
@@ -6903,6 +7150,23 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
       showToast(t('waitUpload', { fallback: 'جاري رفع الصور، يرجى الانتظار...' }), 'info');
       return;
     }
+    if (Object.keys(failedUploadsRef.current).length > 0) {
+      showToast(t('failedUploadsBlockSave'), 'error', 5000);
+      return;
+    }
+    // Check active canvas images for missing or unresolvable src before proceeding
+    if (canvas) {
+      const hasBrokenImage = canvas.getObjects().some((obj: any) => {
+        const n = (obj?.name || '').toLowerCase();
+        if (n === 'background' || n === 'mockup' || n === 'print_area_guide' || n === 'guideline') return false;
+        if (obj.type !== 'image') return false;
+        return !resolveTrustedImageUrl(obj.toObject ? obj.toObject(SERIALIZE_PROPERTIES) : obj);
+      });
+      if (hasBrokenImage) {
+        showToast(t('invalidImageSourceError'), 'error', 5000);
+        return;
+      }
+    }
     if (action === 'cart' || action === 'buy_now') {
       setPendingAction(action);
       runValidation();
@@ -7015,17 +7279,19 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     const currentFace = activeFaceRef.current || activeFace;
 
     let spec: PlacementSpec | undefined;
-    if (studioProfile.family === 'mug') {
-      const mugPlacementId =
-        activeMugMode === 'mug_full_wrap'
-          ? 'mug_full_wrap'
-          : activeMugMode === 'mug_two_sided'
-            ? (isFaceMatching('back', currentFace) ? 'mug_back' : 'mug_front')
-            : 'mug_front';
-      spec = getPlacementById(mugPlacementId, 'mug');
-    } else {
-      const allFaceSpecs = getPlacementsForGarment(gType, currentFace);
-      spec = allFaceSpecs.find(s => s.id === assignedPlacementId) || activeFaceSelectedPlacementsRef.current[0] || allFaceSpecs[0];
+    if (!isFreeModeRef.current) {
+      if (studioProfile.family === 'mug') {
+        const mugPlacementId =
+          activeMugMode === 'mug_full_wrap'
+            ? 'mug_full_wrap'
+            : activeMugMode === 'mug_two_sided'
+              ? (isFaceMatching('back', currentFace) ? 'mug_back' : 'mug_front')
+              : 'mug_front';
+        spec = getPlacementById(mugPlacementId, 'mug');
+      } else {
+        const allFaceSpecs = getPlacementsForGarment(gType, currentFace);
+        spec = allFaceSpecs.find(s => s.id === assignedPlacementId) || activeFaceSelectedPlacementsRef.current[0] || allFaceSpecs[0];
+      }
     }
 
     if (spec) {
@@ -7133,44 +7399,43 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
     if (!canvas) return;
     const obj = canvas.getActiveObject() || activeObject;
     if (!obj) return;
+    const tool = ["textbox","text","i-text"].includes(obj.type||"") ? "allowText" : (obj as any).isCustomUpload ? "allowCustomerUpload" : "allowStickers";
+    if(!canUseTool(tool)) return;
+    const makeUniqueId = () => `obj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     obj.clone((cloned: fabric.Object) => {
+      (cloned as any).id = makeUniqueId();
       (cloned as any).originMode = (obj as any).originMode || (isFreeModeRef.current ? 'free' : 'approved');
       (cloned as any).createdInMode = (obj as any).createdInMode || (isFreeModeRef.current ? 'free' : 'approved');
       (cloned as any).assignedPlacementId = (obj as any).assignedPlacementId;
+      (cloned as any).placementId = (obj as any).placementId;
+      (cloned as any).targetFace = (obj as any).targetFace;
       cloned.set({
         left: (obj.left || 0) + 25,
         top: (obj.top || 0) + 25,
         evented: true,
       });
+      applyPrintBoundaryClipRef.current?.(cloned, canvas.getWidth(), canvas.getHeight());
       canvas.add(cloned);
       canvas.setActiveObject(cloned);
       setActiveObject(cloned);
       computeLiveMetrics(cloned, false);
+      canvas.requestRenderAll();
       canvas.renderAll();
+      recalculatePrice(canvas);
       saveHistoryState();
-    });
-  }, [canvas, activeObject, saveHistoryState, computeLiveMetrics]);
+    }, SERIALIZE_PROPERTIES);
+  }, [canvas, activeObject, saveHistoryState, computeLiveMetrics, canUseTool, recalculatePrice]);
 
   const handleToggleLockActive = useCallback(() => {
     if (!canvas) return;
     const obj = canvas.getActiveObject() || activeObject;
     if (!obj) return;
-    const isCurrentlyLocked = (obj as any).isLocked === true || (obj as any).lockMovementX === true;
+    const isCurrentlyLocked = (obj as any).isLocked === true || obj.selectable === false || (obj as any).lockMovementX === true;
     const nextLocked = !isCurrentlyLocked;
-    obj.set({
-      selectable: true,
-      evented: true,
-      lockMovementX: nextLocked,
-      lockMovementY: nextLocked,
-      lockRotation: nextLocked,
-      lockScalingX: nextLocked,
-      lockScalingY: nextLocked,
-      hasControls: !nextLocked,
-      hasBorders: true,
-    });
-    (obj as any).isLocked = nextLocked;
+    applyObjectLockState(obj, nextLocked);
     canvas.setActiveObject(obj);
     setActiveObject(obj);
+    (canvas as any).fire('layers:refresh');
 
     if (nextLocked) {
       showToast(
@@ -7481,6 +7746,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
   return (
     <div className="w-full h-full flex-1 min-h-0 flex flex-col gap-2 sm:gap-2.5 transition-all overflow-hidden">
       {/* ========================================================================= */}
+      {disabledTools.length>0 && <p role="status" className="text-xs px-2">{t("templateToolLimits",{tools:disabledTools.join(" · ")})}</p>}
       {/* 1. STUDIO HEADER NAVIGATION (PRO STUDIO BAR) */}
       {/* ========================================================================= */}
       {/* 1A. MOBILE SLIM SUBHEADER (Hidden on mobile to eliminate ghost icon and give 100% space to workspace) */}
@@ -7838,7 +8104,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             {/* Tab 1: Stickers */}
             <button
               type="button"
-              id="sidebarTabStickers"
+              id="sidebarTabStickers" disabled={toolPolicy?.allowStickers===false} title={toolPolicy?.allowStickers===false?t("templateUnavailable"):undefined}
               onClick={() => setActiveToolTab('stickers')}
               className={cn(
                 "flex flex-col items-center justify-center py-2.5 px-1 rounded-xl font-bold text-xs gap-1.5 cursor-pointer transition-all",
@@ -7854,7 +8120,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             {/* Tab 2: Upload File */}
             <button
               type="button"
-              id="sidebarTabUpload"
+              id="sidebarTabUpload" disabled={toolPolicy?.allowCustomerUpload===false} title={toolPolicy?.allowCustomerUpload===false?t("templateUnavailable"):undefined}
               onClick={() => setActiveToolTab('upload')}
               className={cn(
                 "flex flex-col items-center justify-center py-2.5 px-1 rounded-xl font-bold text-xs gap-1.5 cursor-pointer transition-all",
@@ -7870,7 +8136,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             {/* Tab 3: Add Text */}
             <button
               type="button"
-              id="sidebarTabText"
+              id="sidebarTabText" disabled={toolPolicy?.allowText===false} title={toolPolicy?.allowText===false?t("templateUnavailable"):undefined}
               onClick={() => setActiveToolTab('text')}
               className={cn(
                 "flex flex-col items-center justify-center py-2.5 px-1 rounded-xl font-bold text-xs gap-1.5 cursor-pointer transition-all",
@@ -7886,7 +8152,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             {/* Tab 4: AI Generation */}
             <button
               type="button"
-              id="sidebarTabAi"
+              id="sidebarTabAi" disabled={toolPolicy?.allowCustomerUpload===false} title={toolPolicy?.allowCustomerUpload===false?t("templateUnavailable"):undefined}
               onClick={() => setActiveToolTab('ai')}
               className={cn(
                 "flex flex-col items-center justify-center py-2.5 px-1 rounded-xl font-bold text-xs gap-1.5 relative cursor-pointer transition-all",
@@ -7902,7 +8168,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           </nav>
 
           {/* TAB 1: STICKERS & GRAPHICS VIEW */}
-          {activeToolTab === 'stickers' && (
+          {toolPolicy?.allowStickers !== false && activeToolTab === 'stickers' && (
             <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
               {/* Panel Header & Search */}
               <div className="p-4 border-b border-slate-100 space-y-3 shrink-0">
@@ -8000,8 +8266,9 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                         <div
                           key={sticker.id}
                           onClick={() => {
-                            if (!ensurePlacementSelected(() => addSticker(sticker.url, { id: sticker.id, name: sticker.name, price: sticker.price }))) return;
-                            addSticker(sticker.url, { id: sticker.id, name: sticker.name, price: sticker.price });
+                            const assetPayload = { id: sticker.id, name: sticker.name, price: sticker.price, category: sticker.category, type: sticker.type, version: sticker.version };
+                            if (!ensurePlacementSelected(() => addSticker(sticker.url, assetPayload))) return;
+                            addSticker(sticker.url, assetPayload);
                             if (typeof window !== 'undefined' && window.innerWidth < 1024) {
                               setActiveMobileTab(null);
                             }
@@ -8049,7 +8316,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           )}
 
           {/* TAB 2: UPLOAD FILE VIEW */}
-          {activeToolTab === 'upload' && (
+          {toolPolicy?.allowCustomerUpload !== false && activeToolTab === 'upload' && (
             <div className="flex flex-col flex-1 min-h-0 p-4 space-y-4 overflow-y-auto pb-8 lg:pb-4 custom-scrollbar">
               <label className="p-6 rounded-2xl border-2 border-dashed border-slate-300 hover:border-[var(--color-primary)] bg-slate-50 hover:bg-orange-50/20 text-center cursor-pointer transition flex flex-col items-center justify-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-orange-100 text-[var(--color-primary)] flex items-center justify-center">
@@ -8099,7 +8366,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           )}
 
           {/* TAB 3: TEXT TOOLS VIEW */}
-          {activeToolTab === 'text' && (
+          {toolPolicy?.allowText !== false && activeToolTab === 'text' && (
             <div className="flex flex-col flex-1 min-h-0 p-4 space-y-4 overflow-y-auto pb-8 lg:pb-4 custom-scrollbar">
               <button
                 type="button"
@@ -8113,7 +8380,23 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               {activeObject && (activeObject.type === 'textbox' || activeObject.type === 'i-text') ? (
                 <div className="space-y-3 pt-2">
                   <TextTools canvas={canvas} activeObject={activeObject} onSaveHistory={saveHistoryState} />
-                  <PrecisionControls canvas={canvas} activeObject={activeObject} onSaveHistory={saveHistoryState} />
+                  <PrecisionControls
+                    canvas={canvas}
+                    activeObject={activeObject}
+                    onSaveHistory={saveHistoryState}
+                    getPrintZone={(obj) => {
+                      if (isMugPanoramicWorkspaceRef.current) {
+                        return { left: 0, top: 0, width: MUG_PANORAMA_SHEET_WIDTH, height: MUG_PANORAMA_SHEET_HEIGHT };
+                      }
+                      return getActiveObjectPrintZoneRef.current?.(obj) || freePrintZoneRef.current || null;
+                    }}
+                    onAfterTransform={(obj) => {
+                      if (!canvas) return;
+                      applyPrintBoundaryClipRef.current?.(obj, canvas.getWidth(), canvas.getHeight());
+                      checkObjectBoundsRef.current?.(canvas);
+                      computeLiveMetrics(obj, false);
+                    }}
+                  />
                 </div>
               ) : (
                 <div className="space-y-2 pt-2">
@@ -8160,7 +8443,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           )}
 
           {/* TAB 4: AI STUDIO VIEW */}
-          {activeToolTab === 'ai' && (
+          {toolPolicy?.allowCustomerUpload !== false && activeToolTab === 'ai' && (
             <div className="flex flex-col flex-1 min-h-0 p-4 space-y-4 overflow-y-auto pb-8 lg:pb-4 custom-scrollbar">
               <div className="p-3 rounded-2xl bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200/80">
                 <div className="flex items-center gap-2 text-purple-800 font-bold text-xs mb-1">
@@ -8523,6 +8806,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               mugMeta={mugMeta}
               showLive3DPanel={showLive3DPanel}
               onToggleLive3DPanel={() => setShowLive3DPanel((v) => !v)}
+              allowedPlacements={versioned ? productData.config.allowedPlacements : undefined}
               onSelectMode={handleSelectMugMode}
               onDuplicateToOpposite={handleDuplicateMugFaceToOpposite}
               onOpen3DPreview={handlePreview}
@@ -8659,6 +8943,44 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                     >
                       <X size={14} />
                     </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Failed Upload Recovery Banner (Only visible if an upload failed URL/CORS verification) */}
+            {Object.keys(failedUploads).length > 0 && (
+              <div
+                id="failedUploadBanner"
+                className="absolute top-14 left-1/2 -translate-x-1/2 z-[60] pointer-events-auto w-[94%] sm:w-auto max-w-md animate-in fade-in slide-in-from-top-2 duration-200"
+              >
+                <div className="flex flex-col gap-1.5 bg-red-600/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-2xl shadow-xl border border-red-300/60 text-xs">
+                  <div className="flex items-center gap-2 font-bold">
+                    <AlertTriangle size={15} className="text-amber-300 shrink-0" />
+                    <span className="leading-snug">{t('uploadUrlVerificationFailed')}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {Object.entries(failedUploads).map(([objId, item]) => (
+                      <div key={objId} className="flex items-center gap-1.5 bg-black/20 rounded-xl px-2 py-1">
+                        <span className="truncate max-w-[120px] font-medium">{item.name}</span>
+                        <button
+                          type="button"
+                          disabled={isUploading}
+                          onClick={() => retryFailedUpload(objId)}
+                          className="bg-white text-red-700 hover:bg-red-50 disabled:opacity-50 px-2.5 py-0.5 rounded-lg text-[11px] font-black transition cursor-pointer whitespace-nowrap"
+                        >
+                          {t('retryUpload')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeFailedUpload(objId)}
+                          className="p-0.5 text-white/80 hover:text-white rounded-md hover:bg-white/15 transition cursor-pointer"
+                          title={t('delete')}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -9566,12 +9888,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
                 <span>{locale === 'tr' ? 'İndirim Kuponu:' : locale === 'en' ? 'Discount:' : 'كوبون فوري للطباعة (خصم):'}</span>
                 <span className="font-mono font-bold">- 0 ₺</span>
               </div>
-              {totalOrderQuantity > 1 && (
-                <div className="border-t border-dashed border-slate-200 pt-1.5 flex justify-between items-center text-slate-500 font-medium text-[11px]">
-                  <span>{locale === 'tr' ? 'Birim Fiyat × Adet:' : locale === 'en' ? 'Unit Price × Qty:' : 'سعر القطعة × الكمية:'}</span>
-                  <span className="font-mono font-bold text-slate-700">{totalPrice} ₺ × {totalOrderQuantity}</span>
-                </div>
-              )}
               <div className="border-t border-slate-200 pt-2 flex justify-between items-baseline text-slate-900">
                 <span className="font-heading font-black text-sm">{locale === 'tr' ? 'Genel Toplam:' : locale === 'en' ? 'Grand Total:' : 'المجموع الإجمالي:'}</span>
                 <div className="text-left">
@@ -9652,6 +9968,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             {/* 1. Stickers / Graphics */}
             <button
               type="button"
+              disabled={toolPolicy?.allowStickers===false}
               onClick={() => {
                 setActiveToolTab('stickers');
                 setActiveMobileTab(activeMobileTab === 'tools' && activeToolTab === 'stickers' ? null : 'tools');
@@ -9668,6 +9985,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             {/* 2. Upload Design */}
             <button
               type="button"
+              disabled={toolPolicy?.allowCustomerUpload===false}
               onClick={() => {
                 setActiveToolTab('upload');
                 setActiveMobileTab(activeMobileTab === 'tools' && activeToolTab === 'upload' ? null : 'tools');
@@ -9684,6 +10002,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
             {/* 3. Add Text */}
             <button
               type="button"
+              disabled={toolPolicy?.allowText===false}
               onClick={() => {
                 addText();
               }}
@@ -9729,6 +10048,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
           {/* 6. Layers / Settings */}
           <button
             type="button"
+            disabled={toolPolicy?.allowLayers===false}
             onClick={() => setActiveMobileTab(activeMobileTab === 'layers' ? null : 'layers')}
             className={cn(
               "flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition active:scale-95 cursor-pointer",
@@ -10265,11 +10585,6 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
               <span className="text-xs text-gray-400 font-medium">{t('totalPrice', { fallback: 'السعر الإجمالي' })}</span>
               <div className="flex items-baseline gap-1.5">
                 <span className="font-black text-xl sm:text-2xl text-amber-400 font-mono">{grandTotalPrice} ₺</span>
-                {totalOrderQuantity > 1 && (
-                  <span className="text-[11px] text-gray-400 font-mono">
-                    ({totalPrice} ₺ × {totalOrderQuantity})
-                  </span>
-                )}
               </div>
             </div>
 
@@ -10342,6 +10657,7 @@ export default function FabricCanvas({ productId, basePrice, productFaces, produ
         availableSizes={availableSizes}
         availableColors={availableColors}
         unitPrice={Number(totalPrice) || basePrice}
+        estimateUnit={estimateUnit}
         selectedColor={selectedColor}
         selectedSize={selectedSize}
         currentMatrix={variantMatrix}

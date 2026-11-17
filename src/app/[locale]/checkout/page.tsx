@@ -1,305 +1,81 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations, useLocale } from 'next-intl';
 import { useCheckoutStore } from '@/store/useCheckoutStore';
-import { auth, db } from '@/lib/firebase';
+import { checkoutCall, CheckoutProblem } from '@/lib/checkoutClient';
+import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, runTransaction, writeBatch, serverTimestamp, increment, getDoc } from 'firebase/firestore';
 import { Loader2, MapPin, Truck, Zap } from 'lucide-react';
-import { getProductFrontImage } from '@/lib/products';
 
 export default function CheckoutSummaryPage() {
   const t = useTranslations('Checkout');
   const locale = useLocale();
   const router = useRouter();
   
-  const { selectedAddress, deliveryMethod, deliveryFee } = useCheckoutStore();
-  const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [userPhone, setUserPhone] = useState<string>('');
-
+  const { selectedAddress, deliveryMethod } = useCheckoutStore();
+  const [quote, setQuote] = useState<any>(null);
+  const [loading,setLoading] = useState(true);
+  const [isProcessing,setIsProcessing] = useState(false);
+  const [accepted,setAccepted] = useState(false);
+  const [error,setError] = useState("");
+  const [review,setReview] = useState("");
+  const [refresh,setRefresh] = useState(0);
+  const attempt = useRef("");
+  const submitting = useRef(false);
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
+    let active = true;
+    setLoading(true); setQuote(null); setAccepted(false); setError(""); setReview("");
+    const unsubscribe = onAuthStateChanged(auth, async user => {
+      const storageKey = "checkout-attempt-" + user?.uid;
+      const saved = sessionStorage.getItem(storageKey);
+      if (user && saved) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-          if (userDoc.exists() && userDoc.data().phone) {
-             setUserPhone(userDoc.data().phone);
-          }
-        } catch(e) {}
-        
-        if (!selectedAddress || !deliveryMethod) {
-          // If state is empty (e.g., hard refresh), go back to cart
-          router.push('/cart');
+          const {key,quote_id} = JSON.parse(saved);
+          const result = await checkoutCall("checkout/confirm",{key,quote_id,accepted:true});
+          sessionStorage.removeItem(storageKey);
+          if (active) router.replace(`/order-confirmation/${result.order_id}`);
           return;
+        } catch(e) {
+          if (!(e instanceof CheckoutProblem) || e.message === "UNAVAILABLE") {
+            if (active) {setLoading(false);setError(t("retryOrder"));}
+            return;
+          }
+          sessionStorage.removeItem(storageKey);
         }
-        fetchCartItems(currentUser.uid);
-      } else {
-        router.push('/');
       }
+      if (!user || !selectedAddress?.id || !deliveryMethod) { router.replace("/cart"); return; }
+      try {
+        const result = await checkoutCall("checkout/quote",{address_id:selectedAddress.id,method:deliveryMethod,locale});
+        if (active) { attempt.current = crypto.randomUUID(); setQuote(result); }
+      } catch (e) {
+        if (active) { setError(t(e instanceof CheckoutProblem && e.message === "NO_STOCK" ? "stockChanged" : "reviewQuote"));
+          if (e instanceof CheckoutProblem) setReview(e.line ?? ""); }
+      } finally { if (active) setLoading(false); }
     });
-    return () => unsubscribe();
-  }, [selectedAddress, deliveryMethod, router]);
-
-  const fetchCartItems = async (uid: string) => {
-    try {
-      const q = query(collection(db, 'cart_items'), where('user_id', '==', uid));
-      const snap = await getDocs(q);
-      const cartItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // Also fetch product names for error messages
-      const itemsWithNames = await Promise.all(cartItems.map(async (item: any) => {
-        let name = 'Product';
-        let imageUrl = item.image_url || null;
-        let customization_mode = null;
-        let quality_metadata = null;
-        try {
-           const pSnap = await getDocs(query(collection(db, 'products'), where('__name__', '==', item.product_id)));
-           if (!pSnap.empty) {
-              const pData = pSnap.docs[0].data();
-              name = pData[`name_${locale}`] || pData.name_en || 'Product';
-              
-              if (item.variant_id) {
-                const [color, size] = item.variant_id.split('_');
-                const varsSnap = await getDocs(collection(db, 'products', item.product_id, 'variants'));
-                let colorName = '';
-                for (const vDoc of varsSnap.docs) {
-                  const vData = vDoc.data();
-                  const docColor = vData.hex || vData.colorName_en || vData.color;
-                  if (docColor === color) {
-                    colorName = vData[`colorName_${locale}`] || vData.colorName_en || color;
-                    if (vData.image_front) {
-                      imageUrl = vData.image_front;
-                    }
-                    break;
-                  }
-                }
-                item.colorName = colorName;
-              }
-              if (!imageUrl) {
-                 imageUrl = await getProductFrontImage(item.product_id);
-              }
-           }
-           if (item.design_id) {
-             const designSnap = await getDoc(doc(db, 'designs', item.design_id));
-             if (designSnap.exists()) {
-                const dData = designSnap.data();
-                if (!imageUrl) imageUrl = dData.preview_image_url;
-                customization_mode = dData.customization_mode || null;
-                quality_metadata = dData.quality_metadata || null;
-             }
-           }
-        } catch(e) {}
-        return { ...item, name, imageUrl: imageUrl || 'https://via.placeholder.com/100', customization_mode, quality_metadata };
-      }));
-      
-      setItems(itemsWithNames);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+    return () => { active = false; unsubscribe(); };
+  },[selectedAddress?.id,deliveryMethod,locale,router,refresh,t]);
+  const items = quote?.lines ?? [];
+  const deliveryFee = (quote?.shipping ?? 0)/100;
+  const subtotal = (quote?.subtotal ?? 0)/100;
+  const total = (quote?.total ?? 0)/100;
   const handleConfirmOrder = async () => {
-    if (!user || items.length === 0) return;
-    setIsProcessing(true);
-    setError(null);
-
+    if (!quote || !accepted || submitting.current) return;
+    submitting.current = true; setIsProcessing(true); setError("");
     try {
-      // 1. Prepare Variant References
-      const itemRefs: any[] = [];
-      for (const item of items) {
-        if (item.variant_id) {
-          const [color, size] = item.variant_id.split('_');
-          const varsSnap = await getDocs(collection(db, 'products', item.product_id, 'variants'));
-          let foundVarRef = null;
-          let foundSize = null;
-          for (const vDoc of varsSnap.docs) {
-            const vData = vDoc.data();
-            const docColor = vData.hex || vData.colorName_en || vData.color;
-            if (docColor === color) {
-              if (vData.sizes && vData.sizes[size] !== undefined) {
-                foundVarRef = vDoc.ref;
-                foundSize = size;
-                break;
-              } else if (vData.size === size) {
-                foundVarRef = vDoc.ref;
-                break;
-              }
-            }
-          }
-          
-          if (foundVarRef) {
-             itemRefs.push({ item, varRef: foundVarRef, size: foundSize });
-          } else {
-             throw new Error(`Variant not found for ${item.name}`);
-          }
-        }
-      }
-
-      // 2. Run Transaction
-      const orderId = doc(collection(db, 'orders')).id;
-      let currentOrderNum = 1000; // Starting number
-      
-      await runTransaction(db, async (transaction) => {
-        // Read Phase
-        const counterRef = doc(db, 'counters', 'orders');
-        const counterDoc = await transaction.get(counterRef);
-        
-        if (counterDoc.exists() && counterDoc.data().current_value) {
-           currentOrderNum = counterDoc.data().current_value + 1;
-        }
-
-        const variantDocs = [];
-        for (const { item, varRef, size } of itemRefs) {
-           const vDoc = await transaction.get(varRef);
-           if (!vDoc.exists()) throw new Error(`Variant not found for ${item.name}`);
-           const vData = vDoc.data() as any;
-           
-           let stock = 0;
-           if (size && vData.sizes) {
-             stock = vData.sizes[size] || 0;
-           } else {
-             stock = vData.stock || 0;
-           }
-           
-           if (stock < item.quantity) {
-              throw new Error(t('outOfStockError', { name: item.name }));
-           }
-           variantDocs.push({ varRef, newStock: stock - item.quantity, size, vData });
-        }
-
-        // Read Phase: Designs for Immutable Snapshot
-        const designDocs = new Map();
-        for (const item of items) {
-          if (item.design_id) {
-            const dDoc = await transaction.get(doc(db, 'designs', item.design_id));
-            if (!dDoc.exists()) {
-              throw new Error(`Design not found for ${item.name}. Cannot create order.`);
-            }
-            const dData = dDoc.data();
-            if (!dData.production_snapshot) {
-              throw new Error(`Production snapshot missing for ${item.name}. Cannot create order.`);
-            }
-            designDocs.set(item.id, dData);
-          }
-        }
-
-        // Write Phase
-        transaction.set(counterRef, { current_value: currentOrderNum }, { merge: true });
-
-        const orderRef = doc(db, 'orders', orderId);
-        transaction.set(orderRef, {
-           user_id: user.uid,
-           order_number: `ORD-${currentOrderNum}`,
-           status: 'pending',
-           delivery_method: deliveryMethod,
-           address_id: selectedAddress?.id || null,
-           delivery_fee: deliveryFee,
-           subtotal,
-           total,
-           payment_method: 'cod',
-           payment_status: 'pending_cod',
-           locale: locale,
-           created_at: serverTimestamp()
-        });
-
-        items.forEach(item => {
-           const itemRef = doc(collection(orderRef, 'items'));
-           const dData = designDocs.get(item.id);
-
-           transaction.set(itemRef, {
-              product_id: item.product_id,
-              variant_id: item.variant_id || null,
-              design_id: item.design_id || null,
-              quantity: item.quantity,
-              unit_price: item.unit_price,
-              
-              canvas_json: typeof dData?.canvas_json === 'string' ? dData.canvas_json : (dData?.canvas_json ? JSON.stringify(dData.canvas_json) : null),
-              production_snapshot: typeof dData?.production_snapshot === 'string' ? dData.production_snapshot : (dData?.production_snapshot ? JSON.stringify(dData.production_snapshot) : null),
-              preview_image_url: dData?.preview_image_url || null,
-              snapshot_version: dData?.production_snapshot ? 1 : null,
-              is_immutable_snapshot: !!dData?.production_snapshot
-           });
-        });
-
-        for (const { varRef, newStock, size, vData } of variantDocs) {
-           if (size && vData.sizes) {
-             transaction.update(varRef, { [`sizes.${size}`]: newStock });
-           } else {
-             transaction.update(varRef, { stock: newStock });
-           }
-        }
-      });
-
-      // 3. Cleanup Cart
-      const batch = writeBatch(db);
-      items.forEach(item => {
-         batch.delete(doc(db, 'cart_items', item.id));
-      });
-      await batch.commit();
-
-      // 4. Send Confirmation Email (Async)
-      if (user.email) {
-        fetch('/api/email/order-confirmation', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ 
-             email: user.email,
-             customerName: user.displayName || user.email.split('@')[0],
-             customerPhone: userPhone,
-             locale: locale,
-             deliveryAddress: selectedAddress ? `${selectedAddress.detailed_address || selectedAddress.full_address}, ${selectedAddress.city || ''}` : '',
-             orderNumber: `ORD-${currentOrderNum}`,
-             total,
-             deliveryMethod,
-             items: items.map(i => ({ 
-               name: i.name, 
-               quantity: i.quantity, 
-               price: i.unit_price,
-               color: i.color,
-               size: i.size,
-               customText: i.custom_text
-             }))
-           })
-        }).catch(console.error);
-      }
-
-      // 5. Send WhatsApp Order Confirmation Notification (Async / Non-blocking)
-      const phoneToSend = userPhone || selectedAddress?.phone || user?.phoneNumber;
-      const nameToSend = user?.displayName || selectedAddress?.full_name || (user?.email ? user.email.split('@')[0] : 'Değerli Müşterimiz');
-      if (phoneToSend) {
-        fetch('/api/whatsapp/order-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phoneNumber: phoneToSend,
-            customerName: nameToSend,
-            orderId: `ORD-${currentOrderNum}`,
-            status: 'pending'
-          })
-        }).catch((err) => console.warn('[WhatsApp Checkout Notification Warning]:', err));
-      }
-
-      // 6. Redirect
-      router.push(`/order-confirmation/${orderId}`);
-      
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'An error occurred while confirming your order.');
-      setIsProcessing(false);
+      const storageKey = "checkout-attempt-" + auth.currentUser.uid;
+      sessionStorage.setItem(storageKey, JSON.stringify({quote_id:quote.quote_id,key:attempt.current}));
+      const result = await checkoutCall("checkout/confirm",{quote_id:quote.quote_id,key:attempt.current,accepted:true});
+      sessionStorage.removeItem(storageKey);
+      router.replace(`/order-confirmation/${result.order_id}`);
+    } catch (e) {
+      if (e instanceof CheckoutProblem && ["REFRESH","NEEDS_REVIEW","NO_STOCK","CART_SIZE"].includes(e.message)) {
+        sessionStorage.removeItem("checkout-attempt-" + auth.currentUser?.uid); setAccepted(false); setQuote(null); setError(t("reviewQuote"));
+      } else setError(t("retryOrder"));
+      submitting.current = false; setIsProcessing(false);
     }
   };
-
-  const subtotal = items.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0);
-  const total = subtotal + deliveryFee;
 
   if (loading) {
     return (
@@ -350,21 +126,18 @@ export default function CheckoutSummaryPage() {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-border/50">
                <h2 className="text-lg font-bold mb-4">{t('itemsCount', { count: items.length })}</h2>
                <div className="space-y-4">
-                 {items.map(item => (
+                 {items.map((item: any) => (
                    <div key={item.id} className="flex gap-4">
-                     <div className="w-12 h-12 rounded-md bg-gray-100 overflow-hidden relative border border-gray-200 flex-shrink-0">
-                       <img src={item.imageUrl} alt={item.name} className="object-cover w-full h-full" />
-                     </div>
                      <div className="flex-1">
                        <p className="font-bold text-sm">{item.name}</p>
                        <p className="text-xs text-gray-500 mt-0.5">
                           {t('quantity')}: {item.quantity} 
-                          {item.variant_id && item.variant_id.includes('_') ? ` | ${item.colorName ? item.colorName + ' - ' : ''}${t('size')}: ${item.variant_id.split('_')[1]}` : (item.size ? ` | ${t('size')}: ${item.size}` : '')}
+                          {item.color} · {item.size}
                        </p>
+                       {item.breakdown.map((part:any,index:number) => <p className="text-xs" key={index}>{part.label || t("part_"+part.type)} · {part.minor/100} ₺</p>)}
+                       {item.old_minor !== item.minor && <p>{t("oldPrice")} <del>{item.old_minor/100} ₺</del> · {t("newPrice")} {item.minor/100} ₺</p>}
                      </div>
-                     <div className="font-bold text-sm">
-                       {item.unit_price * item.quantity} ₺
-                     </div>
+                     <div className="font-bold text-sm">{item.minor * item.quantity / 100} ₺</div>
                    </div>
                  ))}
                </div>
@@ -405,9 +178,12 @@ export default function CheckoutSummaryPage() {
                 </div>
               )}
 
+              {quote && <label className="flex min-h-11 items-center gap-2 mb-3"><input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)} />{t("acceptQuote")}</label>}
+              {error && <div className="flex gap-4"><button className="min-h-11" onClick={()=>setRefresh(n=>n+1)}>{t("refreshQuote")}</button>
+                <button className="min-h-11" onClick={()=>router.push("/cart"+(review ? "#"+encodeURIComponent(review) : ""))}>{t("editCart")}</button></div>}
               <button 
                 onClick={handleConfirmOrder}
-                disabled={isProcessing || items.length === 0}
+                disabled={isProcessing || !accepted || !quote}
                 className="w-full py-4 rounded-xl font-bold text-lg bg-[var(--color-action)] text-white hover:bg-opacity-90 disabled:opacity-50 transition-all shadow-sm flex items-center justify-center gap-2"
               >
                 {isProcessing ? (
@@ -416,7 +192,7 @@ export default function CheckoutSummaryPage() {
                     {t('confirmingOrder')}
                   </>
                 ) : (
-                  t('payNow')
+                  t('confirmCod')
                 )}
               </button>
             </div>

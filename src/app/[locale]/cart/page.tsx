@@ -293,8 +293,8 @@ export default function CartPage() {
 
               return (
                 <div
-                  key={item.id}
-                  className="bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-border/60 hover:border-gray-300 transition-all flex flex-row gap-3 sm:gap-5 relative group"
+                  key={item.id} id={item.id}
+                  className="scroll-mt-28 target:ring-2 target:ring-amber-500 bg-white rounded-2xl p-3 sm:p-5 shadow-sm border border-border/60 hover:border-gray-300 transition-all flex flex-row gap-3 sm:gap-5 relative group"
                 >
                   {/* Product Image Thumbnail */}
                   <Link

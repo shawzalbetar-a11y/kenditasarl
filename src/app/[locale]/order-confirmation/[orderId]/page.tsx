@@ -37,7 +37,8 @@ export default function OrderConfirmationPage({ params }: { params: { orderId: s
         const orderData = orderSnap.data();
         setOrder({ id: orderSnap.id, ...orderData });
         
-        if (orderData.address_id) {
+        if (orderData.address_snapshot) setAddress(orderData.address_snapshot);
+        else if (orderData.address_id) {
            const addrSnap = await getDoc(doc(db, 'addresses', orderData.address_id));
            if (addrSnap.exists()) setAddress(addrSnap.data());
         }
@@ -45,6 +46,9 @@ export default function OrderConfirmationPage({ params }: { params: { orderId: s
         const itemsSnap = await getDocs(collection(db, 'orders', params.orderId, 'items'));
         const orderItems = await Promise.all(itemsSnap.docs.map(async (d) => {
            const idata = d.data();
+           if (idata.schema_version === 1) {
+             return {id:d.id,...idata,title:idata.product_name,imageUrl:idata.preview_image_url || "/favicon.svg",colorName:idata.color};
+           }
            let title = 'Product';
            let imageUrl = 'https://via.placeholder.com/150';
            

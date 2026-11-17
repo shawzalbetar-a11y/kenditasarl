@@ -84,14 +84,37 @@ export default function PhoneVerificationModal({ isOpen, onClose, onSuccess, sav
     setLoading(true);
 
     try {
-      // Link the credential
+      // Link the credential in Firebase Auth
       await confirmationResult.confirm(otpCode);
       
-      // Update firestore to mark phone as verified
-      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        phone: phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`,
-        phone_verified: true
+      // Update firestore via trusted server route to verify OTP proof with Admin SDK
+      const token = await auth.currentUser.getIdToken(true);
+      const verifyRes = await fetch('/api/auth/verify-phone', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
       });
+
+      if (!verifyRes.ok) {
+        const errData = await verifyRes.json().catch(() => ({}));
+        let localizedMsg = errData.message;
+        if (errData.error === 'PHONE_ALREADY_IN_USE' || verifyRes.status === 409) {
+          localizedMsg = t('phoneInUse');
+        } else if (errData.error === 'PHONE_NOT_VERIFIED_IN_AUTH') {
+          localizedMsg = t('phoneNotVerified');
+        } else if (errData.error === 'PHONE_MISMATCH') {
+          localizedMsg = t('phoneMismatch');
+        } else if (verifyRes.status === 429) {
+          localizedMsg = t('tooManyRequests');
+        } else if (verifyRes.status === 503) {
+          localizedMsg = t('serviceUnavailable');
+        } else if (verifyRes.status === 401) {
+          localizedMsg = t('authError');
+        }
+        throw new Error(localizedMsg || t('authError'));
+      }
 
       onSuccess();
       onClose();

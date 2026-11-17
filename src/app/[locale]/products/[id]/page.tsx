@@ -7,6 +7,7 @@ import { Minus, Plus, Paintbrush, ShieldCheck, Check, X, ChevronLeft, ChevronRig
 import { cn } from '@/lib/utils';
 import { useParams, useSearchParams } from 'next/navigation';
 import { db, auth } from '@/lib/firebase';
+import { checkoutCall } from "@/lib/checkoutClient";
 import { doc, getDoc, collection, getDocs, query, where, limit, addDoc, updateDoc } from 'firebase/firestore';
 import ProductCard from '@/components/ui/ProductCard';
 import AuthModal from '@/components/auth/AuthModal';
@@ -492,55 +493,12 @@ export default function ProductDetailsPage() {
     setIsAddingToCart(true);
     try {
       const variantId = `${selectedColor}_${selectedSize}`;
-      const isBlank = viewType === 'blank';
+      const isBlank = viewType === 'blank' || (!hasReadyOption && !selectedReadyDesignId && !product.ready_design_id && !product.linked_ready_designs?.length);
       const targetDesignId = isBlank ? null : (selectedReadyDesignId || product.ready_design_id || null);
       const targetDesignType: 'ready' | 'blank' = isBlank ? 'blank' : 'ready';
 
-      // Find appropriate preview image matching selectedColor and viewType
-      let previewImageUrl = '';
-      if (isBlank) {
-        const blankImg = displayImages.find(img => img.type === 'blank') || displayImages.find(img => !img.type) || displayImages[0];
-        previewImageUrl = blankImg?.url || '';
-      } else {
-        const readyImg = displayImages.find(img => img.type === 'ready') || displayImages[0];
-        previewImageUrl = readyImg?.url || '';
-      }
-
-      // Check if this exact product+variant already exists in cart for this user
-      const q = query(
-        collection(db, 'cart_items'),
-        where('user_id', '==', auth.currentUser.uid),
-        where('product_id', '==', id),
-        where('variant_id', '==', variantId),
-        where('design_id', '==', targetDesignId)
-      );
-
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        // Merge: Update quantity
-        const existingDoc = snap.docs[0];
-        const newQty = existingDoc.data().quantity + quantity;
-
-        await updateDoc(doc(db, 'cart_items', existingDoc.id), {
-          quantity: newQty > maxStock ? maxStock : newQty,
-          preview_image_url: previewImageUrl || existingDoc.data().preview_image_url || ''
-        });
-      } else {
-        // Create new
-        await addDoc(collection(db, 'cart_items'), {
-          user_id: auth.currentUser.uid,
-          product_id: id,
-          variant_id: variantId,
-          color: selectedColor,
-          size: selectedSize,
-          design_id: targetDesignId,
-          design_type: targetDesignType,
-          preview_image_url: previewImageUrl,
-          quantity: quantity,
-          unit_price: product.base_price,
-          created_at: new Date().toISOString()
-        });
-      }
+      await checkoutCall("cart/add", {lines:[{ product_id:id,variant_id:variantId,color:selectedColor,size:selectedSize,
+        design_id:targetDesignId,design_type:targetDesignType,quantity }]});
       alert(t?.('addedToCartSuccess') || (isBlank ? 'تمت إضافة المنتج السادة (بدون طباعة) للسلة بنجاح!' : 'تمت الإضافة للسلة بنجاح!'));
     } catch (err) {
       console.error("Add to cart error:", err);

@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { PrintArea } from '@/lib/customizationConfig';
+import { SERIALIZE_PROPERTIES } from '@/lib/faceCoordinates';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 
@@ -22,6 +23,8 @@ interface ImageToolsProps {
   activeObject: fabric.Object | null;
   onSaveHistory: () => void;
   printArea: PrintArea;
+  getPrintZone?: (obj: fabric.Object) => { left: number; top: number; width: number; height: number } | null;
+  onAfterTransform?: (obj: fabric.Object) => void;
 }
 
 const COLOR_SWATCHES = [
@@ -37,7 +40,14 @@ const COLOR_SWATCHES = [
   '#6B7280',
 ];
 
-export default function ImageTools({ canvas, activeObject, onSaveHistory, printArea }: ImageToolsProps) {
+export default function ImageTools({
+  canvas,
+  activeObject,
+  onSaveHistory,
+  printArea,
+  getPrintZone,
+  onAfterTransform,
+}: ImageToolsProps) {
   const t = useTranslations('Editor');
   const [activeSubTab, setActiveSubTab] = useState<'color' | 'filters' | 'transform'>('color');
   const [opacity, setOpacity] = useState(1);
@@ -201,20 +211,32 @@ export default function ImageTools({ canvas, activeObject, onSaveHistory, printA
     onSaveHistory();
   };
 
+  const isObjectLocked = () =>
+    (activeObject as any).isLocked === true ||
+    activeObject.selectable === false ||
+    (activeObject as any).lockMovementX === true;
+
   const flipX = () => {
+    if (isObjectLocked()) return;
     activeObject.set('flipX', !activeObject.flipX);
     canvas?.renderAll();
+    canvas?.fire('object:modified', { target: activeObject });
+    onAfterTransform?.(activeObject);
     onSaveHistory();
   };
 
   const flipY = () => {
+    if (isObjectLocked()) return;
     activeObject.set('flipY', !activeObject.flipY);
     canvas?.renderAll();
+    canvas?.fire('object:modified', { target: activeObject });
+    onAfterTransform?.(activeObject);
     onSaveHistory();
   };
 
   const duplicate = () => {
     if (!canvas) return;
+    const makeUniqueId = () => `obj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     activeObject.clone((cloned: fabric.Object) => {
       cloned.set({
         left: (cloned.left || 0) + 20,
@@ -223,28 +245,60 @@ export default function ImageTools({ canvas, activeObject, onSaveHistory, printA
       });
       if (cloned.type === 'activeSelection') {
         cloned.canvas = canvas;
-        (cloned as fabric.ActiveSelection).forEachObject((obj: any) => canvas.add(obj));
+        (cloned as fabric.ActiveSelection).forEachObject((obj: any) => {
+          obj.id = makeUniqueId();
+          canvas.add(obj);
+        });
         cloned.setCoords();
       } else {
+        (cloned as any).id = makeUniqueId();
         canvas.add(cloned);
       }
       canvas.setActiveObject(cloned);
+      canvas.requestRenderAll();
+      canvas.fire('object:modified', { target: cloned });
       onSaveHistory();
-    });
+    }, SERIALIZE_PROPERTIES);
+  };
+
+  const resolveActiveZone = () => {
+    const z = getPrintZone?.(activeObject);
+    if (z && Number.isFinite(z.left) && Number.isFinite(z.top) && z.width > 0 && z.height > 0) {
+      return z;
+    }
+    if (printArea && Number.isFinite(printArea.left) && Number.isFinite(printArea.top) && printArea.width > 0 && printArea.height > 0) {
+      return { left: printArea.left, top: printArea.top, width: printArea.width, height: printArea.height };
+    }
+    return null;
   };
 
   const center = () => {
-    if (!canvas) return;
-    canvas.centerObject(activeObject);
+    if (!canvas || !activeObject || isObjectLocked()) return;
+    const zone = resolveActiveZone();
+    if (zone) {
+      const centerPt = activeObject.getCenterPoint();
+      const targetCx = zone.left + zone.width / 2;
+      const targetCy = zone.top + zone.height / 2;
+      activeObject.set({
+        left: (activeObject.left || 0) + (targetCx - centerPt.x),
+        top: (activeObject.top || 0) + (targetCy - centerPt.y),
+      });
+    } else {
+      canvas.centerObject(activeObject);
+    }
     activeObject.setCoords();
+    canvas.requestRenderAll();
     canvas.renderAll();
+    onAfterTransform?.(activeObject);
+    (canvas as any).fire('object:modified', { target: activeObject, skipPlacementSwitch: true });
     onSaveHistory();
   };
 
   const fitToPrintArea = () => {
-    if (!canvas || !activeObject) return;
-    const targetW = printArea?.width || (canvas as any).printAreaWidth || 200;
-    const targetH = printArea?.height || (canvas as any).printAreaHeight || 280;
+    if (!canvas || !activeObject || isObjectLocked()) return;
+    const zone = resolveActiveZone();
+    const targetW = zone?.width || printArea?.width || (canvas as any).printAreaWidth || 200;
+    const targetH = zone?.height || printArea?.height || (canvas as any).printAreaHeight || 280;
     
     // Fit within 92% of actual print area while strictly preserving aspect ratio and leaving safe margins
     const maxW = targetW * 0.92;
@@ -254,11 +308,22 @@ export default function ImageTools({ canvas, activeObject, onSaveHistory, printA
     const scaleFactor = Math.min(maxW / originalW, maxH / originalH);
     
     activeObject.scale(scaleFactor);
-    canvas.centerObject(activeObject);
+    if (zone) {
+      const centerPt = activeObject.getCenterPoint();
+      const targetCx = zone.left + zone.width / 2;
+      const targetCy = zone.top + zone.height / 2;
+      activeObject.set({
+        left: (activeObject.left || 0) + (targetCx - centerPt.x),
+        top: (activeObject.top || 0) + (targetCy - centerPt.y),
+      });
+    } else {
+      canvas.centerObject(activeObject);
+    }
     activeObject.setCoords();
     canvas.requestRenderAll();
     canvas.renderAll();
-    canvas.fire('object:modified', { target: activeObject });
+    onAfterTransform?.(activeObject);
+    (canvas as any).fire('object:modified', { target: activeObject, skipPlacementSwitch: true });
     onSaveHistory();
   };
 

@@ -23,82 +23,134 @@ interface PrecisionControlsProps {
   canvas: fabric.Canvas | null;
   activeObject: fabric.Object | null;
   onSaveHistory: () => void;
+  getPrintZone?: (obj: fabric.Object) => { left: number; top: number; width: number; height: number } | null;
+  onAfterTransform?: (obj: fabric.Object) => void;
 }
 
-export default function PrecisionControls({ canvas, activeObject, onSaveHistory }: PrecisionControlsProps) {
+export default function PrecisionControls({
+  canvas,
+  activeObject,
+  onSaveHistory,
+  getPrintZone,
+  onAfterTransform,
+}: PrecisionControlsProps) {
   const t = useTranslations('Editor');
   const [nudgeStep, setNudgeStep] = useState<number>(5); // 1px, 5px, 10px
 
   if (!canvas || !activeObject) return null;
 
-  const moveObject = (dx: number, dy: number) => {
-    const currentLeft = activeObject.left || 0;
-    const currentTop = activeObject.top || 0;
-    activeObject.set({
-      left: currentLeft + dx,
-      top: currentTop + dy,
-    });
+  const isLocked = () =>
+    (activeObject as any).isLocked === true ||
+    activeObject.selectable === false ||
+    (activeObject as any).lockMovementX === true;
+
+  const resolveZone = () => {
+    const z = getPrintZone?.(activeObject);
+    if (z && Number.isFinite(z.left) && Number.isFinite(z.top) && z.width > 0 && z.height > 0) {
+      return z;
+    }
+    return null;
+  };
+
+  const commitTransform = () => {
     activeObject.setCoords();
     canvas.requestRenderAll();
     canvas.renderAll();
+    onAfterTransform?.(activeObject);
+    (canvas as any).fire('object:modified', { target: activeObject, skipPlacementSwitch: true });
     onSaveHistory();
+  };
+
+  const moveObject = (dx: number, dy: number) => {
+    if (isLocked()) return;
+    const prevLeft = activeObject.left || 0;
+    const prevTop = activeObject.top || 0;
+    let nextLeft = prevLeft + dx;
+    let nextTop = prevTop + dy;
+
+    // Keep object center within its assigned print zone so nudging never migrates to another placement
+    const zone = resolveZone();
+    if (zone) {
+      const center = activeObject.getCenterPoint();
+      const targetCx = Math.max(zone.left, Math.min(zone.left + zone.width, center.x + dx));
+      const targetCy = Math.max(zone.top, Math.min(zone.top + zone.height, center.y + dy));
+      nextLeft = prevLeft + (targetCx - center.x);
+      nextTop = prevTop + (targetCy - center.y);
+    }
+
+    activeObject.set({
+      left: nextLeft,
+      top: nextTop,
+    });
+    commitTransform();
   };
 
   const rotateObject = (deltaAngle: number) => {
+    if (isLocked()) return;
     const currentAngle = activeObject.angle || 0;
     const newAngle = Math.round((currentAngle + deltaAngle) % 360);
     activeObject.set('angle', newAngle);
-    activeObject.setCoords();
-    canvas.requestRenderAll();
-    canvas.renderAll();
-    onSaveHistory();
+    commitTransform();
   };
 
   const resetRotation = () => {
+    if (isLocked()) return;
     activeObject.set('angle', 0);
-    activeObject.setCoords();
-    canvas.requestRenderAll();
-    canvas.renderAll();
-    onSaveHistory();
+    commitTransform();
   };
 
   const scaleObject = (factor: number) => {
+    if (isLocked()) return;
     const currentScaleX = activeObject.scaleX || 1;
     const currentScaleY = activeObject.scaleY || 1;
     activeObject.set({
       scaleX: Math.max(0.05, currentScaleX * factor),
       scaleY: Math.max(0.05, currentScaleY * factor),
     });
-    activeObject.setCoords();
-    canvas.requestRenderAll();
-    canvas.renderAll();
-    onSaveHistory();
+    commitTransform();
   };
 
   const centerHorizontal = () => {
-    (canvas as any).centerObjectH(activeObject);
-    activeObject.setCoords();
-    canvas.requestRenderAll();
-    canvas.renderAll();
-    canvas.fire('object:modified', { target: activeObject });
-    onSaveHistory();
+    if (isLocked()) return;
+    const zone = resolveZone();
+    if (zone) {
+      const center = activeObject.getCenterPoint();
+      const targetCx = zone.left + zone.width / 2;
+      activeObject.set('left', (activeObject.left || 0) + (targetCx - center.x));
+    } else {
+      (canvas as any).centerObjectH(activeObject);
+    }
+    commitTransform();
   };
 
   const centerVertical = () => {
-    (canvas as any).centerObjectV(activeObject);
-    activeObject.setCoords();
-    canvas.requestRenderAll();
-    canvas.renderAll();
-    canvas.fire('object:modified', { target: activeObject });
-    onSaveHistory();
+    if (isLocked()) return;
+    const zone = resolveZone();
+    if (zone) {
+      const center = activeObject.getCenterPoint();
+      const targetCy = zone.top + zone.height / 2;
+      activeObject.set('top', (activeObject.top || 0) + (targetCy - center.y));
+    } else {
+      (canvas as any).centerObjectV(activeObject);
+    }
+    commitTransform();
   };
 
   const centerBoth = () => {
-    canvas.centerObject(activeObject);
-    activeObject.setCoords();
-    canvas.requestRenderAll();
-    canvas.renderAll();
-    onSaveHistory();
+    if (isLocked()) return;
+    const zone = resolveZone();
+    if (zone) {
+      const center = activeObject.getCenterPoint();
+      const targetCx = zone.left + zone.width / 2;
+      const targetCy = zone.top + zone.height / 2;
+      activeObject.set({
+        left: (activeObject.left || 0) + (targetCx - center.x),
+        top: (activeObject.top || 0) + (targetCy - center.y),
+      });
+    } else {
+      canvas.centerObject(activeObject);
+    }
+    commitTransform();
   };
 
   return (

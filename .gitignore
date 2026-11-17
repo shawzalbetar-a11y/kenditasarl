@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+/tests/firestore/node_modules/
+firestore-debug.log
+firebase-debug.log
 /.pnp
 .pnp.js
 
@@ -40,4 +43,7 @@ next-env.d.ts
 .vscode/
 .agents/
 .kilo/
+
+# nested independent admin repository
+/kenditasarl-admin/
 

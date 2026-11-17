@@ -21,6 +21,7 @@ export type MugPrintMode = 'mug_full_wrap' | 'mug_front' | 'mug_two_sided';
 export type MugPanoramaZone = 'left' | 'center' | 'right';
 
 interface MugStudioControlsBarProps {
+  allowedPlacements?: string[];
   activeMode: MugPrintMode;
   activeFace: string;
   mugMeta: MugMeta;
@@ -33,6 +34,7 @@ interface MugStudioControlsBarProps {
 }
 
 export function MugStudioControlsBar({
+  allowedPlacements,
   activeMode,
   activeFace,
   mugMeta,
@@ -74,7 +76,8 @@ export function MugStudioControlsBar({
           {mugMeta.supportsFullWrap && (
             <button
               type="button"
-              aria-pressed={activeMode === 'mug_full_wrap'}
+              hidden={!!allowedPlacements && !['mug_full_wrap'].every(id=>allowedPlacements.includes(id))}
+            aria-pressed={activeMode === 'mug_full_wrap'}
               onClick={() => onSelectMode('mug_full_wrap')}
               className={`min-h-[34px] sm:min-h-[36px] px-2 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer ${activeMode === 'mug_full_wrap'
                   ? 'bg-amber-500 text-white shadow-xs'
@@ -86,6 +89,7 @@ export function MugStudioControlsBar({
           )}
           <button
             type="button"
+            hidden={!!allowedPlacements && !['mug_front'].every(id=>allowedPlacements.includes(id))}
             aria-pressed={activeMode === 'mug_front'}
             onClick={() => onSelectMode('mug_front')}
             className={`min-h-[34px] sm:min-h-[36px] px-2 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer ${activeMode === 'mug_front'
@@ -99,6 +103,7 @@ export function MugStudioControlsBar({
           </button>
           <button
             type="button"
+            hidden={!!allowedPlacements && !['mug_front', 'mug_back'].every(id=>allowedPlacements.includes(id))}
             aria-pressed={activeMode === 'mug_two_sided'}
             onClick={() => onSelectMode('mug_two_sided')}
             className={`min-h-[34px] sm:min-h-[36px] px-2 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer inline-flex items-center gap-1 ${activeMode === 'mug_two_sided'

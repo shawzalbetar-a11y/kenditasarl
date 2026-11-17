@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -12,12 +12,23 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only if config is present (prevents crash on empty .env)
-const isConfigured = !!firebaseConfig.apiKey;
-const app = isConfigured ? (!getApps().length ? initializeApp(firebaseConfig) : getApp()) : null as any;
+const isEmulatorMode =
+  firebaseConfig.projectId === "demo-kenditasarla-rules" ||
+  process.env.NEXT_PUBLIC_FIREBASE_EMULATOR === "1" ||
+  process.env.NEXT_PUBLIC_CHECKOUT_EMULATOR === "1";
+
+const effectiveApiKey = firebaseConfig.apiKey || (isEmulatorMode ? "fake-api-key" : undefined);
+const effectiveConfig = { ...firebaseConfig, apiKey: effectiveApiKey };
+const isConfigured = !!effectiveApiKey;
+const app = isConfigured ? (!getApps().length ? initializeApp(effectiveConfig) : getApp()) : null as any;
 
 export const auth = isConfigured ? getAuth(app) : null as any;
 export const db = isConfigured ? getFirestore(app) : null as any;
 export const storage = isConfigured ? getStorage(app) : null as any;
+
+if (isConfigured && isEmulatorMode) {
+  if (!auth.emulatorConfig) connectAuthEmulator(auth, "http://127.0.0.1:19099", { disableWarnings: true });
+  connectFirestoreEmulator(db, "127.0.0.1", 18080);
+}
 
 export default app;

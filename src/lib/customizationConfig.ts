@@ -24,6 +24,7 @@ export interface ProductImageItem {
 }
 
 export interface PrintArea {
+  mirrorHorizontal?: boolean;
   id: string;
   name: string;
   width: number;
@@ -106,6 +107,13 @@ export interface CustomizationConfig {
   garmentType?: 'tshirt' | 'hoodie' | 'sweatshirt' | 'mug' | 'hat' | 'phone_case' | 'generic';
   allowedPlacements?: string[]; // IDs of approved placements allowed for this product
   defaultPlacementId?: string;
+  mug_meta?: {
+    mugStyle: 'standard' | 'magic' | 'inner_color';
+    mugCapacities: string[];
+    magicRevealCoverColor?: string;
+    handleMarginCm?: number;
+    supportsFullWrap?: boolean;
+  };
 
   // Custom calibrated placement coordinates per product (mapped by placementId)
   calibratedPlacements?: {
@@ -200,6 +208,7 @@ export function normalizePrintArea(pa?: Partial<PrintArea> | null, defaultId: st
   if (typeof pa?.physicalHeightCm === 'number') {
     result.physicalHeightCm = pa.physicalHeightCm;
   }
+  if (typeof pa?.mirrorHorizontal === 'boolean') result.mirrorHorizontal = pa.mirrorHorizontal;
   if (typeof pa?.targetDPI === 'number') {
     result.targetDPI = pa.targetDPI;
   }

@@ -15,6 +15,9 @@ export default function LayerPanel({ canvas, activeObject, onSaveHistory, locale
   const t = useTranslations('Editor');
   const [layers, setLayers] = useState<fabric.Object[]>([]);
 
+  const isObjectLocked = (obj: fabric.Object) =>
+    (obj as any).isLocked === true || obj.selectable === false || (obj as any).lockMovementX === true;
+
   const updateLayers = () => {
     if (!canvas) return;
     setLayers([...canvas.getObjects()].reverse());
@@ -26,10 +29,12 @@ export default function LayerPanel({ canvas, activeObject, onSaveHistory, locale
     canvas.on('object:added', updateLayers);
     canvas.on('object:removed', updateLayers);
     canvas.on('object:modified', updateLayers);
+    (canvas as any).on('layers:refresh', updateLayers);
     return () => {
       canvas.off('object:added', updateLayers);
       canvas.off('object:removed', updateLayers);
       canvas.off('object:modified', updateLayers);
+      (canvas as any).off('layers:refresh', updateLayers);
     };
   }, [canvas]);
 
@@ -43,9 +48,9 @@ export default function LayerPanel({ canvas, activeObject, onSaveHistory, locale
 
   const toggleLock = (obj: fabric.Object, e: React.MouseEvent) => {
     e.stopPropagation();
-    const isCurrentlyLocked = (obj as any).isLocked === true || obj.selectable === false || (obj as any).lockMovementX === true;
+    const isCurrentlyLocked = isObjectLocked(obj);
     const nextLocked = !isCurrentlyLocked;
-    obj.set({
+    const lockProps: Record<string, any> = {
       selectable: true,
       evented: true,
       lockMovementX: nextLocked,
@@ -54,8 +59,15 @@ export default function LayerPanel({ canvas, activeObject, onSaveHistory, locale
       lockScalingX: nextLocked,
       lockScalingY: nextLocked,
       hasControls: !nextLocked,
-    });
+      hasBorders: true,
+    };
+    if (obj.type === 'i-text' || obj.type === 'textbox') {
+      lockProps.editable = !nextLocked;
+    }
+    obj.set(lockProps);
     (obj as any).isLocked = nextLocked;
+    (canvas as any)?.fire('layers:refresh');
+    canvas?.requestRenderAll();
     canvas?.renderAll();
     onSaveHistory();
     updateLayers();
@@ -97,7 +109,7 @@ export default function LayerPanel({ canvas, activeObject, onSaveHistory, locale
       <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
         {layers.map((obj, idx) => {
           const isActive = activeObject === obj;
-          const isLocked = obj.selectable === false;
+          const isLocked = isObjectLocked(obj);
           const isVisible = obj.visible !== false;
           const name = obj.type === 'i-text' ? ((obj as fabric.IText).text?.substring(0, 10) || 'Text') : (obj.name || obj.type);
           

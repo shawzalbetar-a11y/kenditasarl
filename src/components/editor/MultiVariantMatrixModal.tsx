@@ -18,6 +18,7 @@ interface MultiVariantMatrixModalProps {
   availableSizes: string[];
   availableColors: string[];
   unitPrice: number;
+  estimateUnit: (color: string) => number;
   selectedColor: string;
   selectedSize: string;
   currentMatrix?: VariantMatrixItem[] | null;
@@ -71,7 +72,7 @@ export default function MultiVariantMatrixModal({
   onClose,
   availableSizes,
   availableColors,
-  unitPrice,
+  unitPrice, estimateUnit,
   selectedColor,
   selectedSize,
   currentMatrix,
@@ -222,7 +223,7 @@ export default function MultiVariantMatrixModal({
 
   // Total amount based on total pieces
   const effectiveTotalPieces = totalPieces > 0 ? totalPieces : Math.max(1, totalOrderQuantity || 1);
-  const totalPrice = effectiveTotalPieces * unitPrice;
+  const totalPrice = breakdown.length ? breakdown.reduce((sum,item)=>sum + estimateUnit(item.color) * item.quantity,0) : effectiveTotalPieces * unitPrice;
 
   const unusedColors = availableColors.filter(c => !activeColors.some(ac => isColorEqual(ac, c)));
 
