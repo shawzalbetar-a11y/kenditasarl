@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html class="h-full" dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>كندي صمم | استوديو التصميم الفاخر (Kenditasarl Studio PRO)</title>
+  <!-- Google Fonts: Cairo & IBM Plex Sans Arabic -->
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <!-- Font Awesome Icons for rich UI iconography -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet"/>
+  <!-- Tailwind CSS v3 with Plugins -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"IBM Plex Sans Arabic"', 'Cairo', 'sans-serif'],
+            heading: ['Cairo', '"IBM Plex Sans Arabic"', 'sans-serif']
+          },
+          colors: {
+            brand: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              400: '#fb923c',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c'
+            },
+            charcoal: {
+              800: '#1e2229',
+              900: '#121418',
+              950: '#0a0b0d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- BEGIN: Custom CSS Styles -->
+  <style data-purpose="custom-scrollbars">
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+  <style data-purpose="canvas-grid-pattern">
+    .canvas-grid {
+      background-color: #f8fafc;
+      background-image: radial-gradient(#cbd5e1 0.75px, transparent 0.75px);
+      background-size: 20px 20px;
+    }
+    .realistic-tshirt-shadow {
+      filter: drop-shadow(0 25px 35px rgba(15, 23, 42, 0.18)) drop-shadow(0 10px 15px rgba(15, 23, 42, 0.08));
+    }
+    .checkerboard-pattern {
+      background-color: #f8fafc;
+      background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%), 
+                        linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #e2e8f0 75%), 
+                        linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    }
+  </style>
+  <!-- END: Custom CSS Styles -->
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased h-full flex flex-col overflow-hidden select-none">
+
+  <!-- ========================================================================= -->
+  <!-- 1. STUDIO HEADER NAVIGATION -->
+  <!-- ========================================================================= -->
+  <header class="h-16 bg-white border-b border-slate-200/90 px-4 md:px-6 flex items-center justify-between shrink-0 z-30 shadow-xs" data-purpose="main-header">
+    <!-- Brand & Project Breadcrumb Info -->
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-md shadow-brand-500/25">
+          <i class="fa-solid fa-shapes text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-heading font-black text-lg tracking-tight text-slate-900">Kenditasarl | كندي صمم</span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-200">PRO STUDIO</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-500">
+            <span class="font-medium text-slate-700">تيشيرت أوفر سايز فاخر (100% قطن تركي ممشط 240gsm)</span>
+            <span class="text-slate-300">•</span>
+            <span class="text-emerald-600 flex items-center gap-1 font-medium">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              تم الحفظ تلقائياً
+            </span>
+          </div>
+        </div>
+      </div>
+      <!-- Change Product Button -->
+      <button class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition cursor-pointer" title="استبدل الموديل">
+        <i class="fa-solid fa-shirt text-slate-400"></i>
+        <span>تغيير الموديل</span>
+      </button>
+    </div>
+
+    <!-- Center Quick Studio Actions -->
+    <div class="flex items-center gap-2">
+      <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70 text-slate-600">
+        <button class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white hover:text-slate-900 hover:shadow-xs transition cursor-pointer" title="تراجع (Ctrl+Z)">
+          <i class="fa-solid fa-rotate-right -scale-x-100 text-xs"></i>
+        </button>
+        <button class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white hover:text-slate-900 hover:shadow-xs transition cursor-pointer" title="إعادة (Ctrl+Y)">
+          <i class="fa-solid fa-rotate-left -scale-x-100 text-xs"></i>
+        </button>
+        <div class="w-px h-4 bg-slate-300 mx-1"></div>
+        <button id="clearCanvasBtn" class="px-2.5 h-8 rounded-lg flex items-center gap-1.5 text-xs font-medium hover:bg-white hover:text-slate-900 transition cursor-pointer" title="مسح الواجهة">
+          <i class="fa-regular fa-clone text-xs"></i>
+          <span class="hidden sm:inline">مسح الواجهة</span>
+        </button>
+      </div>
+
+      <!-- Real Preview Mockup Toggle -->
+      <button class="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-xs transition cursor-pointer">
+        <i class="fa-solid fa-cube text-brand-600 text-sm"></i>
+        <span>معاينة ثلاثية الأبعاد 3D</span>
+      </button>
+    </div>
+
+    <!-- Final Order & Cart CTAs -->
+    <div class="flex items-center gap-2.5">
+      <button class="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+        <i class="fa-regular fa-bookmark text-sm"></i>
+        <span>حفظ التصميم</span>
+      </button>
+
+      <!-- Multi-Size & Quantity Matrix Trigger -->
+      <button id="openMatrixModalBtn" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs transition cursor-pointer shadow-xs">
+        <i class="fa-solid fa-layer-group text-amber-600"></i>
+        <span>تعدد المقاسات والكميات</span>
+        <span id="headerTotalQtyBadge" class="bg-amber-500 text-white font-mono text-[10px] px-1.5 py-0.2 rounded-full">1</span>
+      </button>
+
+      <!-- Cart Trigger with Price Badge -->
+      <button class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-charcoal-800 text-white shadow-sm transition font-heading font-bold text-xs md:text-sm cursor-pointer">
+        <i class="fa-solid fa-bag-shopping text-brand-500"></i>
+        <span>أضف للسلة</span>
+        <span id="headerCartPrice" class="bg-charcoal-950/80 px-2 py-0.5 rounded-md text-amber-400 font-mono text-xs">535 ₺</span>
+      </button>
+
+      <!-- Direct Instant Checkout -->
+      <button class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-orange-500 hover:from-brand-700 hover:to-orange-600 text-white font-heading font-bold text-xs md:text-sm shadow-md shadow-brand-500/30 transition cursor-pointer">
+        <i class="fa-solid fa-bolt text-xs"></i>
+        <span>شراء فوري</span>
+      </button>
+    </div>
+  </header>
+  <!-- END: Studio Header Navigation -->
+
+  <!-- ========================================================================= -->
+  <!-- 2. STUDIO MAIN WORKSPACE BODY -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 flex overflow-hidden relative">
+
+    <!-- LEFT TOOL SIDEBAR (RTL Right side) -->
+    <aside class="w-80 md:w-96 bg-white border-l border-slate-200 flex flex-col shrink-0 z-20 shadow-lg md:shadow-none" data-purpose="studio-asset-toolbox">
+      <!-- Primary Tool Category Tabs -->
+      <nav aria-label="أدوات التصميم" class="grid grid-cols-4 p-2 gap-1 border-b border-slate-100 bg-slate-50/70">
+        <button id="sidebarTabStickers" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl bg-white text-brand-600 shadow-xs border border-slate-200/80 font-bold text-xs gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-icons text-base"></i>
+          <span>الرسومات</span>
+        </button>
+        <button id="sidebarTabUpload" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-slate-600 hover:bg-white hover:text-slate-900 transition font-medium text-xs gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-cloud-arrow-up text-base"></i>
+          <span>رفع ملف</span>
+        </button>
+        <button id="sidebarTabText" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-slate-600 hover:bg-white hover:text-slate-900 transition font-medium text-xs gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-font text-base"></i>
+          <span>إضافة نص</span>
+        </button>
+        <button id="sidebarTabAi" class="flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-slate-600 hover:bg-white hover:text-slate-900 transition font-medium text-xs gap-1.5 relative cursor-pointer">
+          <span class="absolute top-1.5 left-2 w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+          <i class="fa-solid fa-wand-magic-sparkles text-base text-purple-600"></i>
+          <span>ذكاء اصطناعي</span>
+        </button>
+      </nav>
+
+      <!-- Panel Header & Search -->
+      <div class="p-4 border-b border-slate-100 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="font-heading font-bold text-slate-800 text-sm flex items-center gap-2">
+            <span>مكتبة الرسوم والملصقات الجاهزة</span>
+            <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-mono font-medium">22</span>
+          </h2>
+          <!-- Open Asset Gallery Modal Trigger -->
+          <button id="openGalleryModalBtn" class="text-[11px] text-brand-600 hover:underline cursor-pointer font-bold flex items-center gap-1">
+            <i class="fa-solid fa-expand text-[10px]"></i>
+            <span>تصفح المعرض الكامل</span>
+          </button>
+        </div>
+        <!-- Search Input -->
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input class="w-full text-xs pr-9 pl-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition outline-none" placeholder="ابحث عن فنون، خطوط عربية، شارات..." type="text"/>
+        </div>
+        <!-- Categories Filter Pills -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+          <button class="px-3 py-1 rounded-full bg-slate-900 text-white font-medium shrink-0 cursor-pointer">الكل</button>
+          <button class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium shrink-0 transition cursor-pointer">تصاميم عربية (5)</button>
+          <button class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium shrink-0 transition cursor-pointer">خطوط وعبارات (3)</button>
+          <button class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium shrink-0 transition cursor-pointer">فن تجريدي</button>
+          <button class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium shrink-0 transition cursor-pointer">ستريت وير</button>
+        </div>
+      </div>
+
+      <!-- Quick Upload Banner CTA -->
+      <div class="px-4 pt-3 pb-1">
+        <div class="p-3 rounded-2xl border-2 border-dashed border-slate-200 hover:border-brand-500/60 bg-gradient-to-b from-brand-50/40 to-slate-50/40 text-center cursor-pointer transition group">
+          <div class="flex items-center justify-center gap-2 text-xs font-bold text-brand-600 group-hover:text-brand-700">
+            <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            <span>إفلات تصميمك هنا أو استعراض جهازك</span>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">يدعم PNG, SVG, AI بدقة 300 DPI عالية حتى 25MB مع تفريغ تلقائي</p>
+        </div>
+      </div>
+
+      <!-- Graphics Gallery Grid -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div>
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">التصاميم الأكثر طلباً في كندي صمم</span>
+          <div class="grid grid-cols-3 gap-2.5" id="sidebarStickerGrid">
+            <!-- Sticker 1 (Heart) -->
+            <div class="sticker-card relative group bg-slate-50 border-2 border-brand-500 rounded-xl p-2 cursor-pointer aspect-square flex items-center justify-center hover:shadow-md transition active:scale-95" data-name="Make Me Happy Heart">
+              <span class="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-brand-500 text-white flex items-center justify-center text-[9px] shadow-xs">
+                <i class="fa-solid fa-check"></i>
+              </span>
+              <svg class="w-16 h-16 drop-shadow group-hover:scale-105 transition duration-200" viewbox="0 0 100 100">
+                <path d="M50 85 C15 55 5 35 15 18 C25 2 45 10 50 25 C55 10 75 2 85 18 C95 35 85 55 50 85 Z" fill="#ec4899"></path>
+                <circle cx="35" cy="30" fill="#facc15" r="4"></circle>
+                <circle cx="65" cy="30" fill="#38bdf8" r="4"></circle>
+                <circle cx="50" cy="48" fill="#a855f7" r="5"></circle>
+                <text fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle" x="50" y="65">Make Me Happy</text>
+              </svg>
+            </div>
+            <!-- Sticker 2 (Cyber) -->
+            <div class="sticker-card group bg-slate-50 hover:bg-white border border-slate-200 hover:border-brand-500 rounded-xl p-2 cursor-pointer aspect-square flex items-center justify-center hover:shadow-md transition active:scale-95" data-name="Cyber Character">
+              <div class="w-14 h-14 rounded-lg bg-gradient-to-tr from-indigo-900 via-purple-700 to-pink-600 flex items-center justify-center text-cyan-300 shadow-xs group-hover:scale-105 transition">
+                <i class="fa-solid fa-mask text-2xl"></i>
+              </div>
+            </div>
+            <!-- Sticker 3 (Calligraphy) -->
+            <div class="sticker-card group bg-slate-50 hover:bg-white border border-slate-200 hover:border-brand-500 rounded-xl p-2 cursor-pointer aspect-square flex items-center justify-center hover:shadow-md transition active:scale-95" data-name="خط عربي أصالة">
+              <div class="w-14 h-14 rounded-full border border-amber-300 bg-amber-50 flex items-center justify-center text-amber-800 font-bold text-xs group-hover:scale-105 transition">
+                <span>أصالة</span>
+              </div>
+            </div>
+            <!-- Sticker 4 (Neon Skull) -->
+            <div class="sticker-card group bg-slate-50 hover:bg-white border border-slate-200 hover:border-brand-500 rounded-xl p-2 cursor-pointer aspect-square flex items-center justify-center hover:shadow-md transition active:scale-95" data-name="Neon Cyber Skull">
+              <div class="w-14 h-14 rounded-lg bg-slate-900 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition">
+                <i class="fa-solid fa-skull text-2xl drop-shadow"></i>
+              </div>
+            </div>
+            <!-- Sticker 5 (Retro Sun) -->
+            <div class="sticker-card group bg-slate-50 hover:bg-white border border-slate-200 hover:border-brand-500 rounded-xl p-2 cursor-pointer aspect-square flex items-center justify-center hover:shadow-md transition active:scale-95" data-name="Geometric Retro Sun">
+              <div class="w-14 h-14 rounded-full bg-gradient-to-b from-amber-400 to-rose-500 flex items-center justify-center text-white group-hover:scale-105 transition">
+                <i class="fa-solid fa-sun text-2xl"></i>
+              </div>
+            </div>
+            <!-- Sticker 6 (Tiger Shield) -->
+            <div class="sticker-card group bg-slate-50 hover:bg-white border border-slate-200 hover:border-brand-500 rounded-xl p-2 cursor-pointer aspect-square flex items-center justify-center hover:shadow-md transition active:scale-95" data-name="Streetwear Tiger">
+              <div class="w-14 h-14 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold text-lg group-hover:scale-105 transition">
+                <i class="fa-solid fa-shield-cat text-2xl"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick AI Inspiration Footer -->
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-wand-magic"></i>
+          </div>
+          <span class="text-xs text-slate-600 font-medium">توليد رسمة فنية بالذكاء الاصطناعي</span>
+        </div>
+        <button class="px-2.5 py-1 rounded-lg bg-white border border-purple-200 hover:bg-purple-50 text-purple-700 text-xs font-bold transition cursor-pointer">
+          جرّب الآن
+        </button>
+      </div>
+    </aside>
+    <!-- END: Left Tool Sidebar -->
+
+    <!-- ========================================================================= -->
+    <!-- 3. CENTRAL VISUAL CANVAS STAGE -->
+    <!-- ========================================================================= -->
+    <section class="flex-1 flex flex-col relative canvas-grid overflow-hidden">
+      <!-- Top Canvas Helper Bar -->
+      <div class="h-12 border-b border-slate-200/60 bg-white/75 backdrop-blur-sm px-6 flex items-center justify-between shrink-0 z-10">
+        <!-- Placement Mode Toggle Badges -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-medium text-slate-500">موضع الطباعة النشط:</span>
+          <span id="activePlacementBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-50 text-brand-700 border border-brand-200 text-xs font-bold shadow-xs">
+            <i class="fa-solid fa-crosshairs text-[10px]"></i>
+            <span id="activePlacementName">أعلى الصدر الأيسر (شعار 10×10 سم)</span>
+          </span>
+          <!-- Trigger Placements Guide Modal -->
+          <button id="openPlacementGuideBtn" class="text-xs text-brand-600 hover:text-brand-800 underline font-bold cursor-pointer mr-1">
+            دليل المواضع المعتمدة
+          </button>
+        </div>
+
+        <!-- Canvas Guidelines & Grid toggles -->
+        <div class="flex items-center gap-3 text-xs text-slate-500 font-medium">
+          <label class="flex items-center gap-1.5 cursor-pointer hover:text-slate-700">
+            <input id="toggleSafeZoneCheckbox" checked="" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-3.5 h-3.5 cursor-pointer" type="checkbox"/>
+            <span>حدود الطباعة الآمنة</span>
+          </label>
+          <div class="w-px h-3.5 bg-slate-300"></div>
+          <label class="flex items-center gap-1.5 cursor-pointer hover:text-slate-700">
+            <input checked="" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-3.5 h-3.5 cursor-pointer" type="checkbox"/>
+            <span>المحاذاة التلقائية الذكية</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Main Interactive Stage Container -->
+      <div class="flex-1 relative flex items-center justify-center p-6 overflow-hidden">
+
+        <!-- ========================================================================= -->
+        <!-- USER MEDIA / "MY DESIGNS" FLOATING DRAWER (SCREENSHOT 4) -->
+        <!-- ========================================================================= -->
+        <div id="userMediaDrawer" class="absolute top-4 left-4 z-25 w-64 sm:w-72 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200/90 flex flex-col transition-all duration-300 select-none">
+          <!-- Drawer Header -->
+          <div class="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                <i class="fa-regular fa-folder-closed text-xs"></i>
+              </div>
+              <h3 class="font-black text-xs sm:text-sm text-gray-900 tracking-wide truncate">
+                تصاميمي
+              </h3>
+            </div>
+            <!-- Toggle Collapse Button -->
+            <button id="toggleUserMediaBtn" type="button" class="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer" title="إخفاء نافذة تصاميمي">
+              <i id="toggleUserMediaIcon" class="fa-regular fa-eye-slash text-xs"></i>
+            </button>
+          </div>
+
+          <!-- Drawer Body Content (Collapsible) -->
+          <div id="userMediaBody" class="flex flex-col transition-all duration-200">
+            <!-- + Upload Button -->
+            <div class="p-2.5 border-b border-gray-100">
+              <button type="button" class="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-800 active:scale-98 rounded-xl font-black text-xs flex items-center justify-center gap-2 border border-blue-200 shadow-xs transition-all cursor-pointer">
+                <i class="fa-solid fa-plus text-xs text-blue-600"></i>
+                <span>ارفع تصميمك</span>
+              </button>
+            </div>
+
+            <!-- Segmented Tabs: Uploads vs Library -->
+            <div class="flex bg-gray-100/90 p-1 mx-2 my-1.5 rounded-xl text-xs gap-1 font-bold">
+              <button id="tabMyUploads" type="button" class="flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 min-w-0 cursor-pointer text-[11px] text-gray-600 hover:text-gray-900">
+                <i class="fa-solid fa-arrow-up-from-bracket text-[10px]"></i>
+                <span>مرفوعاتي</span>
+                <span class="font-mono text-[9px] bg-gray-200/90 text-gray-700 px-1.5 py-0.2 rounded-full font-bold">0</span>
+              </button>
+              <button id="tabMyLibrary" type="button" class="flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 min-w-0 cursor-pointer text-[11px] bg-white text-gray-900 shadow-2xs font-black">
+                <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-amber-500"></i>
+                <span>المكتبة</span>
+                <span class="font-mono text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full font-bold">2</span>
+              </button>
+            </div>
+
+            <!-- Uploads / Library Items Grid -->
+            <div class="p-2.5 grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+              <!-- Item 1: Cyberpunk -->
+              <div class="user-media-card group relative bg-slate-900 rounded-xl p-1.5 aspect-square border border-slate-200 hover:border-brand-500 cursor-pointer transition shadow-xs flex items-center justify-center overflow-hidden active:scale-95" title="أنمي سايبر">
+                <div class="w-full h-full rounded-lg bg-gradient-to-tr from-indigo-950 via-purple-900 to-pink-900 flex items-center justify-center text-cyan-300">
+                  <i class="fa-solid fa-mask text-3xl drop-shadow"></i>
+                </div>
+              </div>
+              <!-- Item 2: Make Me Happy -->
+              <div class="user-media-card group relative bg-white rounded-xl p-1 aspect-square border border-slate-200 hover:border-brand-500 cursor-pointer transition shadow-xs flex items-center justify-center overflow-hidden active:scale-95" title="قلب السعادة">
+                <svg class="w-full h-full drop-shadow-xs" viewbox="0 0 100 100">
+                  <path d="M50 85 C15 55 5 35 15 18 C25 2 45 10 50 25 C55 10 75 2 85 18 C95 35 85 55 50 85 Z" fill="#ec4899"></path>
+                  <circle cx="35" cy="30" fill="#facc15" r="4"></circle>
+                  <circle cx="65" cy="30" fill="#38bdf8" r="4"></circle>
+                  <circle cx="50" cy="48" fill="#a855f7" r="5"></circle>
+                  <text fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle" x="50" y="65">Make Me Happy</text>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- TYPEWRITER ANIMATED ONBOARDING HINT BANNER -->
+        <!-- ========================================================================= -->
+        <div id="typewriterHintBanner" class="absolute top-3 right-6 z-25 flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white rounded-full shadow-lg shadow-orange-500/25 border border-amber-300/60 cursor-pointer select-none whitespace-nowrap active:scale-95 transition-all">
+          <i class="fa-solid fa-sparkles text-amber-200 text-xs animate-spin" style="animation-duration: 4s;"></i>
+          <span id="typewriterText" class="text-xs font-bold font-heading">👇 اضغط هنا لاختيار مواضع الطباعة</span>
+          <button id="dismissTypewriterBtn" class="ms-1 p-0.5 rounded-full hover:bg-black/20 text-amber-100 hover:text-white transition cursor-pointer" title="إغلاق التلميح">
+            <i class="fa-solid fa-xmark text-[10px]"></i>
+          </button>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- REALISTIC T-SHIRT MOCKUP STAGE -->
+        <!-- ========================================================================= -->
+        <div class="relative w-full max-w-[560px] max-h-[90%] aspect-[4/5] flex items-center justify-center">
+          <svg id="garmentSvg" class="w-full h-full realistic-tshirt-shadow transition-all duration-300" viewbox="0 0 800 950" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <lineargradient id="tshirtShade" x1="0%" x2="100%" y1="0%" y2="100%">
+                <stop id="gradStop1" offset="0%" stop-color="#242830"></stop>
+                <stop id="gradStop2" offset="25%" stop-color="#181a20"></stop>
+                <stop id="gradStop3" offset="65%" stop-color="#111317"></stop>
+                <stop id="gradStop4" offset="100%" stop-color="#0a0b0d"></stop>
+              </lineargradient>
+            </defs>
+            <!-- T-Shirt Body -->
+            <path id="tshirtBody" d="M260 70 C310 115 490 115 540 70 L645 120 L780 260 L690 350 L615 270 L635 880 L165 880 L185 270 L110 350 L20 260 L155 120 Z" fill="url(#tshirtShade)" stroke="#2b313d" stroke-width="1.5"></path>
+            <!-- Collar -->
+            <path id="tshirtCollar" d="M260 70 C330 145 470 145 540 70 C480 110 320 110 260 70 Z" fill="#14161b" stroke="#2d3340" stroke-width="2"></path>
+            <!-- Inside Tag Area -->
+            <path d="M330 78 C360 92 440 92 470 78 C450 68 350 68 330 78 Z" fill="#0b0c0e"></path>
+            <!-- Creases -->
+            <path d="M185 270 C200 330 195 440 180 500" fill="none" opacity="0.6" stroke="#1f232b" stroke-width="2"></path>
+            <path d="M615 270 C600 330 605 440 620 500" fill="none" opacity="0.6" stroke="#1f232b" stroke-width="2"></path>
+            <!-- Torso Folds -->
+            <path d="M250 180 C270 420 260 680 240 850" fill="none" filter="blur(4px)" opacity="0.3" stroke="#181b22" stroke-width="6"></path>
+            <path d="M550 180 C530 420 540 680 560 850" fill="none" filter="blur(4px)" opacity="0.3" stroke="#181b22" stroke-width="6"></path>
+          </svg>
+
+          <!-- Safe Print Boundary Box (Interactive Selection Box) -->
+          <div id="printBox" class="absolute top-[26%] right-[27%] w-28 h-28 md:w-36 md:h-36 border-2 border-dashed border-brand-500/80 rounded-lg flex items-center justify-center group cursor-move shadow-sm bg-brand-500/5 transition-all">
+            <!-- Floating Transform Controls Toolbar -->
+            <div class="absolute -top-10 bg-slate-900 text-white rounded-lg px-2.5 py-1 shadow-xl flex items-center gap-2 text-xs border border-slate-700/80 scale-95 hover:scale-100 transition whitespace-nowrap z-20">
+              <button id="btnAlignHorizontal" class="hover:text-amber-400 transition cursor-pointer" title="توسيط أفقي"><i class="fa-solid fa-align-center"></i></button>
+              <button id="btnAlignVertical" class="hover:text-amber-400 transition cursor-pointer" title="توسيط عمودي"><i class="fa-solid fa-arrows-up-down"></i></button>
+              <span class="w-px h-3 bg-slate-700"></span>
+              <button id="btnDuplicate" class="hover:text-amber-400 transition cursor-pointer" title="تكرار العنصر"><i class="fa-regular fa-copy"></i></button>
+              <button id="btnLock" class="hover:text-amber-400 transition cursor-pointer" title="قفل الموضع"><i class="fa-solid fa-lock text-[10px]"></i></button>
+              <button id="btnDelete" class="hover:text-red-400 text-red-400 transition cursor-pointer" title="حذف"><i class="fa-solid fa-trash-can text-[10px]"></i></button>
+            </div>
+            <!-- Resize Handles -->
+            <div class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-brand-600 rounded-sm cursor-ne-resize shadow-xs"></div>
+            <div class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-brand-600 rounded-sm cursor-nw-resize shadow-xs"></div>
+            <div class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-brand-600 rounded-sm cursor-se-resize shadow-xs"></div>
+            <div class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-brand-600 rounded-sm cursor-sw-resize shadow-xs"></div>
+            <!-- Rotation Handle -->
+            <div class="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-2 border-brand-600 rounded-full flex items-center justify-center cursor-grab text-[9px] text-brand-600 shadow-sm">
+              <i class="fa-solid fa-rotate"></i>
+            </div>
+            <!-- Placed Artwork Graphic -->
+            <div id="placedArtworkContainer" class="w-20 h-20 md:w-24 md:h-24 pointer-events-none select-none flex items-center justify-center">
+              <svg id="placedArtworkSvg" class="w-full h-full filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]" viewbox="0 0 100 100">
+                <path d="M50 85 C15 55 5 35 15 18 C25 2 45 10 50 25 C55 10 75 2 85 18 C95 35 85 55 50 85 Z" fill="#ec4899"></path>
+                <circle cx="35" cy="30" fill="#facc15" r="4"></circle>
+                <circle cx="65" cy="30" fill="#38bdf8" r="4"></circle>
+                <circle cx="50" cy="48" fill="#a855f7" r="5"></circle>
+                <text fill="#ffffff" font-size="8" font-weight="900" letter-spacing="0.5" text-anchor="middle" x="50" y="65">MAKE ME HAPPY</text>
+              </svg>
+            </div>
+            <!-- Live Resolution Indicator -->
+            <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-emerald-500 text-white font-mono text-[9px] font-bold shadow-xs whitespace-nowrap">
+              300 DPI • جودة ممتازة
+            </div>
+          </div>
+
+          <!-- Subtle Size Calibration watermark label -->
+          <div class="absolute bottom-4 left-6 text-[11px] font-mono font-medium text-slate-500 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-md border border-slate-200/80 shadow-xs">
+            مقياس حقيقي 1:1 • طباعة حرارية DTF أصلية متطورة
+          </div>
+        </div>
+
+        <!-- Floating Zoom Dock -->
+        <div class="absolute bottom-6 left-6 flex items-center bg-white border border-slate-200/90 shadow-md rounded-2xl p-1 gap-1 text-slate-700 z-20">
+          <button id="zoomInBtn" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer" title="تكبير"><i class="fa-solid fa-plus text-xs"></i></button>
+          <span id="zoomLevelText" class="text-xs font-mono font-bold px-2 text-slate-800">100%</span>
+          <button id="zoomOutBtn" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer" title="تصغير"><i class="fa-solid fa-minus text-xs"></i></button>
+          <div class="w-px h-4 bg-slate-200"></div>
+          <button class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer" title="ملء الشاشة"><i class="fa-solid fa-expand text-xs"></i></button>
+          <button id="zoomResetBtn" class="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100 hover:text-slate-900 transition text-brand-600 cursor-pointer" title="إعادة التوسيط"><i class="fa-solid fa-arrows-to-dot text-xs"></i></button>
+        </div>
+
+        <!-- Perspective Switcher -->
+        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg shadow-slate-900/5 rounded-2xl p-1.5 flex items-center gap-1.5 z-20">
+          <button class="face-tab flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs shadow-xs transition cursor-pointer" data-face="front">
+            <i class="fa-solid fa-circle-dot text-[8px] text-brand-500"></i>
+            <span>الواجهة الأمامية</span>
+          </button>
+          <button class="face-tab flex items-center gap-2 px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold text-xs transition cursor-pointer" data-face="back">
+            <span>الجهة الخلفية</span>
+          </button>
+          <button class="face-tab flex items-center gap-2 px-3.5 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold text-xs transition cursor-pointer" data-face="right_shoulder">
+            <span>الكتف الأيمن</span>
+          </button>
+          <button class="face-tab flex items-center gap-2 px-3.5 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold text-xs transition cursor-pointer" data-face="left_shoulder">
+            <span>الكتف الأيسر</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- 4. RIGHT PRODUCT INSPECTOR & CONFIGURATION PANEL -->
+    <!-- ========================================================================= -->
+    <aside class="w-80 md:w-88 bg-white border-r border-slate-200 flex flex-col shrink-0 z-20 shadow-lg md:shadow-none overflow-y-auto">
+      <!-- Garment Spec Header -->
+      <div class="p-4 border-b border-slate-100">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="text-[10px] font-black uppercase tracking-wider text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md">100% قطن تركي ممشط 240gsm</span>
+            <h3 class="font-heading font-black text-slate-900 text-base mt-1">تيشيرت أوفر سايز كلاسيك</h3>
+          </div>
+          <span class="text-xs text-slate-400 font-mono font-bold">#KT-7729</span>
+        </div>
+      </div>
+
+      <!-- Color Variations -->
+      <div class="p-4 border-b border-slate-100 space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <span>لون التيشيرت:</span>
+            <span class="text-slate-900 font-bold" id="selected-color-name">أسود فاحم (Charcoal Black)</span>
+          </label>
+        </div>
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <button class="color-swatch w-8 h-8 rounded-full bg-slate-950 ring-2 ring-offset-2 ring-brand-600 transition shadow-xs flex items-center justify-center text-white text-[10px] cursor-pointer" title="أسود فاحم" data-color="black" data-hex="#111317"><i class="fa-solid fa-check"></i></button>
+          <button class="color-swatch w-8 h-8 rounded-full bg-white border border-slate-300 ring-offset-2 hover:ring-2 hover:ring-slate-400 transition shadow-xs cursor-pointer flex items-center justify-center text-slate-900 text-[10px]" title="أبيض ناصع" data-color="white" data-hex="#f8fafc"></button>
+          <button class="color-swatch w-8 h-8 rounded-full bg-zinc-600 ring-offset-2 hover:ring-2 hover:ring-slate-400 transition shadow-xs cursor-pointer flex items-center justify-center text-white text-[10px]" title="رمادي ميلانج" data-color="grey" data-hex="#4b5563"></button>
+          <button class="color-swatch w-8 h-8 rounded-full bg-slate-900 ring-offset-2 hover:ring-2 hover:ring-slate-400 transition shadow-xs cursor-pointer flex items-center justify-center text-white text-[10px]" title="كحلي ليلي" data-color="navy" data-hex="#1e293b"></button>
+          <button class="color-swatch w-8 h-8 rounded-full bg-emerald-900 ring-offset-2 hover:ring-2 hover:ring-slate-400 transition shadow-xs cursor-pointer flex items-center justify-center text-white text-[10px]" title="أخضر زيتي" data-color="green" data-hex="#064e3b"></button>
+          <button class="color-swatch w-8 h-8 rounded-full bg-amber-100 ring-offset-2 hover:ring-2 hover:ring-slate-400 transition shadow-xs cursor-pointer flex items-center justify-center text-slate-900 text-[10px]" title="بيج صحراوي" data-color="beige" data-hex="#fef3c7"></button>
+        </div>
+      </div>
+
+      <!-- Size Selection & Multi-Quantity Stepper Link -->
+      <div class="p-4 border-b border-slate-100 space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-slate-700">المقاس المطلوب:</label>
+          <button id="openSizeGuideLink" class="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1 cursor-pointer">
+            <i class="fa-solid fa-ruler-horizontal text-[10px]"></i>
+            <span>دليل القياسات الدقيقة</span>
+          </button>
+        </div>
+        <div class="grid grid-cols-6 gap-1.5">
+          <button class="size-btn py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-slate-400 transition cursor-pointer">S</button>
+          <button class="size-btn py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-slate-400 transition cursor-pointer">M</button>
+          <button class="size-btn py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-slate-400 transition cursor-pointer">L</button>
+          <button class="size-btn py-2 rounded-xl bg-slate-900 text-white border border-slate-900 text-xs font-black shadow-xs cursor-pointer">XL</button>
+          <button class="size-btn py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-slate-400 transition cursor-pointer">2XL</button>
+          <button class="size-btn py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-slate-400 transition cursor-pointer">3XL</button>
+        </div>
+      </div>
+
+      <!-- Active Print Locations -->
+      <div class="p-4 border-b border-slate-100 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-700">مواضع الطباعة المعتمدة (2):</span>
+          <span class="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">خصم طباعة مجمعة</span>
+        </div>
+        <div class="space-y-2">
+          <!-- Placement item 1 -->
+          <div class="p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 flex items-center justify-center text-xs font-bold">1</span>
+              <div>
+                <div class="text-xs font-bold text-slate-800">أعلى الصدر الأيسر (شعار مصغر 10×10 سم)</div>
+                <div class="text-[10px] text-slate-400">ملصق "Make Me Happy"</div>
+              </div>
+            </div>
+            <span class="text-xs font-mono font-bold text-slate-700">+35 ₺</span>
+          </div>
+          <!-- Placement item 2 -->
+          <div class="p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">2</span>
+              <div>
+                <div class="text-xs font-bold text-slate-800">وسط الظهر (طباعة A3 كبيرة 30×40 سم)</div>
+                <div class="text-[10px] text-slate-400">لوجو جرافيك مخصص</div>
+              </div>
+            </div>
+            <span class="text-xs font-mono font-bold text-slate-700">+50 ₺</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layers Manager -->
+      <div class="p-4 border-b border-slate-100 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <i class="fa-solid fa-layer-group text-slate-400"></i>
+            <span>إدارة الطبقات الحالية</span>
+          </span>
+          <button class="text-[11px] text-brand-600 hover:text-brand-700 font-bold cursor-pointer">إعادة ترتيب</button>
+        </div>
+        <!-- Active Layer Card -->
+        <div class="p-2 rounded-xl bg-slate-50 border border-brand-500/30 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-pink-100 text-pink-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-heart"></i>
+            </div>
+            <div>
+              <span class="font-bold text-slate-800 block text-[11px]">ملصق: Make Me Happy</span>
+              <span class="text-[9px] text-slate-400 font-mono">1400 × 1400 px</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 text-slate-400">
+            <button class="w-6 h-6 rounded hover:bg-white hover:text-slate-800 flex items-center justify-center cursor-pointer transition" title="إظهار / إخفاء"><i class="fa-regular fa-eye text-xs"></i></button>
+            <button class="w-6 h-6 rounded hover:bg-white hover:text-slate-800 flex items-center justify-center cursor-pointer transition" title="قفل الطبقة"><i class="fa-solid fa-lock-open text-xs"></i></button>
+            <button class="w-6 h-6 rounded hover:bg-white hover:text-red-500 flex items-center justify-center cursor-pointer transition" title="حذف الطبقة"><i class="fa-regular fa-trash-can text-xs"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pricing Summary -->
+      <div class="p-4 bg-slate-50 mt-auto border-t border-slate-200 space-y-3">
+        <div class="space-y-1.5 text-xs text-slate-600">
+          <div class="flex justify-between">
+            <span>سعر التيشيرت الأساسي:</span>
+            <span class="font-mono font-medium">450 ₺</span>
+          </div>
+          <div class="flex justify-between">
+            <span>طباعة موضعين (أمامي + خلفي DTF):</span>
+            <span class="font-mono font-medium">85 ₺</span>
+          </div>
+          <div class="flex justify-between text-emerald-600 font-medium">
+            <span>كوبون فوري للطباعة (خصم):</span>
+            <span class="font-mono font-bold">- 0 ₺</span>
+          </div>
+          <div class="border-t border-slate-200 pt-2 flex justify-between items-baseline text-slate-900">
+            <span class="font-heading font-black text-sm">المجموع الإجمالي:</span>
+            <div class="text-left">
+              <span id="summaryTotalPrice" class="font-heading font-black text-2xl text-brand-600 font-mono">535</span>
+              <span class="text-xs font-bold text-slate-600 mr-1">₺</span>
+              <span class="block text-[10px] text-slate-400 font-normal">شامل ضريبة القيمة المضافة KDV</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="w-full py-3.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-heading font-bold text-sm shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transition transform active:scale-98 cursor-pointer">
+          <i class="fa-solid fa-cart-arrow-down text-base"></i>
+          <span>إتمام الطلب وتأكيد التصميم</span>
+        </button>
+
+        <div class="flex items-center justify-around pt-1 text-[11px] text-slate-400">
+          <span class="flex items-center gap-1"><i class="fa-solid fa-truck-fast text-slate-500"></i> شحن سريع 48 ساعة</span>
+          <span>•</span>
+          <span class="flex items-center gap-1"><i class="fa-solid fa-shield-check text-slate-500"></i> ضمان ثبات الألوان 100%</span>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 1: MULTI-VARIANT & QUANTITY MATRIX MODAL (SCREENSHOT 1) -->
+  <!-- ========================================================================= -->
+  <div id="matrixModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity" onclick="closeMatrixModal()"></div>
+    
+    <div class="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 z-10 flex flex-col gap-5 text-right animate-in zoom-in-95 duration-200">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-orange-50 border border-orange-200 text-orange-600 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-layer-group text-lg"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black text-gray-900">تحديد مقاسات وكميات متعددة</h3>
+            <p class="text-xs text-gray-500">اطلب من نفس تصميمك بمقاسات وألوان مختلفة بسهولة</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- Reset Steppers Button -->
+          <button id="resetMatrixBtn" type="button" class="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 transition cursor-pointer">
+            <i class="fa-solid fa-rotate-left text-[11px]"></i>
+            <span>تصفير</span>
+          </button>
+          <!-- Close Button -->
+          <button type="button" onclick="closeMatrixModal()" class="w-8 h-8 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center cursor-pointer transition">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Color Group: Black -->
+      <div class="space-y-3">
+        <div class="flex items-center gap-2 text-xs font-black text-gray-900">
+          <span class="w-3.5 h-3.5 rounded-full bg-slate-950 inline-block border border-gray-300"></span>
+          <span>أسود (<span id="matrixColorCount">1</span> قطع)</span>
+        </div>
+
+        <!-- Size Cards Stepper Row -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          <!-- Size S -->
+          <div class="p-2.5 rounded-2xl border border-gray-200 bg-white hover:border-gray-300 transition flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-sm text-gray-900">S</span>
+              <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-md">10 متوفر</span>
+            </div>
+            <div class="flex items-center justify-between bg-gray-50 p-1 rounded-xl">
+              <button onclick="changeQty('S', 1)" class="w-6 h-6 rounded-lg bg-white border border-gray-200 hover:border-gray-400 text-gray-700 flex items-center justify-center text-xs font-black transition cursor-pointer">+</button>
+              <span id="qty_S" class="font-mono font-bold text-xs">0</span>
+              <button onclick="changeQty('S', -1)" class="w-6 h-6 rounded-lg bg-white border border-gray-200 hover:border-gray-400 text-gray-700 flex items-center justify-center text-xs font-black transition cursor-pointer">-</button>
+            </div>
+          </div>
+          <!-- Size M -->
+          <div class="p-2.5 rounded-2xl border border-gray-200 bg-white hover:border-gray-300 transition flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-sm text-gray-900">M</span>
+              <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-md">10 متوفر</span>
+            </div>
+            <div class="flex items-center justify-between bg-gray-50 p-1 rounded-xl">
+              <button onclick="changeQty('M', 1)" class="w-6 h-6 rounded-lg bg-white border border-gray-200 hover:border-gray-400 text-gray-700 flex items-center justify-center text-xs font-black transition cursor-pointer">+</button>
+              <span id="qty_M" class="font-mono font-bold text-xs">0</span>
+              <button onclick="changeQty('M', -1)" class="w-6 h-6 rounded-lg bg-white border border-gray-200 hover:border-gray-400 text-gray-700 flex items-center justify-center text-xs font-black transition cursor-pointer">-</button>
+            </div>
+          </div>
+          <!-- Size L -->
+          <div class="p-2.5 rounded-2xl border border-gray-200 bg-white hover:border-gray-300 transition flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-sm text-gray-900">L</span>
+              <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-md">10 متوفر</span>
+            </div>
+            <div class="flex items-center justify-between bg-gray-50 p-1 rounded-xl">
+              <button onclick="changeQty('L', 1)" class="w-6 h-6 rounded-lg bg-white border border-gray-200 hover:border-gray-400 text-gray-700 flex items-center justify-center text-xs font-black transition cursor-pointer">+</button>
+              <span id="qty_L" class="font-mono font-bold text-xs">0</span>
+              <button onclick="changeQty('L', -1)" class="w-6 h-6 rounded-lg bg-white border border-gray-200 hover:border-gray-400 text-gray-700 flex items-center justify-center text-xs font-black transition cursor-pointer">-</button>
+            </div>
+          </div>
+          <!-- Size XL (Active / Selected) -->
+          <div class="p-2.5 rounded-2xl border-2 border-brand-500 bg-brand-50/20 ring-2 ring-brand-400/20 transition flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-sm text-brand-900">XL</span>
+              <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-md">10 متوفر</span>
+            </div>
+            <div class="flex items-center justify-between bg-white p-1 rounded-xl border border-brand-200 shadow-2xs">
+              <button onclick="changeQty('XL', 1)" class="w-6 h-6 rounded-lg bg-brand-500 text-white hover:bg-brand-600 flex items-center justify-center text-xs font-black transition cursor-pointer">+</button>
+              <span id="qty_XL" class="font-mono font-black text-xs text-brand-900">1</span>
+              <button onclick="changeQty('XL', -1)" class="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center text-xs font-black transition cursor-pointer">-</button>
+            </div>
+          </div>
+          <!-- Size 2XL -->
+          <div class="p-2.5 rounded-2xl border border-gray-200 bg-white hover:border-gray-300 transition flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-sm text-gray-900">2XL</span>
+              <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-md">8 متوفر</span>
+            </div>
+            <div class="flex items-center justify-between bg-gray-50 p-1 rounded-xl">
+              <button onclick="changeQty('2XL', 1)" class="w-6 h-6 rounded-lg bg-white border border-gray-200 hover:border-gray-400 text-gray-700 flex items-center justify-center text-xs font-black transition cursor-pointer">+</button>
+              <span id="qty_2XL" class="font-mono font-bold text-xs">0</span>
+              <button onclick="changeQty('2XL', -1)" class="w-6 h-6 rounded-lg bg-white border border-gray-200 hover:border-gray-400 text-gray-700 flex items-center justify-center text-xs font-black transition cursor-pointer">-</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <!-- Totals summary -->
+        <div class="flex items-center gap-6">
+          <div>
+            <span class="text-xs text-gray-400 block font-medium">إجمالي القطع</span>
+            <span id="matrixTotalPieces" class="font-mono font-black text-base text-gray-900">1 قطع</span>
+          </div>
+          <div class="w-px h-8 bg-gray-200"></div>
+          <div>
+            <span class="text-xs text-gray-400 block font-medium">المبلغ الإجمالي</span>
+            <span class="font-mono font-black text-xl text-brand-600"><span id="matrixTotalPrice">535</span> ₺</span>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <button type="button" onclick="closeMatrixModal()" class="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold text-xs transition cursor-pointer">
+            تطبيق التحديد
+          </button>
+          <button type="button" onclick="closeMatrixModal()" class="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-orange-500 hover:from-brand-700 hover:to-orange-600 text-white font-bold text-xs shadow-md shadow-brand-500/25 flex items-center justify-center gap-2 transition cursor-pointer">
+            <i class="fa-solid fa-cart-shopping text-xs"></i>
+            <span>إضافة الكل للسلة</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 2: ASSET GALLERY MODAL (SCREENSHOT 2) -->
+  <!-- ========================================================================= -->
+  <div id="galleryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity" onclick="closeGalleryModal()"></div>
+    
+    <div class="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 z-10 flex flex-col max-h-[90vh] gap-4 text-right animate-in zoom-in-95 duration-200">
+      <!-- Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-orange-50 border border-orange-200 text-orange-600 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-black text-gray-900">معرض التصاميم والملصقات</h3>
+              <span class="text-xs bg-gray-100 text-gray-600 font-mono font-bold px-2 py-0.5 rounded-full">22</span>
+            </div>
+            <p class="text-xs text-gray-500">اختر من تشكيلتنا المميزة وأضفها إلى مساحة التصميم بنقرة واحدة.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeGalleryModal()" class="w-8 h-8 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center cursor-pointer transition">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Search Input -->
+      <div class="relative shrink-0">
+        <i class="fa-solid fa-magnifying-glass absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+        <input class="w-full text-xs pr-11 pl-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition outline-none" placeholder="بحث في التصاميم والملصقات أو الأقسام..." type="text"/>
+      </div>
+
+      <!-- Category Filter Pills -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs shrink-0 no-scrollbar">
+        <button class="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-brand-600 to-orange-500 text-white font-bold flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer">
+          <span>جميع الأقسام</span>
+          <span class="bg-white/20 px-1.5 py-0.2 rounded-full text-[10px] font-mono">22</span>
+        </button>
+        <button class="px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium flex items-center gap-1.5 shrink-0 transition cursor-pointer">
+          <span>تصاميم عربية</span>
+          <span class="bg-gray-200 px-1.5 py-0.2 rounded-full text-[10px] font-mono">5</span>
+        </button>
+        <button class="px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium flex items-center gap-1.5 shrink-0 transition cursor-pointer">
+          <span>خطوط وعبارات</span>
+          <span class="bg-gray-200 px-1.5 py-0.2 rounded-full text-[10px] font-mono">3</span>
+        </button>
+        <button class="px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium flex items-center gap-1.5 shrink-0 transition cursor-pointer">
+          <span>رياضة</span>
+          <span class="bg-gray-200 px-1.5 py-0.2 rounded-full text-[10px] font-mono">0</span>
+        </button>
+        <button class="px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium flex items-center gap-1.5 shrink-0 transition cursor-pointer">
+          <span>حيوانات</span>
+          <span class="bg-gray-200 px-1.5 py-0.2 rounded-full text-[10px] font-mono">0</span>
+        </button>
+        <button class="px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium flex items-center gap-1.5 shrink-0 transition cursor-pointer">
+          <span>مضحك</span>
+          <span class="bg-gray-200 px-1.5 py-0.2 rounded-full text-[10px] font-mono">0</span>
+        </button>
+      </div>
+
+      <!-- Assets Grid -->
+      <div class="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 p-1">
+        <!-- Asset 1 (Heart) -->
+        <div onclick="insertAssetToCanvas('Make Me Happy Heart')" class="group relative bg-white border border-gray-200 hover:border-brand-500 rounded-2xl p-2 cursor-pointer aspect-square flex flex-col items-center justify-center hover:shadow-md transition active:scale-95 checkerboard-pattern overflow-hidden">
+          <span class="absolute top-1.5 left-1.5 px-1.5 py-0.2 rounded-md bg-emerald-500 text-white font-bold text-[9px]">مجاني</span>
+          <span class="absolute top-1.5 right-1.5 px-1.5 py-0.2 rounded-md bg-purple-100 text-purple-700 font-bold text-[9px]">SVG</span>
+          <svg class="w-16 h-16 drop-shadow group-hover:scale-105 transition duration-200" viewbox="0 0 100 100">
+            <path d="M50 85 C15 55 5 35 15 18 C25 2 45 10 50 25 C55 10 75 2 85 18 C95 35 85 55 50 85 Z" fill="#ec4899"></path>
+            <circle cx="35" cy="30" fill="#facc15" r="4"></circle>
+            <circle cx="65" cy="30" fill="#38bdf8" r="4"></circle>
+            <circle cx="50" cy="48" fill="#a855f7" r="5"></circle>
+            <text fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle" x="50" y="65">Make Me Happy</text>
+          </svg>
+        </div>
+        <!-- Asset 2 (Cyber) -->
+        <div onclick="insertAssetToCanvas('Cyber Character')" class="group relative bg-white border border-gray-200 hover:border-brand-500 rounded-2xl p-2 cursor-pointer aspect-square flex flex-col items-center justify-center hover:shadow-md transition active:scale-95 checkerboard-pattern overflow-hidden">
+          <span class="absolute top-1.5 left-1.5 px-1.5 py-0.2 rounded-md bg-emerald-500 text-white font-bold text-[9px]">مجاني</span>
+          <div class="w-14 h-14 rounded-xl bg-gradient-to-tr from-indigo-950 via-purple-900 to-pink-900 flex items-center justify-center text-cyan-300 group-hover:scale-105 transition">
+            <i class="fa-solid fa-mask text-2xl"></i>
+          </div>
+        </div>
+        <!-- Asset 3 (Calligraphy) -->
+        <div onclick="insertAssetToCanvas('خط عربي أصالة')" class="group relative bg-white border border-gray-200 hover:border-brand-500 rounded-2xl p-2 cursor-pointer aspect-square flex flex-col items-center justify-center hover:shadow-md transition active:scale-95 checkerboard-pattern overflow-hidden">
+          <span class="absolute top-1.5 left-1.5 px-1.5 py-0.2 rounded-md bg-emerald-500 text-white font-bold text-[9px]">مجاني</span>
+          <span class="text-amber-800 font-bold text-sm bg-amber-50 border border-amber-300 w-14 h-14 rounded-full flex items-center justify-center group-hover:scale-105 transition">أصالة</span>
+        </div>
+        <!-- Asset 4 (Calligraphy 2) -->
+        <div onclick="insertAssetToCanvas('عارف جانيار')" class="group relative bg-white border border-gray-200 hover:border-brand-500 rounded-2xl p-2 cursor-pointer aspect-square flex flex-col items-center justify-center hover:shadow-md transition active:scale-95 checkerboard-pattern overflow-hidden">
+          <span class="absolute top-1.5 left-1.5 px-1.5 py-0.2 rounded-md bg-emerald-500 text-white font-bold text-[9px]">مجاني</span>
+          <div class="text-rose-600 font-black text-xs text-center border border-rose-200 bg-rose-50 p-2 rounded-xl">عارف جانيار ❤️</div>
+        </div>
+        <!-- Asset 5 (Vector Avatar) -->
+        <div onclick="insertAssetToCanvas('أيقونة بروفايل')" class="group relative bg-white border border-gray-200 hover:border-brand-500 rounded-2xl p-2 cursor-pointer aspect-square flex flex-col items-center justify-center hover:shadow-md transition active:scale-95 checkerboard-pattern overflow-hidden">
+          <span class="absolute top-1.5 left-1.5 px-1.5 py-0.2 rounded-md bg-emerald-500 text-white font-bold text-[9px]">مجاني</span>
+          <span class="absolute top-1.5 right-1.5 px-1.5 py-0.2 rounded-md bg-purple-100 text-purple-700 font-bold text-[9px]">SVG</span>
+          <i class="fa-solid fa-circle-user text-4xl text-slate-800 group-hover:scale-105 transition"></i>
+        </div>
+        <!-- Asset 6 (Tiger Shield) -->
+        <div onclick="insertAssetToCanvas('Streetwear Tiger')" class="group relative bg-white border border-gray-200 hover:border-brand-500 rounded-2xl p-2 cursor-pointer aspect-square flex flex-col items-center justify-center hover:shadow-md transition active:scale-95 checkerboard-pattern overflow-hidden">
+          <span class="absolute top-1.5 left-1.5 px-1.5 py-0.2 rounded-md bg-emerald-500 text-white font-bold text-[9px]">مجاني</span>
+          <div class="w-14 h-14 rounded-xl bg-red-600 text-white flex items-center justify-center group-hover:scale-105 transition">
+            <i class="fa-solid fa-shield-cat text-2xl"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 shrink-0">
+        <span>انقر على أي عنصر لإدراجه فوراً في مساحة التصميم</span>
+        <button type="button" onclick="closeGalleryModal()" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold transition cursor-pointer">
+          إغلاق
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 3: PRINT PLACEMENT & DESIGN GUIDE MODAL (SCREENSHOT 3) -->
+  <!-- ========================================================================= -->
+  <div id="placementGuideModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity" onclick="closePlacementGuideModal()"></div>
+    
+    <div class="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 z-10 flex flex-col max-h-[92vh] gap-4 text-right animate-in zoom-in-95 duration-200">
+      <!-- Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-shirt text-lg"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h3 class="text-sm font-black text-gray-900">دليل مواضع الطباعة والتصميم</h3>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">DTF</span>
+            </div>
+            <p class="text-[11px] text-gray-500">المواضع القياسية المعتمدة أو وضع التصميم الحر</p>
+          </div>
+        </div>
+        <button type="button" onclick="closePlacementGuideModal()" class="w-8 h-8 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center cursor-pointer transition">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Mode Switcher: Standards vs Free Mode -->
+      <div class="grid grid-cols-2 p-1 bg-amber-50/80 rounded-2xl border border-amber-200 gap-1 shrink-0">
+        <button id="modeStandardBtn" type="button" class="py-2 px-3 rounded-xl bg-white text-gray-900 font-bold text-xs shadow-xs flex items-center justify-center gap-2 cursor-pointer transition">
+          <i class="fa-solid fa-shirt text-amber-500"></i>
+          <span>المواضع المعتمدة عالمياً</span>
+        </button>
+        <button id="modeFreeBtn" type="button" onclick="openFreeModeDisclaimer()" class="py-2 px-3 rounded-xl text-amber-800 hover:bg-white/50 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition">
+          <i class="fa-solid fa-bolt text-amber-600"></i>
+          <span>الوضع الحر ⚡</span>
+        </button>
+      </div>
+
+      <!-- Color Isolation & Sync Bar -->
+      <div class="p-2.5 rounded-2xl bg-amber-50/50 border border-amber-200/60 flex items-center justify-between text-xs shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="w-4 h-4 rounded-full bg-slate-950 inline-block border border-gray-300"></span>
+          <div class="flex flex-col">
+            <span class="font-bold text-gray-900">مواضع خاصة باللون الحالي: أسود</span>
+            <span class="text-[10px] text-gray-400">كل لون له مواضع طباعة مستقلة خاصة به</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" class="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer">
+            <i class="fa-regular fa-copy text-[10px]"></i>
+            <span>نسخ للكل</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Category Filter Tabs with Counters -->
+      <div class="flex items-center gap-1 p-1 bg-gray-100 rounded-2xl text-xs font-bold shrink-0">
+        <button class="flex-1 py-1.5 px-2 rounded-xl bg-white text-gray-900 shadow-2xs flex items-center justify-center gap-1 cursor-pointer">
+          <span>الكل</span>
+          <span class="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center font-mono">2</span>
+        </button>
+        <button class="flex-1 py-1.5 px-2 rounded-xl text-gray-500 hover:text-gray-900 flex items-center justify-center gap-1 cursor-pointer">
+          <span>الصدر (الأمام)</span>
+          <span class="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center font-mono">1</span>
+        </button>
+        <button class="flex-1 py-1.5 px-2 rounded-xl text-gray-500 hover:text-gray-900 flex items-center justify-center gap-1 cursor-pointer">
+          <span>الظهر (الخلف)</span>
+          <span class="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center font-mono">1</span>
+        </button>
+        <button class="flex-1 py-1.5 px-2 rounded-xl text-gray-500 hover:text-gray-900 flex items-center justify-center gap-1 cursor-pointer">
+          <span>الأكمام</span>
+        </button>
+      </div>
+
+      <!-- Placements List -->
+      <div class="flex-1 overflow-y-auto space-y-2.5">
+        <!-- Placement 1: Left Chest Logo (Selected) -->
+        <div class="p-3 rounded-2xl border-2 border-amber-500 bg-amber-50/90 ring-2 ring-amber-400/25 flex items-center gap-3 cursor-pointer select-none">
+          <div class="w-5 h-5 rounded-lg bg-amber-500 text-white flex items-center justify-center text-xs shadow-xs shrink-0">
+            <i class="fa-solid fa-check text-[10px]"></i>
+          </div>
+          <!-- Miniature Garment SVG with highlighted left chest -->
+          <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-300 p-1 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 100 100" class="w-full h-full">
+              <path d="M32 20 L12 36 L20 46 L29 38 L29 86 L71 86 L71 38 L80 46 L88 36 L68 20 C62 26 38 26 32 20 Z" fill="#cbd5e1" stroke="#94a3b8" stroke-width="2"/>
+              <path d="M34 20 C42 28 58 28 66 20" stroke="#64748b" stroke-width="1.5" fill="none"/>
+              <rect x="55" y="25" width="16" height="16" rx="1.5" fill="#f59e0b" stroke="#d97706" stroke-width="1.2"/>
+              <line x1="63" y1="21" x2="63" y2="25" stroke="#f59e0b" stroke-width="1" stroke-dasharray="1.5 1.5"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-xs sm:text-sm font-black text-gray-900 truncate">شعار الصدر الأيسر</span>
+              <span class="text-[11px] font-mono font-black text-amber-700 bg-amber-500/15 px-2 py-0.5 rounded-md shrink-0">10×10 cm</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10.5px] text-gray-500 mt-1 flex-wrap">
+              <span class="flex items-center gap-0.5 text-indigo-700 font-bold shrink-0">
+                <i class="fa-solid fa-tag text-[9px]"></i>
+                <span>نزولاً 8 سم من الياقة</span>
+              </span>
+              <span>•</span>
+              <span class="text-gray-400 font-medium">الواجهة الأمامية</span>
+            </div>
+            <p class="text-[10px] text-gray-400 mt-1">يبدأ من 7 إلى 9 سم أسفل طوق الرقبة بمحاذاة فتحة العنق اليسرى</p>
+          </div>
+        </div>
+
+        <!-- Placement 2: Center Chest -->
+        <div class="p-3 rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-3 cursor-pointer select-none">
+          <div class="w-5 h-5 rounded-lg border-2 border-gray-300 bg-white hover:border-amber-400 shrink-0"></div>
+          <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-300 p-1 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 100 100" class="w-full h-full">
+              <path d="M32 20 L12 36 L20 46 L29 38 L29 86 L71 86 L71 38 L80 46 L88 36 L68 20 C62 26 38 26 32 20 Z" fill="#cbd5e1" stroke="#94a3b8" stroke-width="2"/>
+              <path d="M34 20 C42 28 58 28 66 20" stroke="#64748b" stroke-width="1.5" fill="none"/>
+              <rect x="35" y="28" width="30" height="20" rx="1.5" fill="#3b82f6" stroke="#2563eb" stroke-width="1.2"/>
+              <line x1="50" y1="21" x2="50" y2="28" stroke="#3b82f6" stroke-width="1" stroke-dasharray="1.5 1.5"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-xs sm:text-sm font-black text-gray-900 truncate">وسط الصدر</span>
+              <span class="text-[11px] font-mono font-black text-amber-700 bg-amber-500/15 px-2 py-0.5 rounded-md shrink-0">24×16 cm</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10.5px] text-gray-500 mt-1 flex-wrap">
+              <span class="flex items-center gap-0.5 text-indigo-700 font-bold shrink-0">
+                <i class="fa-solid fa-tag text-[9px]"></i>
+                <span>نزولاً 8 سم من الياقة</span>
+              </span>
+              <span>•</span>
+              <span class="text-gray-400 font-medium">الواجهة الأمامية</span>
+            </div>
+            <p class="text-[10px] text-gray-400 mt-1">شعار أو عبارة ممركزة في وسط الصدر أسفل الياقة بـ 8 سم</p>
+          </div>
+        </div>
+
+        <!-- Placement 3: Full Front Chest -->
+        <div class="p-3 rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 flex items-center gap-3 cursor-pointer select-none">
+          <div class="w-5 h-5 rounded-lg border-2 border-gray-300 bg-white hover:border-amber-400 shrink-0"></div>
+          <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-300 p-1 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 100 100" class="w-full h-full">
+              <path d="M32 20 L12 36 L20 46 L29 38 L29 86 L71 86 L71 38 L80 46 L88 36 L68 20 C62 26 38 26 32 20 Z" fill="#cbd5e1" stroke="#94a3b8" stroke-width="2"/>
+              <path d="M34 20 C42 28 58 28 66 20" stroke="#64748b" stroke-width="1.5" fill="none"/>
+              <rect x="30" y="27" width="40" height="46" rx="1.5" fill="#3b82f6" stroke="#2563eb" stroke-width="1.2"/>
+              <line x1="50" y1="21" x2="50" y2="27" stroke="#3b82f6" stroke-width="1" stroke-dasharray="1.5 1.5"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-xs sm:text-sm font-black text-gray-900 truncate">الصدر بالكامل</span>
+              <span class="text-[11px] font-mono font-black text-amber-700 bg-amber-500/15 px-2 py-0.5 rounded-md shrink-0">30×40 cm</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10.5px] text-gray-500 mt-1 flex-wrap">
+              <span class="flex items-center gap-0.5 text-indigo-700 font-bold shrink-0">
+                <i class="fa-solid fa-tag text-[9px]"></i>
+                <span>نزولاً 6.5 سم من الياقة</span>
+              </span>
+              <span>•</span>
+              <span class="text-gray-400 font-medium">الواجهة الأمامية</span>
+            </div>
+            <p class="text-[10px] text-gray-400 mt-1">تصميم عريض يغطي الصدر بالكامل ويبدأ 5 إلى 7.5 سم أسفل الياقة</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="pt-3 border-t border-gray-100 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-gray-800">تم اختيار (2) مواضع</span>
+          <button type="button" class="text-xs text-red-500 hover:underline font-bold cursor-pointer">إلغاء التحديد</button>
+        </div>
+        <button type="button" onclick="closePlacementGuideModal()" class="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md transition cursor-pointer flex items-center gap-1.5">
+          <i class="fa-solid fa-check"></i>
+          <span>تأكيد المواضع</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 4: FREE MODE DISCLAIMER & WARNING MODAL -->
+  <!-- ========================================================================= -->
+  <div id="freeModeDisclaimerModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity" onclick="closeFreeModeDisclaimer()"></div>
+    
+    <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-amber-400/50 p-6 z-10 flex flex-col gap-4 text-right animate-in zoom-in-95 duration-200">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-600 flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-black text-gray-900">تنبيه هام وإخلاء مسؤولية</h3>
+          <span class="text-xs font-bold text-amber-600">الوضع الحر في التصميم</span>
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-950 leading-relaxed space-y-2">
+        <p>
+          عند تفعيل <strong>(الوضع الحر)</strong>، تصبح أنت المسؤول الوحيد عن تحديد موضع وأبعاد ومحاذاة التصميم على كامل القطعة.
+        </p>
+        <p class="text-[11px] text-amber-900/80">
+          • لن يتم تطبيق المعايير القياسية الآلية للمواضع المعتمدة عالمياً.<br/>
+          • سيتم طباعة تصميمك تماماً بنفس الموضع والنسبة التي وضعتها في الكانفا.
+        </p>
+      </div>
+
+      <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-800">
+        <input id="agreeDisclaimerCheckbox" type="checkbox" class="rounded border-gray-300 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"/>
+        <span>أوافق وأتحمل المسؤولية الكاملة عن مواضع التصميم الحر</span>
+      </label>
+
+      <div class="pt-2 flex items-center gap-2">
+        <button id="confirmFreeModeBtn" disabled type="button" onclick="activateFreeMode()" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+          تفعيل الوضع الحر ⚡
+        </button>
+        <button type="button" onclick="closeFreeModeDisclaimer()" class="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs transition cursor-pointer">
+          إلغاء
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 5. INTERACTIVE JAVASCRIPT CONTROLLER -->
+  <!-- ========================================================================= -->
+  <script>
+    // 1. Multi-Size Matrix Modal Controls
+    const matrixModal = document.getElementById('matrixModal');
+    const openMatrixBtn = document.getElementById('openMatrixModalBtn');
+    const resetMatrixBtn = document.getElementById('resetMatrixBtn');
+
+    openMatrixBtn.addEventListener('click', () => {
+      matrixModal.classList.remove('hidden');
+    });
+
+    function closeMatrixModal() {
+      matrixModal.classList.add('hidden');
+    }
+
+    const quantities = { S: 0, M: 0, L: 0, XL: 1, '2XL': 0 };
+    const UNIT_PRICE = 535;
+
+    function changeQty(size, delta) {
+      quantities[size] = Math.max(0, quantities[size] + delta);
+      document.getElementById(`qty_${size}`).textContent = quantities[size];
+      updateMatrixTotals();
+    }
+
+    function updateMatrixTotals() {
+      const totalPieces = Object.values(quantities).reduce((acc, q) => acc + q, 0);
+      const totalPrice = totalPieces * UNIT_PRICE;
+
+      document.getElementById('matrixColorCount').textContent = totalPieces;
+      document.getElementById('matrixTotalPieces').textContent = `${totalPieces} قطع`;
+      document.getElementById('matrixTotalPrice').textContent = totalPrice;
+      document.getElementById('headerTotalQtyBadge').textContent = totalPieces;
+      document.getElementById('headerCartPrice').textContent = `${totalPrice} ₺`;
+      document.getElementById('summaryTotalPrice').textContent = totalPrice;
+    }
+
+    resetMatrixBtn.addEventListener('click', () => {
+      Object.keys(quantities).forEach(k => {
+        quantities[k] = 0;
+        document.getElementById(`qty_${k}`).textContent = 0;
+      });
+      updateMatrixTotals();
+    });
+
+    // 2. Asset Gallery Modal Controls
+    const galleryModal = document.getElementById('galleryModal');
+    const openGalleryModalBtn = document.getElementById('openGalleryModalBtn');
+
+    openGalleryModalBtn.addEventListener('click', () => {
+      galleryModal.classList.remove('hidden');
+    });
+
+    function closeGalleryModal() {
+      galleryModal.classList.add('hidden');
+    }
+
+    function insertAssetToCanvas(name) {
+      alert(`✨ تم إدراج [${name}] بنجاح في مساحة التصميم!`);
+      closeGalleryModal();
+    }
+
+    // 3. Placement Guide Modal Controls
+    const placementGuideModal = document.getElementById('placementGuideModal');
+    const openPlacementGuideBtn = document.getElementById('openPlacementGuideBtn');
+
+    openPlacementGuideBtn.addEventListener('click', () => {
+      placementGuideModal.classList.remove('hidden');
+    });
+
+    function closePlacementGuideModal() {
+      placementGuideModal.classList.add('hidden');
+    }
+
+    // 4. Free Mode Disclaimer Controls
+    const freeModeModal = document.getElementById('freeModeDisclaimerModal');
+    const agreeCheckbox = document.getElementById('agreeDisclaimerCheckbox');
+    const confirmFreeBtn = document.getElementById('confirmFreeModeBtn');
+
+    function openFreeModeDisclaimer() {
+      freeModeModal.classList.remove('hidden');
+    }
+
+    function closeFreeModeDisclaimer() {
+      freeModeModal.classList.add('hidden');
+    }
+
+    agreeCheckbox.addEventListener('change', (e) => {
+      confirmFreeBtn.disabled = !e.target.checked;
+    });
+
+    function activateFreeMode() {
+      closeFreeModeDisclaimer();
+      closePlacementGuideModal();
+      document.getElementById('activePlacementName').textContent = 'الوضع الحر (كامل القطعة ⚡)';
+      document.getElementById('activePlacementBadge').className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-400 text-xs font-black shadow-xs animate-pulse';
+    }
+
+    // 5. User Media / "My Designs" Drawer Collapsing
+    const userMediaDrawer = document.getElementById('userMediaDrawer');
+    const userMediaBody = document.getElementById('userMediaBody');
+    const toggleUserMediaBtn = document.getElementById('toggleUserMediaBtn');
+    const toggleUserMediaIcon = document.getElementById('toggleUserMediaIcon');
+    let isUserMediaCollapsed = false;
+
+    toggleUserMediaBtn.addEventListener('click', () => {
+      isUserMediaCollapsed = !isUserMediaCollapsed;
+      if (isUserMediaCollapsed) {
+        userMediaBody.classList.add('hidden');
+        toggleUserMediaIcon.className = 'fa-regular fa-eye text-xs text-blue-600';
+        toggleUserMediaBtn.title = 'إظهار نافذة تصاميمي';
+      } else {
+        userMediaBody.classList.remove('hidden');
+        toggleUserMediaIcon.className = 'fa-regular fa-eye-slash text-xs';
+        toggleUserMediaBtn.title = 'إخفاء نافذة تصاميمي';
+      }
+    });
+
+    // 6. Dynamic Color Swatch Switcher with Smooth Transition
+    const swatches = document.querySelectorAll('.color-swatch');
+    const tshirtBody = document.getElementById('tshirtBody');
+    const tshirtCollar = document.getElementById('tshirtCollar');
+    const colorLabel = document.getElementById('selected-color-name');
+
+    swatches.forEach(swatch => {
+      swatch.addEventListener('click', () => {
+        swatches.forEach(s => {
+          s.classList.remove('ring-2', 'ring-brand-600');
+          s.innerHTML = '';
+        });
+        swatch.classList.add('ring-2', 'ring-brand-600');
+        swatch.innerHTML = '<i class="fa-solid fa-check"></i>';
+        colorLabel.textContent = swatch.title;
+
+        const hex = swatch.dataset.hex;
+        if (tshirtBody) {
+          tshirtBody.setAttribute('fill', hex);
+        }
+        if (tshirtCollar) {
+          tshirtCollar.setAttribute('fill', hex);
+        }
+      });
+    });
+
+    // 7. Interactive Face Switcher
+    const faceTabs = document.querySelectorAll('.face-tab');
+    faceTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        faceTabs.forEach(t => {
+          t.className = 'face-tab flex items-center gap-2 px-3.5 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold text-xs transition cursor-pointer';
+          const dot = t.querySelector('.fa-circle-dot');
+          if (dot) dot.remove();
+        });
+        tab.className = 'face-tab flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs shadow-xs transition cursor-pointer';
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid fa-circle-dot text-[8px] text-brand-500';
+        tab.prepend(icon);
+      });
+    });
+
+    // 8. Size Selector Interaction
+    const sizeBtns = document.querySelectorAll('.size-btn');
+    sizeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        sizeBtns.forEach(b => {
+          b.className = 'size-btn py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-slate-400 transition cursor-pointer';
+        });
+        btn.className = 'size-btn py-2 rounded-xl bg-slate-900 text-white border border-slate-900 text-xs font-black shadow-xs cursor-pointer';
+      });
+    });
+
+    // 9. Typewriter Animated Onboarding Hint Controller
+    const typewriterTextEl = document.getElementById('typewriterText');
+    const dismissTypewriterBtn = document.getElementById('dismissTypewriterBtn');
+    const typewriterBanner = document.getElementById('typewriterHintBanner');
+
+    const phrases = [
+      '👇 اضغط هنا لاختيار مواضع الطباعة',
+      '⚡ أو صمّم بحرية مع "الوضع الحر"'
+    ];
+    let phraseIdx = 0;
+    let charIdx = 0;
+    let isDeleting = false;
+
+    function tickTypewriter() {
+      const currentPhrase = phrases[phraseIdx];
+      if (!isDeleting) {
+        charIdx++;
+        typewriterTextEl.textContent = currentPhrase.slice(0, charIdx);
+        if (charIdx === currentPhrase.length) {
+          isDeleting = true;
+          setTimeout(tickTypewriter, 3000);
+          return;
+        }
+      } else {
+        charIdx--;
+        typewriterTextEl.textContent = currentPhrase.slice(0, charIdx);
+        if (charIdx === 0) {
+          isDeleting = false;
+          phraseIdx = (phraseIdx + 1) % phrases.length;
+        }
+      }
+      setTimeout(tickTypewriter, isDeleting ? 25 : 45);
+    }
+    setTimeout(tickTypewriter, 1000);
+
+    dismissTypewriterBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      typewriterBanner.classList.add('hidden');
+    });
+
+    typewriterBanner.addEventListener('click', () => {
+      placementGuideModal.classList.remove('hidden');
+    });
+
+    // 10. Zoom Level Controller
+    let currentZoom = 100;
+    const zoomText = document.getElementById('zoomLevelText');
+    document.getElementById('zoomInBtn').addEventListener('click', () => {
+      currentZoom = Math.min(200, currentZoom + 15);
+      zoomText.textContent = `${currentZoom}%`;
+      document.getElementById('garmentSvg').style.transform = `scale(${currentZoom / 100})`;
+    });
+    document.getElementById('zoomOutBtn').addEventListener('click', () => {
+      currentZoom = Math.max(70, currentZoom - 15);
+      zoomText.textContent = `${currentZoom}%`;
+      document.getElementById('garmentSvg').style.transform = `scale(${currentZoom / 100})`;
+    });
+    document.getElementById('zoomResetBtn').addEventListener('click', () => {
+      currentZoom = 100;
+      zoomText.textContent = '100%';
+      document.getElementById('garmentSvg').style.transform = 'scale(1)';
+    });
+
+    // 11. In-Canvas Toolbar Buttons
+    document.getElementById('btnAlignHorizontal').addEventListener('click', () => {
+      const box = document.getElementById('printBox');
+      box.style.right = '34%';
+    });
+    document.getElementById('btnAlignVertical').addEventListener('click', () => {
+      const box = document.getElementById('printBox');
+      box.style.top = '32%';
+    });
+    document.getElementById('btnDelete').addEventListener('click', () => {
+      document.getElementById('placedArtworkContainer').innerHTML = '<div class="text-xs text-gray-400 font-bold border border-dashed border-gray-300 p-3 rounded-lg">منطقة طباعة فارغة</div>';
+    });
+    document.getElementById('toggleSafeZoneCheckbox').addEventListener('change', (e) => {
+      const box = document.getElementById('printBox');
+      if (e.target.checked) {
+        box.classList.remove('border-transparent', 'bg-transparent');
+        box.classList.add('border-dashed', 'border-brand-500/80', 'bg-brand-500/5');
+      } else {
+        box.classList.remove('border-dashed', 'border-brand-500/80', 'bg-brand-500/5');
+        box.classList.add('border-transparent', 'bg-transparent');
+      }
+    });
+  </script>
+</body>
+</html>
